@@ -22,19 +22,6 @@ type Ingredient = {
 
 type DraftIngredient = { ingredientId: number | null; amount: string };
 
-const fieldStyle: React.CSSProperties = {
-  background: "var(--paper-raised)",
-  border: "1px solid var(--line)",
-  borderRadius: 8,
-  padding: "11px 13px",
-  fontSize: 14,
-  fontFamily: "var(--body)",
-  fontWeight: 600,
-  width: "100%",
-  minHeight: 44,
-  color: "var(--ink)",
-};
-
 export default function RecipesPage() {
   const [recipes, setRecipes] = useState<Recipe[] | null>(null);
   const [query, setQuery] = useState("");
@@ -57,90 +44,49 @@ export default function RecipesPage() {
   }, [recipes, query]);
 
   return (
-    <main>
-      <div className="chrome">
+    <>
+      <header className="chrome">
         <p className="eb">Recipes · {recipes ? recipes.length : "…"}</p>
         <h1>Your recipes</h1>
-      </div>
+      </header>
 
-      <div style={{ padding: 16, display: "grid", gap: 12 }}>
-        <div style={{ position: "relative" }}>
-          <span
-            aria-hidden="true"
-            style={{
-              position: "absolute",
-              left: 14,
-              top: "50%",
-              transform: "translateY(-50%)",
-              color: "var(--sage)",
-              fontSize: 14,
-            }}
-          >
-            ⌕
-          </span>
+      <div className="content stack-sm">
+        <div className="search">
+          <span className="search-icon" aria-hidden="true">⌕</span>
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search recipes"
             aria-label="Search recipes"
-            className="search"
-            style={{ ...fieldStyle, paddingLeft: 36 }}
+            className="input"
           />
         </div>
 
         {recipes === null ? (
-          <p className="slot">Loading…</p>
+          <p className="loading">Loading…</p>
         ) : filtered.length === 0 ? (
-          <p className="slot" style={{ padding: "8px 2px" }}>
+          <p className="empty">
             {recipes.length === 0
               ? "No recipes yet — add one to start planning."
               : "No recipes match your search."}
           </p>
         ) : (
           filtered.map((r) => (
-            <Link
-              key={r.id}
-              href={`/recipes/${r.id}`}
-              style={{ textDecoration: "none", color: "var(--ink)" }}
-            >
-              <div
-                className="card"
-                style={{ display: "flex", alignItems: "center", gap: 14 }}
-              >
-                <div
-                  aria-hidden="true"
-                  style={{
-                    flex: "none",
-                    width: 56,
-                    height: 56,
-                    borderRadius: 8,
-                    background:
-                      "linear-gradient(135deg, var(--enamel), var(--enamel-dark))",
-                  }}
-                />
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div className="title">{r.name}</div>
-                  <p
-                    className="slot"
-                    style={{ marginTop: 4, color: "var(--sage)" }}
-                  >
-                    Serves {r.baseServings}
-                  </p>
-                </div>
-                <span aria-hidden="true" style={{ color: "var(--sage)" }}>
-                  ›
+            <Link key={r.id} href={`/recipes/${r.id}`} className="row">
+              <span className="row-link">
+                <span className="thumb" aria-hidden="true" />
+                <span className="row-main">
+                  <span className="title" style={{ display: "block" }}>{r.name}</span>
+                  <span className="meta">Serves {r.baseServings}</span>
                 </span>
-              </div>
+              </span>
+              <span className="arrow" aria-hidden="true">›</span>
             </Link>
           ))
         )}
 
-        <button
-          type="button"
-          className="btn"
-          onClick={() => setCreateOpen(true)}
-        >
+        <button type="button" className="btn block" onClick={() => setCreateOpen(true)}>
           + New recipe
         </button>
       </div>
@@ -153,7 +99,7 @@ export default function RecipesPage() {
           loadRecipes();
         }}
       />
-    </main>
+    </>
   );
 }
 
@@ -188,9 +134,7 @@ function NewRecipeSheet({
   const ingredientOptions = ingredients.map((i) => ({ id: i.id, label: i.name }));
 
   function updateLine(idx: number, patch: Partial<DraftIngredient>) {
-    setLines((prev) =>
-      prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)),
-    );
+    setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
   }
 
   async function submit() {
@@ -223,7 +167,6 @@ function NewRecipeSheet({
       setError("Couldn't save the recipe. Please try again.");
       return;
     }
-    // reset
     setName("");
     setBaseServings(2);
     setNotes("");
@@ -234,117 +177,98 @@ function NewRecipeSheet({
 
   return (
     <Sheet open={open} title="New recipe" onClose={onClose}>
-      <div style={{ padding: "4px 18px 0", display: "grid", gap: 14 }}>
-        <label style={{ display: "grid", gap: 6 }}>
-          <span className="slot">Name</span>
+      <div className="sh-body">
+        <label className="field">
+          <span className="field-label">Name</span>
           <input
             type="text"
+            className="input"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Sunday Pancakes"
-            style={fieldStyle}
           />
         </label>
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <span className="slot">Base servings</span>
+        <div className="servings-row">
+          <span className="field-label" style={{ marginBottom: 0 }}>Base servings</span>
           <Stepper value={baseServings} min={1} onChange={setBaseServings} />
         </div>
 
-        <div style={{ display: "grid", gap: 6 }}>
-          <span className="slot">Ingredients</span>
-          {lines.map((line, idx) => (
-            <div key={idx} style={{ display: "grid", gap: 6 }}>
-              <Dropdown
-                value={line.ingredientId}
-                options={ingredientOptions}
-                placeholder={
-                  ingredients.length === 0
-                    ? "No ingredients yet"
-                    : "Choose ingredient…"
-                }
-                onChange={(id) => updateLine(idx, { ingredientId: Number(id) })}
-              />
+        <div className="field">
+          <span className="field-label">Ingredients</span>
+          <div className="stack-sm">
+            {lines.map((line, idx) => (
+              <div key={idx} className="stack-sm" style={{ gap: 6 }}>
+                <Dropdown
+                  value={line.ingredientId}
+                  options={ingredientOptions}
+                  placeholder={
+                    ingredients.length === 0 ? "No ingredients yet" : "Choose ingredient…"
+                  }
+                  onChange={(id) => updateLine(idx, { ingredientId: Number(id) })}
+                />
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  className="input mono"
+                  value={line.amount}
+                  onChange={(e) => updateLine(idx, { amount: e.target.value })}
+                  placeholder="Amount (e.g. 300)"
+                  aria-label="Amount"
+                />
+              </div>
+            ))}
+            <button
+              type="button"
+              className="trigger add"
+              onClick={() => setLines((prev) => [...prev, { ingredientId: null, amount: "" }])}
+            >
+              + Add ingredient
+            </button>
+          </div>
+        </div>
+
+        <div className="field">
+          <span className="field-label">Steps</span>
+          <div className="stack-sm">
+            {steps.map((step, idx) => (
               <input
+                key={idx}
                 type="text"
-                inputMode="decimal"
-                value={line.amount}
-                onChange={(e) => updateLine(idx, { amount: e.target.value })}
-                placeholder="Amount (e.g. 300)"
-                aria-label="Amount"
-                style={{ ...fieldStyle, fontFamily: "var(--mono)" }}
+                className="input"
+                value={step}
+                onChange={(e) =>
+                  setSteps((prev) => prev.map((s, i) => (i === idx ? e.target.value : s)))
+                }
+                placeholder={`Step ${idx + 1}`}
+                aria-label={`Step ${idx + 1}`}
               />
-            </div>
-          ))}
-          <button
-            type="button"
-            className="trigger"
-            style={{ justifyContent: "center", color: "var(--enamel)" }}
-            onClick={() =>
-              setLines((prev) => [...prev, { ingredientId: null, amount: "" }])
-            }
-          >
-            + Add ingredient
-          </button>
+            ))}
+            <button
+              type="button"
+              className="trigger add"
+              onClick={() => setSteps((prev) => [...prev, ""])}
+            >
+              + Add step
+            </button>
+          </div>
         </div>
 
-        <div style={{ display: "grid", gap: 6 }}>
-          <span className="slot">Steps</span>
-          {steps.map((step, idx) => (
-            <input
-              key={idx}
-              type="text"
-              value={step}
-              onChange={(e) =>
-                setSteps((prev) =>
-                  prev.map((s, i) => (i === idx ? e.target.value : s)),
-                )
-              }
-              placeholder={`Step ${idx + 1}`}
-              aria-label={`Step ${idx + 1}`}
-              style={fieldStyle}
-            />
-          ))}
-          <button
-            type="button"
-            className="trigger"
-            style={{ justifyContent: "center", color: "var(--enamel)" }}
-            onClick={() => setSteps((prev) => [...prev, ""])}
-          >
-            + Add step
-          </button>
-        </div>
-
-        <label style={{ display: "grid", gap: 6 }}>
-          <span className="slot">Notes</span>
+        <label className="field">
+          <span className="field-label">Notes</span>
           <textarea
+            className="input"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Optional"
             rows={2}
-            style={{ ...fieldStyle, resize: "vertical" }}
+            style={{ resize: "vertical" }}
           />
         </label>
 
-        {error ? (
-          <p className="slot" style={{ color: "var(--run-ink)" }}>
-            {error}
-          </p>
-        ) : null}
+        {error ? <p className="notice">{error}</p> : null}
 
-        <button
-          type="button"
-          className="btn"
-          disabled={saving}
-          onClick={submit}
-          style={{ marginBottom: 4 }}
-        >
+        <button type="button" className="btn block" disabled={saving} onClick={submit}>
           {saving ? "Saving…" : "Save recipe"}
         </button>
       </div>

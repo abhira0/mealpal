@@ -31,7 +31,6 @@ function youTubeId(url: string): string | null {
   return m ? m[1] : null;
 }
 
-/** Round to at most 2 decimals, dropping trailing zeros. */
 function roundScaled(n: number): string {
   const r = Math.round(n * 100) / 100;
   return String(r);
@@ -46,6 +45,17 @@ function todayISO(): string {
 
 type CookState = "idle" | "working" | "done" | "error";
 
+function Chrome({ children }: { children: React.ReactNode }) {
+  return (
+    <header className="chrome">
+      <Link href="/recipes" className="chrome-back">
+        ← Recipes
+      </Link>
+      {children}
+    </header>
+  );
+}
+
 export function RecipeView({ id }: { id: string }) {
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
@@ -55,20 +65,19 @@ export function RecipeView({ id }: { id: string }) {
 
   useEffect(() => {
     let active = true;
-    Promise.all([
-      fetch(`/api/recipes/${id}`),
-      fetch("/api/ingredients"),
-    ]).then(async ([rRes, iRes]) => {
-      if (!active) return;
-      if (rRes.status === 404 || !rRes.ok) {
-        setNotFound(true);
-        return;
-      }
-      const r: Recipe = await rRes.json();
-      setRecipe(r);
-      setServings(r.baseServings || 1);
-      if (iRes.ok) setIngredients(await iRes.json());
-    });
+    Promise.all([fetch(`/api/recipes/${id}`), fetch("/api/ingredients")]).then(
+      async ([rRes, iRes]) => {
+        if (!active) return;
+        if (rRes.status === 404 || !rRes.ok) {
+          setNotFound(true);
+          return;
+        }
+        const r: Recipe = await rRes.json();
+        setRecipe(r);
+        setServings(r.baseServings || 1);
+        if (iRes.ok) setIngredients(await iRes.json());
+      },
+    );
     return () => {
       active = false;
     };
@@ -101,9 +110,7 @@ export function RecipeView({ id }: { id: string }) {
         return;
       }
       const event: { id: number } = await evRes.json();
-      const cookRes = await fetch(`/api/events/${event.id}/cook`, {
-        method: "POST",
-      });
+      const cookRes = await fetch(`/api/events/${event.id}/cook`, { method: "POST" });
       setCook(cookRes.ok ? "done" : "error");
     } catch {
       setCook("error");
@@ -112,27 +119,19 @@ export function RecipeView({ id }: { id: string }) {
 
   if (notFound) {
     return (
-      <main>
-        <div className="chrome">
-          <Link href="/recipes" className="eb" style={{ display: "inline-block" }}>
-            ← Recipes
-          </Link>
-          <h1>Recipe not found</h1>
-        </div>
-      </main>
+      <Chrome>
+        <h1>Recipe not found</h1>
+      </Chrome>
     );
   }
 
   if (!recipe) {
     return (
-      <main>
-        <div className="chrome">
-          <Link href="/recipes" className="eb" style={{ display: "inline-block" }}>
-            ← Recipes
-          </Link>
+      <>
+        <Chrome>
           <h1>Loading…</h1>
-        </div>
-      </main>
+        </Chrome>
+      </>
     );
   }
 
@@ -140,122 +139,64 @@ export function RecipeView({ id }: { id: string }) {
   const firstMedia = recipe.media[0];
 
   return (
-    <main>
-      <div className="chrome">
-        <Link href="/recipes" className="eb" style={{ display: "inline-block" }}>
-          ← Recipes
-        </Link>
+    <>
+      <Chrome>
         <h1>{recipe.name}</h1>
-      </div>
+      </Chrome>
 
-      <div style={{ padding: 16, display: "grid", gap: 18 }}>
-        {/* Media block */}
+      <div className="content stack">
         <MediaBlock media={firstMedia} title={recipe.name} />
 
-        {/* Serving stepper */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
+        <div className="servings-row">
           <span className="title">Servings</span>
           <Stepper value={servings} min={1} onChange={setServings} />
         </div>
 
-        {/* Ingredients */}
         <section>
-          <h2 className="title" style={{ marginBottom: 8 }}>
+          <h2 className="title" style={{ marginBottom: 4 }}>
             Ingredients
           </h2>
-          <div>
-            {recipe.ingredients.map((line) => {
-              const ing = lookup.get(line.ingredientId);
-              const scaled = roundScaled(line.amount * ratio);
-              const unit = ing?.canonicalUnit ?? "";
-              const value = unit ? `${scaled} ${unit}` : scaled;
-              return (
-                <div
-                  key={line.ingredientId}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 12,
-                    padding: "11px 0",
-                    borderTop: "1px solid var(--line)",
-                  }}
-                >
-                  <span style={{ fontWeight: 500 }}>
-                    {ing?.name ?? `Ingredient #${line.ingredientId}`}
-                  </span>
-                  <QuantityChip value={value} />
-                </div>
-              );
-            })}
-          </div>
+          {recipe.ingredients.map((line) => {
+            const ing = lookup.get(line.ingredientId);
+            const scaled = roundScaled(line.amount * ratio);
+            const unit = ing?.canonicalUnit ?? "";
+            const value = unit ? `${scaled} ${unit}` : scaled;
+            return (
+              <div key={line.ingredientId} className="ing-row">
+                <span className="nm">
+                  {ing?.name ?? `Ingredient #${line.ingredientId}`}
+                </span>
+                <QuantityChip value={value} />
+              </div>
+            );
+          })}
         </section>
 
-        {/* Steps */}
         {recipe.steps.length > 0 ? (
           <section>
-            <h2 className="title" style={{ marginBottom: 8 }}>
+            <h2 className="title" style={{ marginBottom: 4 }}>
               Steps
             </h2>
-            <ol
-              style={{
-                listStyle: "none",
-                display: "grid",
-                gap: 14,
-                padding: 0,
-              }}
-            >
+            <ol style={{ listStyle: "none" }}>
               {recipe.steps.map((s, i) => (
-                <li
-                  key={s.position ?? i}
-                  style={{ display: "flex", gap: 12, alignItems: "flex-start" }}
-                >
-                  <span
-                    className="num"
-                    aria-hidden="true"
-                    style={{
-                      flex: "none",
-                      width: 26,
-                      height: 26,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      background: "var(--enamel)",
-                      color: "var(--paper)",
-                      borderRadius: 6,
-                      fontFamily: "var(--mono)",
-                      fontWeight: 700,
-                      fontSize: 13,
-                    }}
-                  >
+                <li key={s.position ?? i} className="step">
+                  <span className="num" aria-hidden="true">
                     {i + 1}
                   </span>
-                  <span style={{ paddingTop: 3 }}>{s.text}</span>
+                  <span className="step-text">{s.text}</span>
                 </li>
               ))}
             </ol>
           </section>
         ) : null}
 
-        {recipe.notes ? (
-          <p className="slot" style={{ color: "var(--sage)" }}>
-            {recipe.notes}
-          </p>
-        ) : null}
+        {recipe.notes ? <p className="body" style={{ color: "var(--sage)" }}>{recipe.notes}</p> : null}
 
-        {/* Cook it */}
         <button
           type="button"
-          className="btn"
+          className="btn block"
           disabled={cook === "working" || cook === "done"}
           onClick={cookIt}
-          style={{ marginTop: 4 }}
         >
           {cook === "working"
             ? "Logging…"
@@ -264,54 +205,28 @@ export function RecipeView({ id }: { id: string }) {
               : "Cook it · logs to today"}
         </button>
         {cook === "error" ? (
-          <p className="slot" style={{ color: "var(--run-ink)" }}>
+          <p className="notice">
             Couldn&apos;t log this — make sure you have a meal slot set up.
           </p>
         ) : null}
       </div>
-    </main>
+    </>
   );
 }
 
 function MediaBlock({ media, title }: { media: Media | undefined; title: string }) {
   if (!media) {
-    return (
-      <div
-        aria-hidden="true"
-        style={{
-          width: "100%",
-          height: 180,
-          borderRadius: 8,
-          background:
-            "linear-gradient(135deg, var(--enamel), var(--enamel-dark))",
-        }}
-      />
-    );
+    return <div className="media" aria-hidden="true" />;
   }
 
   const yt = media.kind === "youtube" ? youTubeId(media.url) : null;
   if (media.kind === "youtube" && yt) {
     return (
-      <div
-        style={{
-          position: "relative",
-          paddingBottom: "56.25%",
-          height: 0,
-          borderRadius: 8,
-          overflow: "hidden",
-        }}
-      >
+      <div className="media">
         <iframe
           src={`https://www.youtube.com/embed/${yt}`}
           title={title}
           allowFullScreen
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            border: 0,
-          }}
         />
       </div>
     );
@@ -319,21 +234,16 @@ function MediaBlock({ media, title }: { media: Media | undefined; title: string 
 
   if (media.kind === "video") {
     return (
-      <video
-        src={media.url}
-        controls
-        style={{ width: "100%", borderRadius: 8, display: "block" }}
-      />
+      <div className="media">
+        <video src={media.url} controls />
+      </div>
     );
   }
 
-  // photo (or unknown) → image
-  // eslint-disable-next-line @next/next/no-img-element
   return (
-    <img
-      src={media.url}
-      alt={title}
-      style={{ width: "100%", borderRadius: 8, display: "block" }}
-    />
+    <div className="media">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={media.url} alt={title} />
+    </div>
   );
 }

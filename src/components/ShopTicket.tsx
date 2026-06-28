@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { QuantityChip } from "@/components/QuantityChip";
+import { Favicon } from "@/components/Favicon";
 import { dollarsToCents, centsToDollars } from "@/lib/money";
 import { formatQty } from "@/lib/units";
 
@@ -20,11 +21,15 @@ export type PriceMap = Record<number, number | null>;
 
 export function ShopTicket({
   shopName,
+  website,
+  iconUrl,
   total,
   lines,
   prices,
 }: {
   shopName: string;
+  website?: string | null;
+  iconUrl?: string | null;
   total: number; // running total in cents for this ticket
   lines: ShopLine[];
   prices: PriceMap;
@@ -37,31 +42,24 @@ export function ShopTicket({
   if (visible.length === 0) return null;
 
   return (
-    <div className="ticket" style={{ marginTop: 14 }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "baseline",
-          marginBottom: 6,
-        }}
-      >
-        <span className="title">{shopName}</span>
-        <span
-          className="chip price"
-          style={{ background: "transparent", border: "none", paddingRight: 0 }}
-        >
-          ${centsToDollars(total).toFixed(2)}
-        </span>
+    <div className="ticket">
+      <div className="ticket-head">
+        <p className="eb">Stop</p>
+        <h2>
+          <Favicon name={shopName} website={website} iconUrl={iconUrl} size={22} />
+          {shopName}
+          {total > 0 && (
+            <span className="tk-total">${centsToDollars(total).toFixed(2)}</span>
+          )}
+        </h2>
       </div>
-      <div style={{ display: "flex", flexDirection: "column" }}>
-        {visible.map((line, i) => (
+      <div className="ticket-body">
+        {visible.map((line) => (
           <ShopLineRow
             key={line.ingredientId}
             line={line}
             priceCents={line.product ? prices[line.product.id] ?? null : null}
             struck={struck.has(line.ingredientId)}
-            first={i === 0}
             onBought={() => {
               setStruck((prev) => new Set(prev).add(line.ingredientId));
               // brief strike-through, then drop the line
@@ -80,13 +78,11 @@ function ShopLineRow({
   line,
   priceCents,
   struck,
-  first,
   onBought,
 }: {
   line: ShopLine;
   priceCents: number | null;
   struck: boolean;
-  first: boolean;
   onBought: () => void;
 }) {
   const [pricing, setPricing] = useState(false);
@@ -136,183 +132,61 @@ function ShopLineRow({
     }
   }
 
-  return (
-    <div
-      style={{
-        borderTop: first ? "none" : "1px solid var(--line-soft)",
-        padding: "12px 0",
-        opacity: struck ? 0.5 : 1,
-        transition: "opacity .25s ease",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-        <CustomCheckbox
-          checked={pricing || struck}
-          onChange={onCheck}
-          label={`Mark ${line.ingredientName} bought`}
-        />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontWeight: 600,
-              fontSize: 15,
-              textDecoration: struck ? "line-through" : "none",
-              color: struck ? "var(--sage)" : "var(--ink)",
-            }}
-          >
-            {line.ingredientName}
-          </div>
-          <div
-            style={{
-              fontFamily: "var(--mono)",
-              fontSize: 10,
-              letterSpacing: ".06em",
-              textTransform: "uppercase",
-              color: "var(--sage)",
-              marginTop: 2,
-            }}
-          >
-            {line.product ? line.product.name : "No product on file"}
-            {priceCents != null && (
-              <> · ${centsToDollars(priceCents).toFixed(2)}</>
-            )}
-          </div>
-          <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-            <QuantityChip value={`need ${formatNeeded(line)}`} tone="default" />
-            {line.urgency && (
-              <QuantityChip value={line.urgency.label} tone={line.urgency.tone} />
-            )}
-          </div>
-        </div>
-      </div>
+  const checked = pricing || struck;
 
-      {pricing && line.product && !struck && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            marginTop: 10,
-            flexWrap: "wrap",
-            paddingLeft: 34,
-          }}
-        >
-          <PriceInput value={dollars} onChange={setDollars} onSubmit={record} />
-          <button
-            type="button"
-            className="btn"
-            style={{ padding: "9px 14px", minHeight: 40 }}
-            onClick={record}
-            disabled={busy}
-          >
-            {busy ? "…" : "Record"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setPricing(false)}
-            style={{
-              fontFamily: "var(--mono)",
-              fontSize: 11,
-              letterSpacing: ".06em",
-              textTransform: "uppercase",
-              color: "var(--sage)",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              minHeight: 40,
-            }}
-          >
-            cancel
-          </button>
-          {error && (
-            <span className="eb" style={{ color: "var(--paprika)" }}>
-              {error}
-            </span>
+  return (
+    <div className={struck ? "ticket-row done" : "ticket-row"}>
+      <button
+        type="button"
+        className="checkbox"
+        role="checkbox"
+        aria-checked={checked}
+        aria-label={`Mark ${line.ingredientName} bought`}
+        onClick={() => onCheck(!checked)}
+      />
+      <div className="tk-main">
+        <div className="tk-name">{line.ingredientName}</div>
+        <div className="tk-meta">
+          {line.product ? line.product.name : "No product on file"}
+          {priceCents != null && <> · ${centsToDollars(priceCents).toFixed(2)}</>}
+        </div>
+        <div className="tk-chips">
+          <QuantityChip value={`need ${formatNeeded(line)}`} tone="default" />
+          {line.urgency && (
+            <QuantityChip value={line.urgency.label} tone={line.urgency.tone} />
           )}
         </div>
-      )}
+
+        {pricing && line.product && !struck && (
+          <div className="servings-row" style={{ marginTop: 10, justifyContent: "flex-start", gap: 8, flexWrap: "wrap" }}>
+            <span className="input mono" style={{ display: "inline-flex", alignItems: "center", width: "auto", padding: "0 10px", minHeight: 40 }}>
+              <span style={{ color: "var(--sage)", marginRight: 2 }}>$</span>
+              <input
+                inputMode="decimal"
+                value={dollars}
+                onChange={(e) => setDollars(e.target.value.replace(/[^0-9.]/g, ""))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    record();
+                  }
+                }}
+                aria-label="Price paid in dollars"
+                autoFocus
+                style={{ width: 70, border: "none", outline: "none", background: "transparent", font: "inherit", color: "inherit" }}
+              />
+            </span>
+            <button type="button" className="tab" onClick={record} disabled={busy}>
+              {busy ? "…" : "Record"}
+            </button>
+            <button type="button" className="btn-link" onClick={() => setPricing(false)}>
+              cancel
+            </button>
+            {error && <span className="eb" style={{ color: "var(--paprika)" }}>{error}</span>}
+          </div>
+        )}
+      </div>
     </div>
-  );
-}
-
-/** Custom $ input (no native number control beyond a styled text field). */
-function PriceInput({
-  value,
-  onChange,
-  onSubmit,
-}: {
-  value: string;
-  onChange: (s: string) => void;
-  onSubmit: () => void;
-}) {
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        border: "1px solid var(--line)",
-        borderRadius: 8,
-        background: "#fff",
-        padding: "0 10px",
-        minHeight: 40,
-        fontFamily: "var(--mono)",
-        fontWeight: 700,
-      }}
-    >
-      <span style={{ color: "var(--sage)", marginRight: 2 }}>$</span>
-      <input
-        inputMode="decimal"
-        value={value}
-        onChange={(e) => onChange(e.target.value.replace(/[^0-9.]/g, ""))}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            onSubmit();
-          }
-        }}
-        aria-label="Price paid in dollars"
-        autoFocus
-        style={{
-          width: 70,
-          border: "none",
-          outline: "none",
-          background: "transparent",
-          fontFamily: "var(--mono)",
-          fontWeight: 700,
-          fontSize: 14,
-          color: "var(--ink)",
-        }}
-      />
-    </span>
-  );
-}
-
-/** Hand-built checkbox using the locked .checkbox class (no native input). */
-function CustomCheckbox({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (b: boolean) => void;
-  label: string;
-}) {
-  return (
-    <span
-      className="checkbox"
-      role="checkbox"
-      aria-checked={checked}
-      aria-label={label}
-      tabIndex={0}
-      style={{ marginTop: 2, cursor: "pointer" }}
-      onClick={() => onChange(!checked)}
-      onKeyDown={(e) => {
-        if (e.key === " " || e.key === "Enter") {
-          e.preventDefault();
-          onChange(!checked);
-        }
-      }}
-    />
   );
 }
 

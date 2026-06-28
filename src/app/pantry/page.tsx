@@ -36,19 +36,19 @@ export default function PantryPage() {
   }
 
   return (
-    <div className="app">
+    <>
       <header className="chrome">
         <p className="eb">Pantry</p>
         <h1>What&apos;s in stock</h1>
       </header>
 
-      <main style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-        {error && <p className="eb" style={{ color: "var(--paprika)" }}>{error}</p>}
+      <main className="content stack-sm">
+        {error && <p className="notice">{error}</p>}
+
+        {ingredients === null && !error && <p className="loading">Loading…</p>}
 
         {ingredients && ingredients.length === 0 && (
-          <p style={{ color: "var(--sage)", fontSize: 14 }}>
-            No ingredients yet.
-          </p>
+          <p className="empty">No ingredients yet.</p>
         )}
 
         {ingredients?.map((ing) => {
@@ -58,37 +58,22 @@ export default function PantryPage() {
           const low = ing.servingSize != null ? qty < ing.servingSize : qty <= 0;
           return (
             <div className="card" key={ing.id}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 12,
-                }}
-              >
+              <div className="card-row">
                 <span style={{ fontWeight: 600, fontSize: 16 }}>{ing.name}</span>
                 <QuantityChip
                   value={formatQty(qty, ing.canonicalUnit)}
                   tone={low ? "low" : "default"}
                 />
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  marginTop: 8,
-                }}
-              >
-                <StockAdjust
-                  ingredientId={ing.id}
-                  unit={ing.canonicalUnit}
-                  onAdjusted={(delta) => applyDelta(ing.id, delta)}
-                />
-              </div>
+              <StockAdjust
+                ingredientId={ing.id}
+                unit={ing.canonicalUnit}
+                onAdjusted={(delta) => applyDelta(ing.id, delta)}
+              />
             </div>
           );
         })}
       </main>
-    </div>
+    </>
   );
 }

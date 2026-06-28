@@ -3,27 +3,6 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 
-const inputStyle: React.CSSProperties = {
-  background: "var(--paper-raised)",
-  border: "1px solid var(--line)",
-  borderRadius: 8,
-  padding: 11,
-  width: "100%",
-  font: "inherit",
-  fontSize: 15,
-  color: "var(--ink)",
-};
-
-const labelStyle: React.CSSProperties = {
-  fontFamily: "var(--mono)",
-  fontSize: 9,
-  letterSpacing: ".14em",
-  textTransform: "uppercase",
-  color: "var(--sage)",
-  display: "block",
-  marginBottom: 6,
-};
-
 export default function LoginPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
@@ -66,102 +45,72 @@ export default function LoginPage() {
   }
 
   return (
-    <main>
-      <div className="chrome">
+    <>
+      <header className="chrome">
         <p className="eb">MealPal</p>
         <h1>{mode === "login" ? "Welcome back" : "Set up your household"}</h1>
-      </div>
+      </header>
 
-      <div style={{ padding: 16 }}>
-        {error && (
-          <p
-            style={{
-              fontSize: 13,
-              margin: "0 0 14px",
-              padding: "9px 11px",
-              borderRadius: 8,
-              background: "var(--run-bg)",
-              color: "var(--run-ink)",
-            }}
-          >
-            {error}
-          </p>
-        )}
+      <div className="content stack">
+        {error && <p className="notice">{error}</p>}
 
-        <form onSubmit={onSubmit}>
-          <div style={{ marginBottom: 16 }}>
-            <label htmlFor="email" style={labelStyle}>
-              Email
-            </label>
+        <form onSubmit={onSubmit} className="stack">
+          <label className="field">
+            <span className="field-label">Email</span>
             <input
               id="email"
               type="email"
+              className="input"
               placeholder="you@household.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              style={inputStyle}
             />
-          </div>
+          </label>
 
-          <div style={{ marginBottom: 16 }}>
-            <label htmlFor="password" style={labelStyle}>
-              Password
-            </label>
+          <label className="field">
+            <span className="field-label">Password</span>
             <input
               id="password"
               type="password"
+              className="input"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              style={inputStyle}
             />
-          </div>
+          </label>
 
           {mode === "register" && (
-            <div style={{ marginBottom: 16 }}>
-              <label htmlFor="household" style={labelStyle}>
-                Household name
-              </label>
+            <label className="field">
+              <span className="field-label">Household name</span>
               <input
                 id="household"
+                className="input"
                 placeholder="The Kitchen Table"
                 value={householdName}
                 onChange={(e) => setHouseholdName(e.target.value)}
-                style={inputStyle}
               />
-            </div>
+            </label>
           )}
 
-          <button type="submit" className="btn" style={{ width: "100%" }} disabled={busy}>
+          <button type="submit" className="btn block" disabled={busy}>
             {busy ? "…" : mode === "login" ? "Log in" : "Create account"}
           </button>
         </form>
 
         <button
           type="button"
+          className="btn-link"
+          style={{ justifyContent: "center" }}
           onClick={() => {
             setMode(mode === "login" ? "register" : "login");
             setError(null);
-          }}
-          style={{
-            display: "block",
-            width: "100%",
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            marginTop: 18,
-            fontFamily: "var(--body)",
-            fontWeight: 600,
-            fontSize: 14,
-            color: "var(--enamel)",
-            minHeight: 44,
           }}
         >
           {mode === "login" ? "Need an account? Register" : "Have an account? Log in"}
         </button>
       </div>
-    </main>
+    </>
   );
 }

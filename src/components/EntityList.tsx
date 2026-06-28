@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ENTITIES, type ColumnDef, type EntitySlug } from "@/app/manage/entities";
+import { Favicon } from "@/components/Favicon";
 
 type Row = Record<string, unknown> & { id: number | string };
 type RefMaps = Record<string, Map<string, string>>;
@@ -20,7 +21,6 @@ export function EntityList({ slug }: { slug: EntitySlug }) {
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
-  // Which entities do we need to resolve FK columns to names?
   const refSlugs = useMemo(
     () =>
       Array.from(
@@ -90,104 +90,71 @@ export function EntityList({ slug }: { slug: EntitySlug }) {
   }
 
   return (
-    <main>
-      <div className="chrome">
-        <p className="eb">Manage</p>
+    <>
+      <header className="chrome">
+        <Link href="/manage" className="chrome-back">← Catalog</Link>
         <h1>{config.label}</h1>
-      </div>
+      </header>
 
-      <div style={{ padding: 16 }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 16,
-          }}
-        >
-          <Link href="/manage" className="eb" style={{ color: "var(--enamel)" }}>
-            ← Catalog
-          </Link>
-          <Link
-            href={`/manage/${slug}/new`}
-            className="btn"
-            style={{ textDecoration: "none", display: "inline-flex", alignItems: "center" }}
-          >
-            + Add {config.singular.toLowerCase()}
-          </Link>
-        </div>
-
-        {error && (
-          <p
-            style={{
-              fontSize: 13,
-              margin: "0 0 12px",
-              padding: "9px 11px",
-              borderRadius: 8,
-              background: "var(--run-bg)",
-              color: "var(--run-ink)",
-            }}
-          >
-            {error}
-          </p>
-        )}
+      <div className="content stack-sm">
+        {error && <p className="notice">{error}</p>}
 
         {loaded && rows.length === 0 && !error && (
-          <p className="slot" style={{ padding: "16px 2px" }}>
-            No {config.label.toLowerCase()} yet.
-          </p>
+          <p className="empty">No {config.label.toLowerCase()} yet.</p>
         )}
 
-        <div style={{ display: "grid", gap: 8 }}>
-          {rows.map((row) => {
-            const inner = (
-              <>
-                <span className="title" style={{ fontSize: 14, display: "block" }}>
-                  {cellValue(row, config.columns[0])}
+        {rows.map((row) => {
+          const icon = config.icon?.(row);
+          const main = (
+            <span className="row-main">
+              <span className="title" style={{ display: "block", fontSize: 15 }}>
+                {cellValue(row, config.columns[0])}
+              </span>
+              {config.columns.slice(1).map((col) => (
+                <span key={col.key} className="meta" style={{ display: "block" }}>
+                  {col.label}: {cellValue(row, col)}
                 </span>
-                {config.columns.slice(1).map((col) => (
-                  <span key={col.key} className="slot" style={{ display: "block", marginTop: 3 }}>
-                    {col.label}: {cellValue(row, col)}
-                  </span>
-                ))}
-              </>
-            );
+              ))}
+            </span>
+          );
 
-            return (
-              <div key={String(row.id)} className="card" style={{ padding: 12 }}>
-                {config.canEdit ? (
-                  <Link
-                    href={`/manage/${slug}/${row.id}`}
-                    style={{ display: "block", color: "inherit", textDecoration: "none" }}
-                  >
-                    {inner}
-                  </Link>
-                ) : (
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <span>{inner}</span>
-                    {config.canDelete && (
-                      <button
-                        type="button"
-                        className="btn"
-                        style={{ background: "var(--paper-raised)", color: "var(--paprika)", border: "1px solid var(--line)" }}
-                        onClick={() => remove(row.id)}
-                      >
-                        Delete
-                      </button>
+          return (
+            <div key={String(row.id)} className="row">
+              {config.canEdit ? (
+                <Link href={`/manage/${slug}/${row.id}`} className="row-link">
+                  {icon && (
+                    <span className="icon-badge">
+                      <Favicon name={icon.name} website={icon.website} iconUrl={icon.iconUrl} size={24} />
+                    </span>
+                  )}
+                  {main}
+                  <span className="arrow" aria-hidden="true">›</span>
+                </Link>
+              ) : (
+                <>
+                  <span className="row-link" style={{ cursor: "default" }}>
+                    {icon && (
+                      <span className="icon-badge">
+                        <Favicon name={icon.name} website={icon.website} iconUrl={icon.iconUrl} size={24} />
+                      </span>
                     )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                    {main}
+                  </span>
+                  {config.canDelete && (
+                    <button type="button" className="btn-link danger" style={{ width: "auto" }} onClick={() => remove(row.id)}>
+                      Delete
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })}
+
+        <Link href={`/manage/${slug}/new`} className="btn block" style={{ textDecoration: "none" }}>
+          + Add {config.singular.toLowerCase()}
+        </Link>
       </div>
-    </main>
+    </>
   );
 }

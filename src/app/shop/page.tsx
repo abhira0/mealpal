@@ -12,17 +12,15 @@ type RawLine = {
 };
 type ShoppingMap = Record<string, RawLine[]>;
 
-type Product = {
-  id: number;
-  effectiveCents: number | null;
-};
-
+type Product = { id: number; effectiveCents: number | null };
 type Ingredient = { id: number; canonicalUnit: string };
+type Shop = { id: number; name: string; website: string | null; iconUrl: string | null };
 
 export default function ShopPage() {
   const [data, setData] = useState<ShoppingMap | null>(null);
   const [prices, setPrices] = useState<PriceMap>({});
   const [units, setUnits] = useState<Record<number, string>>({});
+  const [shopMeta, setShopMeta] = useState<Record<string, Shop>>({});
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -34,9 +32,7 @@ export default function ShopPage() {
     fetch("/api/products")
       .then((r) => (r.ok ? r.json() : []))
       .then((products: Product[]) =>
-        setPrices(
-          Object.fromEntries(products.map((p) => [p.id, p.effectiveCents])),
-        ),
+        setPrices(Object.fromEntries(products.map((p) => [p.id, p.effectiveCents]))),
       )
       .catch(() => {});
 
@@ -46,6 +42,13 @@ export default function ShopPage() {
         setUnits(Object.fromEntries(ings.map((i) => [i.id, i.canonicalUnit]))),
       )
       .catch(() => {});
+
+    fetch("/api/shops")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((shops: Shop[]) =>
+        setShopMeta(Object.fromEntries(shops.map((s) => [s.name, s]))),
+      )
+      .catch(() => {});
   }, []);
 
   const shops = useMemo(
@@ -53,7 +56,6 @@ export default function ShopPage() {
     [data],
   );
 
-  // Per-shop running total (sum of suggested product prices), and trip total.
   function shopTotal(lines: RawLine[]): number {
     return lines.reduce(
       (sum, l) => sum + (l.product ? prices[l.product.id] ?? 0 : 0),
@@ -63,16 +65,13 @@ export default function ShopPage() {
   const tripTotal = shops.reduce((sum, [, lines]) => sum + shopTotal(lines), 0);
 
   function toLines(lines: RawLine[]): ShopLine[] {
-    return lines.map((l) => ({
-      ...l,
-      unit: units[l.ingredientId],
-    }));
+    return lines.map((l) => ({ ...l, unit: units[l.ingredientId] }));
   }
 
   const stopCount = shops.length;
 
   return (
-    <div className="app">
+    <>
       <header className="chrome">
         <p className="eb">
           Shop · {stopCount} {stopCount === 1 ? "stop" : "stops"}
@@ -81,29 +80,30 @@ export default function ShopPage() {
         <h1>The run</h1>
       </header>
 
-      <main style={{ padding: "0 16px 16px" }}>
-        {error && (
-          <p className="eb" style={{ color: "var(--paprika)", marginTop: 16 }}>
-            {error}
-          </p>
-        )}
+      <main className="content stack">
+        {error && <p className="notice">{error}</p>}
+
+        {data === null && !error && <p className="loading">Loading…</p>}
 
         {data && shops.length === 0 && (
-          <p style={{ color: "var(--sage)", fontSize: 14, marginTop: 16 }}>
-            Nothing to buy — plan some meals first.
-          </p>
+          <p className="empty">Nothing to buy — plan some meals first.</p>
         )}
 
-        {shops.map(([shopName, lines]) => (
-          <ShopTicket
-            key={shopName}
-            shopName={shopName}
-            total={shopTotal(lines)}
-            lines={toLines(lines)}
-            prices={prices}
-          />
-        ))}
+        {shops.map(([shopName, lines]) => {
+          const meta = shopMeta[shopName];
+          return (
+            <ShopTicket
+              key={shopName}
+              shopName={shopName}
+              website={meta?.website}
+              iconUrl={meta?.iconUrl}
+              total={shopTotal(lines)}
+              lines={toLines(lines)}
+              prices={prices}
+            />
+          );
+        })}
       </main>
-    </div>
+    </>
   );
 }
