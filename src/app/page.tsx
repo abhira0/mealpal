@@ -50,82 +50,42 @@ export default async function TodayPage() {
   const avatar = initials(session.user.name ?? session.user.email);
 
   return (
-    <main className="app">
+    <>
       <header className="chrome">
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            gap: 12,
-          }}
-        >
+        <div className="chrome-row">
           <div>
             <p className="eb">Today · {eyebrowDate}</p>
             <h1>{greeting()}</h1>
           </div>
-          <Link
-            href="/manage"
-            aria-label="Manage account"
-            className="eb"
-            style={{
-              flex: "none",
-              width: 40,
-              height: 40,
-              borderRadius: "50%",
-              background: "var(--enamel-dark)",
-              color: "var(--paper)",
-              display: "grid",
-              placeItems: "center",
-              textDecoration: "none",
-              fontSize: 12,
-              letterSpacing: ".06em",
-            }}
-          >
+          <Link href="/manage" aria-label="Manage account" className="avatar">
             {avatar}
           </Link>
         </div>
       </header>
 
-      <div style={{ padding: 16 }}>
+      <div className="content">
         {slots.length === 0 ? (
-          <div className="card">
+          <div className="empty">
             <p className="title">No meal slots yet</p>
-            <p style={{ margin: "8px 0 14px", fontSize: 14 }}>
-              Add breakfast, lunch and dinner to start planning.
-            </p>
-            <Link className="btn" href="/manage" style={{ display: "inline-block", textDecoration: "none" }}>
-              Set up slots
-            </Link>
+            <p>Add breakfast, lunch and dinner in Manage to start planning.</p>
           </div>
         ) : (
           <div className="timeline">
             {slots.map((slot) => {
               const slotEvents = events.filter((e) => e.slotId === slot.id);
+              const empty = slotEvents.length === 0;
               return (
-                <div key={slot.id} style={{ position: "relative", marginBottom: 22 }}>
-                  <span className="node" aria-hidden="true" />
+                <div key={slot.id} className="seg">
+                  <span className={empty ? "node empty" : "node"} aria-hidden="true" />
                   <p className="slot" style={{ marginBottom: 8 }}>
                     {slot.name}
                   </p>
-                  {slotEvents.length === 0 ? (
-                    <Link
-                      href="/plan"
-                      className="slot"
-                      style={{
-                        color: "var(--sage)",
-                        textTransform: "none",
-                        letterSpacing: "normal",
-                        fontFamily: "var(--body)",
-                        fontSize: 14,
-                        textDecoration: "none",
-                        display: "inline-block",
-                      }}
-                    >
+                  {empty ? (
+                    <Link href="/plan" className="btn-add">
                       + Add a meal
                     </Link>
                   ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <div className="stack-sm">
                       {slotEvents.map((ev) => (
                         <MealCard
                           key={ev.id}
@@ -144,6 +104,6 @@ export default async function TodayPage() {
           </div>
         )}
       </div>
-    </main>
+    </>
   );
 }

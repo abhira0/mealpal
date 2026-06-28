@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Dropdown } from "@/components/Dropdown";
@@ -7,27 +8,6 @@ import { ENTITIES, type EntitySlug, type FieldDef } from "@/app/manage/entities"
 
 type Row = Record<string, unknown> & { id: number | string };
 type OptionMap = Record<string, { value: string; label: string }[]>;
-
-const inputStyle: React.CSSProperties = {
-  background: "var(--paper-raised)",
-  border: "1px solid var(--line)",
-  borderRadius: 8,
-  padding: 11,
-  width: "100%",
-  font: "inherit",
-  fontSize: 14,
-  color: "var(--ink)",
-};
-
-const labelStyle: React.CSSProperties = {
-  fontFamily: "var(--mono)",
-  fontSize: 9,
-  letterSpacing: ".14em",
-  textTransform: "uppercase",
-  color: "var(--sage)",
-  display: "block",
-  marginBottom: 6,
-};
 
 // Tiny fixed option sets render as an inline radio list instead of a sheet.
 const INLINE_RADIO_MAX = 4;
@@ -192,7 +172,7 @@ export function EntityForm({ slug, id }: { slug: EntitySlug; id?: string }) {
     // Inline radio list for tiny fixed sets (e.g. unit g/ml/oz/count).
     if (f.type === "select" && !f.optionsFrom && opts.length > 0 && opts.length <= INLINE_RADIO_MAX) {
       return (
-        <div role="radiogroup" aria-label={f.label} style={{ display: "flex", gap: 6 }}>
+        <div className="unit-radio" role="radiogroup" aria-label={f.label}>
           {opts.map((o) => {
             const on = values[f.name] === o.value;
             return (
@@ -201,17 +181,8 @@ export function EntityForm({ slug, id }: { slug: EntitySlug; id?: string }) {
                 type="button"
                 role="radio"
                 aria-checked={on}
+                aria-pressed={on}
                 onClick={() => set(f.name, o.value)}
-                className="trigger"
-                style={{
-                  justifyContent: "center",
-                  fontFamily: "var(--mono)",
-                  fontSize: 12,
-                  padding: "10px 0",
-                  background: on ? "var(--enamel)" : "var(--paper-raised)",
-                  color: on ? "var(--paper)" : "var(--ink)",
-                  borderColor: on ? "var(--enamel)" : "var(--line)",
-                }}
               >
                 {o.label}
               </button>
@@ -236,103 +207,66 @@ export function EntityForm({ slug, id }: { slug: EntitySlug; id?: string }) {
     return (
       <input
         id={f.name}
+        className={f.type === "number" ? "input mono" : "input"}
         type={f.type}
         step={f.type === "number" ? "any" : undefined}
         value={values[f.name] ?? ""}
         onChange={(e) => set(f.name, e.target.value)}
-        style={inputStyle}
       />
     );
   }
 
   return (
-    <main>
-      <div className="chrome">
-        <p className="eb">Manage · {config.label}</p>
+    <>
+      <header className="chrome">
+        <Link href={`/manage/${slug}`} className="chrome-back">← {config.label}</Link>
         <h1>
           {editing ? "Edit" : "New"} {config.singular.toLowerCase()}
         </h1>
-      </div>
+      </header>
 
-      <div style={{ padding: 16 }}>
-        {error && (
-          <p
-            style={{
-              fontSize: 13,
-              margin: "0 0 12px",
-              padding: "9px 11px",
-              borderRadius: 8,
-              background: "var(--run-bg)",
-              color: "var(--run-ink)",
-            }}
-          >
-            {error}
-          </p>
-        )}
+      <div className="content">
+        {error && <p className="notice" style={{ marginBottom: 12 }}>{error}</p>}
 
-        <form onSubmit={onSubmit} className="card">
+        <form onSubmit={onSubmit} className="card stack">
           {config.importPath && !editing && (
-            <div style={{ marginBottom: 14 }}>
-              <button
-                type="button"
-                className="btn"
-                style={{ background: "var(--paper-raised)", color: "var(--enamel)", border: "1px solid var(--line)" }}
-                disabled={busy}
-                onClick={onImport}
-              >
-                {busy ? "…" : "Import from site"}
-              </button>
-            </div>
+            <button type="button" className="trigger add" disabled={busy} onClick={onImport}>
+              {busy ? "…" : "Import from site"}
+            </button>
           )}
 
           {values.imageUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={values.imageUrl}
-              alt=""
-              style={{ display: "block", maxHeight: 160, borderRadius: 8, margin: "0 auto 12px" }}
-            />
+            <img src={values.imageUrl} alt="" style={{ display: "block", maxHeight: 160, borderRadius: 8, margin: "0 auto" }} />
           )}
 
           {config.fields.map((f) => (
-            <div style={{ marginBottom: 14 }} key={f.name}>
-              <label htmlFor={f.name} style={labelStyle}>
+            <label className="field" key={f.name} htmlFor={f.name}>
+              <span className="field-label">
                 {f.label}
                 {unitFor(f) ? ` (${unitFor(f)})` : ""}
                 {f.optional ? " · optional" : ""}
-              </label>
+              </span>
               {renderControl(f)}
-            </div>
+            </label>
           ))}
 
-          <button type="submit" className="btn" style={{ width: "100%" }} disabled={busy}>
+          <button type="submit" className="btn block" disabled={busy}>
             {busy ? "…" : editing ? "Save changes" : `Add ${config.singular.toLowerCase()}`}
           </button>
 
           {editing && config.canDelete && (
             <button
               type="button"
+              className="btn-link danger"
               onClick={onDelete}
               disabled={busy}
-              style={{
-                display: "block",
-                width: "100%",
-                marginTop: 12,
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                fontFamily: "var(--body)",
-                fontWeight: 600,
-                fontSize: 14,
-                color: "var(--paprika)",
-                minHeight: 44,
-              }}
             >
               Delete {config.singular.toLowerCase()}
             </button>
           )}
         </form>
       </div>
-    </main>
+    </>
   );
 }

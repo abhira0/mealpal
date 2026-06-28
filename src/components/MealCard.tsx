@@ -49,41 +49,16 @@ export function MealCard({
 
   return (
     <div className="card">
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 10,
-        }}
-      >
-        <Link
-          href={`/recipes/${recipeId}`}
-          className="title"
-          style={{ color: "var(--ink)", textDecoration: "none", flex: 1 }}
-        >
+      <div className="card-row">
+        <Link href={`/recipes/${recipeId}`} className="title row-main">
           {title}
         </Link>
         <QuantityChip value={shortServings(servings)} />
       </div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 10,
-          marginTop: 12,
-        }}
-      >
+      <div className="card-row" style={{ marginTop: 12 }}>
         <span className="slot">{cooked ? "✓ Cooked" : "Planned"}</span>
         {!cooked && (
-          <button
-            type="button"
-            className="btn"
-            onClick={cook}
-            disabled={cooking}
-            style={{ padding: "8px 14px", minHeight: 40 }}
-          >
+          <button type="button" className="btn" onClick={cook} disabled={cooking}>
             {cooking ? "Cooking…" : "Cook it"}
           </button>
         )}

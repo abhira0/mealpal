@@ -3,34 +3,6 @@
 import { useState } from "react";
 import { Stepper } from "@/components/Stepper";
 
-const linkStyle: React.CSSProperties = {
-  fontFamily: "var(--mono)",
-  fontSize: 11,
-  letterSpacing: ".06em",
-  textTransform: "uppercase",
-  color: "var(--enamel)",
-  background: "none",
-  border: "none",
-  padding: "8px 4px",
-  minHeight: 36,
-  cursor: "pointer",
-};
-
-const btnStyle: React.CSSProperties = {
-  fontFamily: "var(--mono)",
-  fontWeight: 700,
-  fontSize: 11,
-  letterSpacing: ".04em",
-  textTransform: "uppercase",
-  background: "var(--paper-raised)",
-  border: "1px solid var(--line)",
-  borderRadius: 6,
-  color: "var(--enamel)",
-  padding: "8px 10px",
-  minHeight: 38,
-  cursor: "pointer",
-};
-
 /**
  * Inline "+ adjust" affordance for a pantry row. Reveals a custom stepper
  * (no native controls) whose value is the delta multiplier, and POSTs it to
@@ -74,56 +46,42 @@ export function StockAdjust({
 
   if (!open) {
     return (
-      <button type="button" style={linkStyle} onClick={() => setOpen(true)}>
+      <button type="button" className="btn-link" onClick={() => setOpen(true)}>
         + adjust
       </button>
     );
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        flexWrap: "wrap",
-        justifyContent: "flex-end",
-      }}
-    >
-      <Stepper value={units} min={1} onChange={setUnits} />
-      <span
-        style={{
-          fontFamily: "var(--mono)",
-          fontSize: 9,
-          letterSpacing: ".12em",
-          textTransform: "uppercase",
-          color: "var(--sage)",
-        }}
-      >
-        ×{step} {unit}
-      </span>
-      <button type="button" style={btnStyle} onClick={() => commit(1)} disabled={busy}>
-        + add
-      </button>
-      <button type="button" style={btnStyle} onClick={() => commit(-1)} disabled={busy}>
-        − use
-      </button>
-      <button
-        type="button"
-        style={linkStyle}
-        onClick={() => {
-          setOpen(false);
-          setError(null);
-          setUnits(1);
-        }}
-      >
-        cancel
-      </button>
-      {error && (
-        <span className="eb" style={{ color: "var(--paprika)" }}>
-          {error}
+    <div className="stack-sm" style={{ marginTop: 10 }}>
+      <div className="servings-row">
+        <Stepper value={units} min={1} onChange={setUnits} />
+        <span className="meta">
+          ×{step} {unit}
         </span>
-      )}
+      </div>
+      <div className="servings-row">
+        <div style={{ display: "flex", gap: 8 }}>
+          <button type="button" className="tab" onClick={() => commit(1)} disabled={busy}>
+            + add
+          </button>
+          <button type="button" className="tab" onClick={() => commit(-1)} disabled={busy}>
+            − use
+          </button>
+        </div>
+        <button
+          type="button"
+          className="btn-link"
+          onClick={() => {
+            setOpen(false);
+            setError(null);
+            setUnits(1);
+          }}
+        >
+          cancel
+        </button>
+      </div>
+      {error && <p className="notice">{error}</p>}
     </div>
   );
 }

@@ -24,16 +24,7 @@ export function Checkbox({ checked, onChange, label }: CheckboxProps) {
   }
 
   return (
-    <label
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 10,
-        minHeight: 44,
-        cursor: "pointer",
-      }}
-      onClick={toggle}
-    >
+    <label className="check-label" onClick={toggle}>
       <span
         className="checkbox"
         role="checkbox"

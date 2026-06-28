@@ -68,8 +68,10 @@ export function Dropdown({
         aria-expanded={open}
         onClick={() => setOpen(true)}
       >
-        <span>{selected ? selected.label : placeholder}</span>
-        <span aria-hidden="true">▾</span>
+        <span className={selected ? undefined : "placeholder"}>
+          {selected ? selected.label : placeholder}
+        </span>
+        <span className="caret" aria-hidden="true">▾</span>
       </button>
 
       <Sheet open={open} title={label ?? "Select"} onClose={() => setOpen(false)}>
@@ -83,7 +85,8 @@ export function Dropdown({
           {options.map((o, i) => {
             const isSelected = o.id === value;
             return (
-              <div
+              <button
+                type="button"
                 key={String(o.id)}
                 className="o"
                 role="option"
@@ -92,8 +95,8 @@ export function Dropdown({
                 onClick={() => commit(o.id)}
               >
                 <span>{o.label}</span>
-                {isSelected ? <span aria-hidden="true">✓</span> : null}
-              </div>
+                {isSelected ? <span className="tick" aria-hidden="true">✓</span> : null}
+              </button>
             );
           })}
         </div>
