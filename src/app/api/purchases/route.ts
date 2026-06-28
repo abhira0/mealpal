@@ -14,7 +14,8 @@ export async function POST(req: Request) {
     : b?.dollars !== undefined ? dollarsToCents(Number(b.dollars)) : NaN;
   if (!productId || !Number.isFinite(cents) || cents < 0)
     return NextResponse.json({ error: "productId and cents/dollars required" }, { status: 400 });
+  const expiresAt = typeof b?.expiresAt === "string" && /^\d{4}-\d{2}-\d{2}$/.test(b.expiresAt) ? b.expiresAt : null;
   return NextResponse.json(
-    recordPurchase(db, session.user.householdId, { productId, quantity, cents: Math.round(cents) }),
+    recordPurchase(db, session.user.householdId, { productId, quantity, cents: Math.round(cents), expiresAt }),
     { status: 201 });
 }

@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, blob } from "drizzle-orm/sqlite-core";
 
 export const households = sqliteTable("households", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -29,17 +29,13 @@ export const shops = sqliteTable("shops", {
     .notNull()
     .references(() => households.id),
   name: text("name").notNull(),
-});
-
-export const branches = sqliteTable("branches", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  householdId: integer("household_id")
-    .notNull()
-    .references(() => households.id),
-  shopId: integer("shop_id")
-    .notNull()
-    .references(() => shops.id),
-  name: text("name").notNull(),
+  // e.g. "costco.com" or "https://costco.com" — used to derive the shop's logo
+  website: text("website"),
+  // explicit logo URL; overrides the website-derived favicon when set
+  iconUrl: text("icon_url"),
+  // uploaded logo bytes + mime; overrides iconUrl/website-derived favicon when set
+  iconData: blob("icon_data", { mode: "buffer" }),
+  iconMime: text("icon_mime"),
 });
 
 export const products = sqliteTable("products", {
@@ -53,28 +49,17 @@ export const products = sqliteTable("products", {
   shopId: integer("shop_id")
     .notNull()
     .references(() => shops.id),
-  // optional specific location; null = "the shop, any branch"
-  branchId: integer("branch_id").references(() => branches.id),
   name: text("name").notNull(),
   // how many of the ingredient's canonical units are in ONE unit of this product
   packSize: integer("pack_size").notNull(),
   // preference rank within the ingredient (lower = preferred). default 100.
   priority: integer("priority").notNull().default(100),
+  // manual price override / seed in cents; null = derive from latest purchase
+  priceCents: integer("price_cents"),
   available: integer("available", { mode: "boolean" }).notNull().default(true),
   url: text("url"),
+  imageUrl: text("image_url"),
   createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
-});
-
-export const prices = sqliteTable("prices", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  productId: integer("product_id")
-    .notNull()
-    .references(() => products.id),
-  // money stored as integer cents — never floats
-  cents: integer("cents").notNull(),
-  observedAt: integer("observed_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
 });
@@ -147,6 +132,8 @@ export const purchases = sqliteTable("purchases", {
   productId: integer("product_id").notNull().references(() => products.id),
   quantity: integer("quantity").notNull().default(1),
   cents: integer("cents").notNull(),
+  // date-only YYYY-MM-DD; null = no expiry tracked
+  expiresAt: text("expires_at"),
   purchasedAt: integer("purchased_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 

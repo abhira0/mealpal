@@ -22,6 +22,55 @@
       "when": 1782674296587,
       "tag": "0002_illegal_agent_zero",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1782676885142,
+      "tag": "0003_mighty_paibok",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1782677112649,
+      "tag": "0004_orange_scorpion",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1782677952138,
+      "tag": "0005_special_cerebro",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1782678589990,
+      "tag": "0006_dark_avengers",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1782678590000,
+      "tag": "0007_add_price_cents",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1782678590001,
+      "tag": "0008_add_shop_icon_blob",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1782678590002,
+      "tag": "0009_drop_branches",
+      "breakpoints": true
     }
   ]
 }

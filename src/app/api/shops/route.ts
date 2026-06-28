@@ -15,5 +15,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const name = body?.name?.trim();
   if (!name) return NextResponse.json({ error: "name is required." }, { status: 400 });
-  return NextResponse.json(createShop(db, session.user.householdId, name), { status: 201 });
+  const website = body?.website?.trim() || null;
+  const iconUrl = body?.iconUrl?.trim() || null;
+  return NextResponse.json(createShop(db, session.user.householdId, name, website, iconUrl), { status: 201 });
 }

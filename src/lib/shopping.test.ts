@@ -20,21 +20,19 @@ beforeEach(() => {
     .returning().all()[0].id;
   shopId = db.insert(schema.shops).values({ householdId: hid, name: "Costco" }).returning().all()[0].id;
   productId = createProduct(db, hid, {
-    ingredientId: flourId, shopId, branchId: null, name: "AP Flour 25lb",
+    ingredientId: flourId, shopId, name: "AP Flour 25lb",
     packSize: 11340, priority: 1, url: null,
   }).id;
 });
 
 describe("recordPurchase", () => {
-  it("buying 1 product restocks packSize*qty into inventory and records the purchase + price", () => {
+  it("buying 1 product restocks packSize*qty into inventory and records the purchase", () => {
     recordPurchase(db, hid, { productId, quantity: 1, cents: 1299 });
     expect(currentStock(db, hid, flourId)).toBe(11340);
     const purchases = db.select().from(schema.purchases)
       .where(eq(schema.purchases.householdId, hid)).all();
     expect(purchases).toHaveLength(1);
-    const prices = db.select().from(schema.prices)
-      .where(eq(schema.prices.productId, productId)).all();
-    expect(prices[0].cents).toBe(1299);
+    expect(purchases[0].cents).toBe(1299);
   });
 
   it("buying 2 adds 2x the pack size", () => {
