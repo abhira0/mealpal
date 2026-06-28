@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 type Tab = { href: string; label: string; icon: React.ReactNode };
 
 const ICON_PROPS = {
+  width: 22,
+  height: 22,
   fill: "none",
   stroke: "currentColor",
   strokeWidth: 2,
@@ -58,6 +60,16 @@ const TABS: Tab[] = [
       </svg>
     ),
   },
+  {
+    href: "/manage",
+    label: "Manage",
+    icon: (
+      <svg {...ICON_PROPS}>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.5-2.3 1a7 7 0 0 0-1.7-1l-.3-2.5h-4l-.3 2.5a7 7 0 0 0-1.7 1l-2.3-1-2 3.5 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.5 2.3-1a7 7 0 0 0 1.7 1l.3 2.5h4l.3-2.5a7 7 0 0 0 1.7-1l2.3 1 2-3.5-2-1.5a7 7 0 0 0 .1-1Z" />
+      </svg>
+    ),
+  },
 ];
 
 export function BottomNav() {
@@ -66,7 +78,7 @@ export function BottomNav() {
   if (pathname === "/login") return null;
 
   return (
-    <nav className="bottom-nav" aria-label="Primary">
+    <nav className="nav" aria-label="Primary">
       {TABS.map((tab) => {
         const active =
           tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
@@ -74,7 +86,7 @@ export function BottomNav() {
           <Link
             key={tab.href}
             href={tab.href}
-            className={active ? "active" : ""}
+            className={active ? "on" : ""}
             aria-current={active ? "page" : undefined}
           >
             {tab.icon}
