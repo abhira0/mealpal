@@ -15,6 +15,13 @@
       "when": 1782672852289,
       "tag": "0001_stiff_shockwave",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1782674296587,
+      "tag": "0002_illegal_agent_zero",
+      "breakpoints": true
     }
   ]
 }
