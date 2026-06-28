@@ -76,7 +76,7 @@ export default async function TodayPage() {
               const empty = slotEvents.length === 0;
               return (
                 <div key={slot.id} className="seg">
-                  <span className={empty ? "node empty" : "node"} aria-hidden="true" />
+                  <span className={empty ? "node node--empty" : "node"} aria-hidden="true" />
                   <p className="slot" style={{ marginBottom: 8 }}>
                     {slot.name}
                   </p>
