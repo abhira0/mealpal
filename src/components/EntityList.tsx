@@ -124,7 +124,7 @@ export function EntityList({ slug }: { slug: EntitySlug }) {
                 <Link href={`/manage/${slug}/${row.id}`} className="row-link">
                   {icon && (
                     <span className="icon-badge">
-                      <Favicon name={icon.name} website={icon.website} iconUrl={icon.iconUrl} size={24} />
+                      <Favicon name={icon.name} website={icon.website} iconUrl={icon.iconUrl} size={32} />
                     </span>
                   )}
                   {main}
@@ -135,7 +135,7 @@ export function EntityList({ slug }: { slug: EntitySlug }) {
                   <span className="row-link" style={{ cursor: "default" }}>
                     {icon && (
                       <span className="icon-badge">
-                        <Favicon name={icon.name} website={icon.website} iconUrl={icon.iconUrl} size={24} />
+                        <Favicon name={icon.name} website={icon.website} iconUrl={icon.iconUrl} size={32} />
                       </span>
                     )}
                     {main}
