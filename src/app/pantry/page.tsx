@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { QuantityChip } from "@/components/QuantityChip";
 import { StockAdjust } from "@/components/StockAdjust";
-import { formatQty } from "@/lib/units";
 
 type Ingredient = {
   id: number;
@@ -60,16 +58,14 @@ export default function PantryPage() {
             <div className="card" key={ing.id}>
               <div className="card-row">
                 <span style={{ fontWeight: 600, fontSize: 16 }}>{ing.name}</span>
-                <QuantityChip
-                  value={formatQty(qty, ing.canonicalUnit)}
+                <StockAdjust
+                  ingredientId={ing.id}
+                  unit={ing.canonicalUnit}
+                  current={qty}
                   tone={low ? "low" : "default"}
+                  onAdjusted={(delta) => applyDelta(ing.id, delta)}
                 />
               </div>
-              <StockAdjust
-                ingredientId={ing.id}
-                unit={ing.canonicalUnit}
-                onAdjusted={(delta) => applyDelta(ing.id, delta)}
-              />
             </div>
           );
         })}
