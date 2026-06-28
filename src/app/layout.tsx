@@ -44,10 +44,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${bricolage.variable} ${hanken.variable} ${spaceMono.variable}`}
-      >
+    <html
+      lang="en"
+      className={`${bricolage.variable} ${hanken.variable} ${spaceMono.variable}`}
+    >
+      <body>
         <div className="app">{children}</div>
         <BottomNav />
       </body>
