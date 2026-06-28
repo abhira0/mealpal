@@ -123,7 +123,7 @@ button{font-family:inherit}
 .row-main{min-width:0;flex:1}
 .row .arrow{color:var(--sage);font-size:14px;flex:none}
 .thumb{width:48px;height:48px;border-radius:8px;background:linear-gradient(135deg,var(--enamel),var(--enamel-dark));flex:none;object-fit:cover}
-.icon-badge{width:32px;height:32px;border-radius:6px;background:var(--chip-bg);display:grid;place-items:center;flex:none;overflow:hidden}
+.icon-badge{width:32px;height:32px;border-radius:6px;display:grid;place-items:center;flex:none;overflow:hidden}
 
 /* ---------- account rows (Manage) ---------- */
 .account-row{background:var(--paper-raised);border:1px solid var(--line);border-radius:8px;padding:14px;display:flex;justify-content:space-between;align-items:center;gap:12px;text-decoration:none;color:inherit;min-height:56px}

@@ -4,10 +4,37 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Dropdown } from "@/components/Dropdown";
+import { Favicon } from "@/components/Favicon";
 import { ENTITIES, type EntitySlug, type FieldDef } from "@/app/manage/entities";
 
 type Row = Record<string, unknown> & { id: number | string };
 type OptionMap = Record<string, { value: string; label: string }[]>;
+
+// Downscale a picked image to a ~64px PNG data URL so we can store it inline
+// in the icon_url text column without bloating the row. Favicons are tiny.
+function fileToIcon(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const max = 64;
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Couldn't read that image"));
+    };
+    img.src = url;
+  });
+}
 
 // Tiny fixed option sets render as an inline radio list instead of a sheet.
 const INLINE_RADIO_MAX = 4;
@@ -188,6 +215,56 @@ export function EntityForm({ slug, id }: { slug: EntitySlug; id?: string }) {
               </button>
             );
           })}
+        </div>
+      );
+    }
+
+    // Icon: show the current icon (or the website-derived favicon fallback)
+    // with an upload/replace button laid over it; clicking opens the picker.
+    if (f.type === "file") {
+      const has = Boolean(values[f.name]);
+      return (
+        <div className="icon-upload" style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
+          <span style={{ position: "relative", width: 72, height: 72, cursor: "pointer", flexShrink: 0 }}>
+            <Favicon name={values.name ?? ""} website={values.website} iconUrl={values[f.name]} size={72} />
+            <span
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                fontSize: 11,
+                fontWeight: 600,
+                textAlign: "center",
+                color: "#fff",
+                background: "rgba(0,0,0,.6)",
+                padding: "2px 0",
+                borderRadius: "0 0 6px 6px",
+              }}
+            >
+              {has ? "Replace" : "Upload"}
+            </span>
+          </span>
+          <input
+            id={f.name}
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              try {
+                set(f.name, await fileToIcon(file));
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Couldn't read that image");
+              }
+            }}
+          />
+          {has && (
+            <button type="button" className="btn-link" style={{ width: "auto" }} onClick={(e) => { e.preventDefault(); set(f.name, ""); }}>
+              Remove
+            </button>
+          )}
         </div>
       );
     }

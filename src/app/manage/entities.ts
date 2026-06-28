@@ -4,7 +4,7 @@
 export type FieldDef = {
   name: string;
   label: string;
-  type: "text" | "number" | "select";
+  type: "text" | "number" | "select" | "file";
   // For type:"select" — pull options from another entity's list endpoint,
   // using `optionLabel` for the visible text and `id` for the value.
   optionsFrom?: EntitySlug;
@@ -90,12 +90,11 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
     itemPath: (id) => `/api/shops/${id}`,
     columns: [
       { key: "name", label: "Name" },
-      { key: "website", label: "Website" },
     ],
     fields: [
       { name: "name", label: "Name", type: "text", required: true },
       { name: "website", label: "Website", type: "text", optional: true },
-      { name: "iconUrl", label: "Icon URL", type: "text", optional: true },
+      { name: "iconUrl", label: "Icon", type: "file", optional: true },
     ],
     icon: (row) => ({
       name: String(row.name ?? ""),
