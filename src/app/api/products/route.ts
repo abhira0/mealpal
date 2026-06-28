@@ -1,12 +1,21 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { createProduct, listProductsForIngredient } from "@/lib/products";
+import {
+  createProduct,
+  listAllProducts,
+  listProductsForIngredient,
+} from "@/lib/products";
+import { dollarsToCents } from "@/lib/money";
 
 export async function GET(req: Request) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const ingredientId = Number(new URL(req.url).searchParams.get("ingredientId"));
+  const ingredientIdParam = new URL(req.url).searchParams.get("ingredientId");
+  if (ingredientIdParam === null) {
+    return NextResponse.json(listAllProducts(db, session.user.householdId));
+  }
+  const ingredientId = Number(ingredientIdParam);
   if (!ingredientId)
     return NextResponse.json({ error: "ingredientId query param required." }, { status: 400 });
   return NextResponse.json(
@@ -28,14 +37,19 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
+  // Optional manual price / importer seed. null = derive from purchases.
+  const dollars = b?.dollars !== undefined ? Number(b.dollars) : NaN;
+  const priceCents =
+    Number.isFinite(dollars) && dollars >= 0 ? dollarsToCents(dollars) : null;
   const row = createProduct(db, session.user.householdId, {
     ingredientId,
     shopId,
-    branchId: b?.branchId ? Number(b.branchId) : null,
     name,
     packSize,
     priority: b?.priority !== undefined ? Number(b.priority) : 100,
+    priceCents,
     url: b?.url?.trim() || null,
+    imageUrl: b?.imageUrl?.trim() || null,
   });
   return NextResponse.json(row, { status: 201 });
 }

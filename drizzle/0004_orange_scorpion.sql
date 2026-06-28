@@ -1,0 +1,1 @@
+ALTER TABLE `purchases` ADD `expires_at` text;

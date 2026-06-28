@@ -4,18 +4,17 @@ import { schema } from "@/db";
 
 type Db = BetterSQLite3Database<typeof schema>;
 
-export interface PurchaseInput { productId: number; quantity: number; cents: number; }
+export interface PurchaseInput { productId: number; quantity: number; cents: number; expiresAt?: string | null; }
 
-/** Record a purchase: insert purchase row, append a price observation, restock inventory. */
+/** Record a purchase: insert purchase row and restock inventory. The purchase IS the price history. */
 export function recordPurchase(db: Db, householdId: number, input: PurchaseInput) {
   return db.transaction((tx) => {
     const [product] = tx.select().from(schema.products)
       .where(and(eq(schema.products.id, input.productId), eq(schema.products.householdId, householdId))).all();
     if (!product) throw new Error("product not found in household");
     const [purchase] = tx.insert(schema.purchases)
-      .values({ householdId, productId: input.productId, quantity: input.quantity, cents: input.cents })
+      .values({ householdId, productId: input.productId, quantity: input.quantity, cents: input.cents, expiresAt: input.expiresAt ?? null })
       .returning().all();
-    tx.insert(schema.prices).values({ productId: input.productId, cents: input.cents }).run();
     tx.insert(schema.stockMovements).values({
       householdId, ingredientId: product.ingredientId,
       delta: product.packSize * input.quantity, reason: "purchase", purchaseId: purchase.id,
