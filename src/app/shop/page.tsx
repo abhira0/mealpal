@@ -1,49 +1,109 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ShopTicket, type ShopLine } from "@/components/ShopTicket";
+import { useEffect, useMemo, useState } from "react";
+import { ShopTicket, type ShopLine, type PriceMap } from "@/components/ShopTicket";
+import { centsToDollars } from "@/lib/money";
 
-type ShoppingMap = Record<string, ShopLine[]>;
+type RawLine = {
+  ingredientId: number;
+  ingredientName: string;
+  needed: number;
+  product: { id: number; name: string } | null;
+};
+type ShoppingMap = Record<string, RawLine[]>;
 
-function rangeISO(): { from: string; to: string } {
-  const d = new Date();
-  const from = d.toISOString().slice(0, 10);
-  const end = new Date(d.getTime() + 6 * 24 * 60 * 60 * 1000);
-  return { from, to: end.toISOString().slice(0, 10) };
-}
+type Product = {
+  id: number;
+  effectiveCents: number | null;
+};
+
+type Ingredient = { id: number; canonicalUnit: string };
 
 export default function ShopPage() {
   const [data, setData] = useState<ShoppingMap | null>(null);
+  const [prices, setPrices] = useState<PriceMap>({});
+  const [units, setUnits] = useState<Record<number, string>>({});
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const { from, to } = rangeISO();
-    fetch(`/api/shopping?from=${from}&to=${to}`)
+    fetch("/api/shopping")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((j) => setData(j as ShoppingMap))
       .catch(() => setError("Couldn't load the shopping list yet."));
+
+    fetch("/api/products")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((products: Product[]) =>
+        setPrices(
+          Object.fromEntries(products.map((p) => [p.id, p.effectiveCents])),
+        ),
+      )
+      .catch(() => {});
+
+    fetch("/api/ingredients")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((ings: Ingredient[]) =>
+        setUnits(Object.fromEntries(ings.map((i) => [i.id, i.canonicalUnit]))),
+      )
+      .catch(() => {});
   }, []);
 
-  const shops = data ? Object.entries(data).filter(([, lines]) => lines.length) : [];
+  const shops = useMemo(
+    () => (data ? Object.entries(data).filter(([, lines]) => lines.length) : []),
+    [data],
+  );
+
+  // Per-shop running total (sum of suggested product prices), and trip total.
+  function shopTotal(lines: RawLine[]): number {
+    return lines.reduce(
+      (sum, l) => sum + (l.product ? prices[l.product.id] ?? 0 : 0),
+      0,
+    );
+  }
+  const tripTotal = shops.reduce((sum, [, lines]) => sum + shopTotal(lines), 0);
+
+  function toLines(lines: RawLine[]): ShopLine[] {
+    return lines.map((l) => ({
+      ...l,
+      unit: units[l.ingredientId],
+    }));
+  }
+
+  const stopCount = shops.length;
 
   return (
-    <main className="app-main">
-      <div className="page-header">
-        <p className="eyebrow">Shop</p>
-        <h1>The shopping run</h1>
-      </div>
+    <div className="app">
+      <header className="chrome">
+        <p className="eb">
+          Shop · {stopCount} {stopCount === 1 ? "stop" : "stops"}
+          {tripTotal > 0 && <> · ${centsToDollars(tripTotal).toFixed(2)}</>}
+        </p>
+        <h1>The run</h1>
+      </header>
 
-      {error && <p className="error">{error}</p>}
+      <main style={{ padding: "0 16px 16px" }}>
+        {error && (
+          <p className="eb" style={{ color: "var(--paprika)", marginTop: 16 }}>
+            {error}
+          </p>
+        )}
 
-      {data && shops.length === 0 && (
-        <div className="empty-state">
-          <p>Nothing to buy — plan some meals first.</p>
-        </div>
-      )}
+        {data && shops.length === 0 && (
+          <p style={{ color: "var(--sage)", fontSize: 14, marginTop: 16 }}>
+            Nothing to buy — plan some meals first.
+          </p>
+        )}
 
-      {shops.map(([shopName, lines]) => (
-        <ShopTicket key={shopName} shopName={shopName} lines={lines} />
-      ))}
-    </main>
+        {shops.map(([shopName, lines]) => (
+          <ShopTicket
+            key={shopName}
+            shopName={shopName}
+            total={shopTotal(lines)}
+            lines={toLines(lines)}
+            prices={prices}
+          />
+        ))}
+      </main>
+    </div>
   );
 }
