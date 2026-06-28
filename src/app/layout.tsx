@@ -12,7 +12,7 @@ const bricolage = Bricolage_Grotesque({
 const hanken = Hanken_Grotesk({
   variable: "--font-hanken",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
 });
 
 const spaceMono = Space_Mono({
@@ -44,12 +44,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${bricolage.variable} ${hanken.variable} ${spaceMono.variable}`}
-    >
-      <body>
-        {children}
+    <html lang="en">
+      <body
+        className={`${bricolage.variable} ${hanken.variable} ${spaceMono.variable}`}
+      >
+        <div className="app">{children}</div>
         <BottomNav />
       </body>
     </html>

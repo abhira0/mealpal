@@ -1,14 +1,9 @@
-type Tone = "default" | "low" | "price";
-
-const CLASS: Record<Tone, string> = {
-  default: "chip",
-  low: "chip chip--low",
-  price: "chip chip--price",
-};
+type Tone = "default" | "low" | "run" | "price";
 
 /**
  * The signature element: a monospace value on label-tape, with a tinted
- * accent bar that encodes meaning (sage = fine, turmeric = low, enamel = price).
+ * accent bar that encodes meaning (sage = default, turmeric = low,
+ * paprika = run-out, enamel = price).
  */
 export function QuantityChip({
   value,
@@ -17,5 +12,6 @@ export function QuantityChip({
   value: string;
   tone?: Tone;
 }) {
-  return <span className={CLASS[tone]}>{value}</span>;
+  const className = tone === "default" ? "chip" : `chip ${tone}`;
+  return <span className={className}>{value}</span>;
 }
