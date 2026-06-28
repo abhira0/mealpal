@@ -1,12 +1,12 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import { authConfig } from "@/auth.config";
 import { db } from "@/db";
 import { findUserByEmail } from "@/lib/users";
 import { verifyPassword } from "@/lib/password";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  session: { strategy: "jwt" },
-  pages: { signIn: "/login" },
+  ...authConfig,
   providers: [
     Credentials({
       credentials: { email: {}, password: {} },
@@ -26,15 +26,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    jwt({ token, user }) {
-      if (user) token.householdId = (user as { householdId: number }).householdId;
-      return token;
-    },
-    session({ session, token }) {
-      session.user.id = token.sub!;
-      session.user.householdId = token.householdId;
-      return session;
-    },
-  },
 });
