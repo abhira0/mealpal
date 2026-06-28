@@ -183,11 +183,7 @@ textarea {
   color: var(--ink);
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.05s ease;
-}
-
-.btn:active {
-  transform: translateY(1px);
+  transition: background 0.15s ease;
 }
 
 .btn-primary {

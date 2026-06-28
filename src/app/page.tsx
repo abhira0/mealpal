@@ -56,11 +56,7 @@ export default async function TodayPage() {
               <div className="timeline-slot" key={slot.id}>
                 <div className="slot-label">{slot.name}</div>
                 {slotEvents.length === 0 ? (
-                  <Link
-                    href="/plan"
-                    className="caption"
-                    style={{ display: "inline-block", padding: "8px 0" }}
-                  >
+                  <Link href="/plan" className="btn-ghost">
                     + Add a meal
                   </Link>
                 ) : (
