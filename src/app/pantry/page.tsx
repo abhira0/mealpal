@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { StockAdjust } from "@/components/StockAdjust";
+import { Sheet } from "@/components/Sheet";
 import { formatQty } from "@/lib/units";
 
 type Ingredient = {
@@ -21,6 +22,8 @@ export default function PantryPage() {
   const [stock, setStock] = useState<NumMap>({});
   const [byProduct, setByProduct] = useState<NumMap>({});
   const [expiry, setExpiry] = useState<ExpiryMap>({});
+  const [prodExpiry, setProdExpiry] = useState<ExpiryMap>({});
+  const [editing, setEditing] = useState<Ingredient | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -34,17 +37,29 @@ export default function PantryPage() {
         setStock((st as { qty: NumMap }).qty);
         setByProduct((st as { byProduct: NumMap }).byProduct);
         setExpiry((st as { expiry: ExpiryMap }).expiry);
+        setProdExpiry((st as { expiryByProduct: ExpiryMap }).expiryByProduct);
         setProducts(prods as Product[]);
       })
       .catch(() => setError("Couldn't load the pantry yet."));
   }, []);
 
   // Adjust an ingredient's total, optionally pinned to a product.
-  function applyDelta(ingId: number, productId: number | null, delta: number) {
+  function applyDelta(ingId: number, productId: number | null, delta: number, exp: string | null) {
     setStock((prev) => ({ ...prev, [ingId]: (prev[String(ingId)] ?? 0) + delta }));
-    if (productId != null)
+    if (productId != null) {
       setByProduct((prev) => ({ ...prev, [productId]: (prev[String(productId)] ?? 0) + delta }));
+      if (exp) setProdExpiry((prev) => ({ ...prev, [productId]: exp }));
+    } else if (exp) {
+      setExpiry((prev) => ({ ...prev, [ingId]: exp }));
+    }
   }
+
+  const editProducts = editing
+    ? products.filter((p) => p.ingredientId === editing.id)
+    : [];
+  const editTotal = editing ? stock[String(editing.id)] ?? 0 : 0;
+  const editAttributed = editProducts.reduce((s, p) => s + (byProduct[String(p.id)] ?? 0), 0);
+  const editUnattributed = editTotal - editAttributed;
 
   return (
     <>
@@ -64,66 +79,77 @@ export default function PantryPage() {
 
         {ingredients?.map((ing) => {
           const qty = stock[String(ing.id)] ?? 0;
+          if (qty === 0) return null; // nothing in stock — hide
           const exp = expiry[String(ing.id)];
-          const ingProducts = products.filter((p) => p.ingredientId === ing.id);
-          const attributed = ingProducts.reduce((s, p) => s + (byProduct[String(p.id)] ?? 0), 0);
-          const unattributed = qty - attributed;
           return (
-            <div className="card" key={ing.id}>
+            <button
+              key={ing.id}
+              type="button"
+              className="card"
+              style={{ textAlign: "left", width: "100%", cursor: "pointer" }}
+              onClick={() => setEditing(ing)}
+            >
               <div className="card-row">
                 <span style={{ fontWeight: 600, fontSize: 16 }}>{ing.name}</span>
-                <span className="meta" style={{ color: qty <= 0 ? "var(--rust, #b4541f)" : undefined }}>
-                  {formatQty(qty, ing.canonicalUnit)}
-                </span>
+                <span className="meta">{formatQty(qty, ing.canonicalUnit)}</span>
               </div>
-
-              {ingProducts.length === 0 ? (
-                // No products to attribute to — adjust the ingredient total directly.
-                <div className="card-row" style={{ marginTop: 8 }}>
-                  <span className="meta">on hand</span>
-                  <StockAdjust
-                    ingredientId={ing.id}
-                    unit={ing.canonicalUnit}
-                    current={qty}
-                    tone={qty <= 0 ? "low" : "default"}
-                    onAdjusted={(delta, e) => {
-                      applyDelta(ing.id, null, delta);
-                      if (e) setExpiry((p) => ({ ...p, [ing.id]: e }));
-                    }}
-                  />
-                </div>
-              ) : (
-                ingProducts.map((p) => {
-                  const pq = byProduct[String(p.id)] ?? 0;
-                  return (
-                    <div className="card-row" key={p.id} style={{ marginTop: 8 }}>
-                      <span className="meta">{p.name}</span>
-                      <StockAdjust
-                        ingredientId={ing.id}
-                        productId={p.id}
-                        unit={ing.canonicalUnit}
-                        current={pq}
-                        tone={pq <= 0 ? "low" : "default"}
-                        onAdjusted={(delta, e) => {
-                          applyDelta(ing.id, p.id, delta);
-                          if (e) setExpiry((prev) => ({ ...prev, [ing.id]: e }));
-                        }}
-                      />
-                    </div>
-                  );
-                })
-              )}
-
-              {ingProducts.length > 0 && unattributed > 0 && (
-                <p className="meta" style={{ marginTop: 8, opacity: 0.7 }}>
-                  unattributed · {formatQty(unattributed, ing.canonicalUnit)}
-                </p>
-              )}
               {exp && <p className="meta">soonest expiry · {exp}</p>}
-            </div>
+            </button>
           );
         })}
       </main>
+
+      <Sheet
+        open={editing !== null}
+        title={editing?.name ?? ""}
+        onClose={() => setEditing(null)}
+      >
+        {editing && (
+          <div className="sh-body">
+            {editProducts.length === 0 && (
+              <p className="meta">No products for this ingredient.</p>
+            )}
+
+            {editProducts.map((p) => {
+              const pq = byProduct[String(p.id)] ?? 0;
+              const pe = prodExpiry[String(p.id)];
+              return (
+                <div key={p.id} style={{ marginBottom: 14 }}>
+                  <div className="card-row">
+                    <span className="body" style={{ color: "var(--sage)" }}>{p.name}</span>
+                    <StockAdjust
+                      ingredientId={editing.id}
+                      productId={p.id}
+                      unit={editing.canonicalUnit}
+                      current={pq}
+                      tone={pq <= 0 ? "low" : "default"}
+                      onAdjusted={(delta, e) => applyDelta(editing.id, p.id, delta, e)}
+                    />
+                  </div>
+                  {pe && <p className="meta">expires · {pe}</p>}
+                </div>
+              );
+            })}
+
+            {editUnattributed > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <div className="card-row">
+                  <span className="body" style={{ color: "var(--sage)", opacity: 0.7 }}>
+                    Unattributed
+                  </span>
+                  <StockAdjust
+                    ingredientId={editing.id}
+                    unit={editing.canonicalUnit}
+                    current={editUnattributed}
+                    tone="default"
+                    onAdjusted={(delta, e) => applyDelta(editing.id, null, delta, e)}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </Sheet>
     </>
   );
 }
