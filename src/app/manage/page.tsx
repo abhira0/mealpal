@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { SignOutButton } from "@/components/SignOutButton";
 import { ENTITIES, type EntitySlug } from "@/app/manage/entities";
+import { BookOpen, ChevronRight, Egg, Store, Tag, Utensils, type LucideIcon } from "lucide-react";
 
 // Resolve the app's own origin so server-side fetches to /api hit this app.
 async function origin(): Promise<string> {
@@ -24,11 +25,11 @@ async function count(base: string, listPath: string, cookie: string): Promise<nu
   }
 }
 
-const CATALOG: { slug: EntitySlug; emoji: string }[] = [
-  { slug: "ingredients", emoji: "🥚" },
-  { slug: "shops", emoji: "🏪" },
-  { slug: "products", emoji: "🏷️" },
-  { slug: "slots", emoji: "🍽️" },
+const CATALOG: { slug: EntitySlug; Icon: LucideIcon }[] = [
+  { slug: "ingredients", Icon: Egg },
+  { slug: "shops", Icon: Store },
+  { slug: "products", Icon: Tag },
+  { slug: "slots", Icon: Utensils },
 ];
 
 export default async function ManagePage() {
@@ -63,24 +64,24 @@ export default async function ManagePage() {
           <p className="section-label">Catalog</p>
           <Link href="/recipes" className="account-row">
             <span className="row-link">
-              <span className="icon-badge" aria-hidden="true">📖</span>
+              <span className="icon-badge" aria-hidden="true"><BookOpen size={18} /></span>
               <span className="title">Recipes</span>
             </span>
             <span className="meta" style={{ marginTop: 0 }}>
               {recipesCount ?? "—"}
             </span>
-            <span className="arrow" aria-hidden="true">›</span>
+            <ChevronRight className="arrow" size={16} aria-hidden="true" />
           </Link>
-          {CATALOG.map(({ slug, emoji }) => (
+          {CATALOG.map(({ slug, Icon }) => (
             <Link key={slug} href={`/manage/${slug}`} className="account-row">
               <span className="row-link">
-                <span className="icon-badge" aria-hidden="true">{emoji}</span>
+                <span className="icon-badge" aria-hidden="true"><Icon size={18} /></span>
                 <span className="title">{ENTITIES[slug].label}</span>
               </span>
               <span className="meta" style={{ marginTop: 0 }}>
                 {counts[slug] ?? "—"}
               </span>
-              <span className="arrow" aria-hidden="true">›</span>
+              <ChevronRight className="arrow" size={16} aria-hidden="true" />
             </Link>
           ))}
         </section>
