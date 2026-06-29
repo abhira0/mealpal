@@ -9,6 +9,7 @@ type Recipe = {
   name: string;
   baseServings: number;
   notes: string | null;
+  costCents: number | null;
 };
 
 export default function RecipesPage() {
@@ -72,7 +73,12 @@ export default function RecipesPage() {
                 <span className="thumb" aria-hidden="true" />
                 <span className="row-main">
                   <span className="title" style={{ display: "block" }}>{r.name}</span>
-                  <span className="meta">Serves {r.baseServings}</span>
+                  <span className="meta">
+                    Serves {r.baseServings}
+                    {r.costCents != null && r.baseServings > 0
+                      ? ` · $${(r.costCents / r.baseServings / 100).toFixed(2)}/meal`
+                      : ""}
+                  </span>
                 </span>
               </span>
               <span className="arrow" aria-hidden="true">›</span>

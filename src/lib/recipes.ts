@@ -59,8 +59,13 @@ export function updateRecipe(db: Db, householdId: number, id: number, input: Rec
 }
 
 export function listRecipes(db: Db, householdId: number) {
-  return db.select().from(schema.recipes)
+  const recipes = db.select().from(schema.recipes)
     .where(eq(schema.recipes.householdId, householdId)).all();
+  return recipes.map((recipe) => {
+    const ingredients = db.select().from(schema.recipeIngredients)
+      .where(eq(schema.recipeIngredients.recipeId, recipe.id)).all();
+    return { ...recipe, costCents: recipeCostCents(db, householdId, ingredients) };
+  });
 }
 
 export function getRecipe(db: Db, householdId: number, id: number) {
