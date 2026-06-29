@@ -246,4 +246,19 @@ input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:#a9a496;posi
 .cook-nav{display:flex;gap:12px}
 .cook-nav .btn{flex:1}
 
+/* recipe editor */
+.icon-x{flex:none;display:grid;place-items:center;width:34px;height:34px;border:1px solid var(--line);border-radius:8px;background:var(--paper-raised);color:var(--sage);cursor:pointer}
+.icon-x:hover:not(:disabled){color:var(--paprika);border-color:var(--paprika)}
+.icon-x:disabled{opacity:.35;cursor:default}
+.ing-edit{display:flex;gap:8px;align-items:center}
+.ing-edit-sel{flex:3;min-width:0}
+.ing-edit-qty{flex:2;min-width:0;position:relative}
+.ing-edit-unit{position:absolute;right:12px;top:50%;transform:translateY(-50%);opacity:.5;pointer-events:none}
+.step-edit{display:flex;gap:8px;align-items:flex-start;background:var(--paper-raised);border:1px solid var(--line);border-radius:10px;padding:8px}
+.step-grip{flex:none;background:none;border:none;color:var(--sage);cursor:grab;padding:6px 2px;display:grid;place-items:center}
+.step-edit-num{flex:none;width:24px;height:24px;border-radius:6px;background:var(--enamel);color:var(--paper);font-weight:700;font-size:12px;display:grid;place-items:center;margin-top:5px}
+.step-edit-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.step-insert{align-self:center;display:grid;place-items:center;width:26px;height:22px;border:1px dashed var(--line);border-radius:999px;background:none;color:var(--sage);cursor:pointer;margin:2px 0}
+.step-insert:hover{color:var(--enamel);border-color:var(--enamel)}
+
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}

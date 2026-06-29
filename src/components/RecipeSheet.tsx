@@ -1,12 +1,31 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical, Plus, X } from "lucide-react";
 import { Sheet } from "@/components/Sheet";
 import { Stepper } from "@/components/Stepper";
 import { Dropdown } from "@/components/Dropdown";
 
 type Ingredient = { id: number; name: string; canonicalUnit: string };
 type DraftIngredient = { ingredientId: number | null; amount: string };
+type DraftStep = { id: string; text: string; start: string; end: string };
 type Media = { kind: string; url: string };
 
 // Full recipe shape when editing; undefined when creating.
@@ -21,7 +40,10 @@ export type EditableRecipe = {
   media?: Media[];
 };
 
-type DraftStep = { text: string; start: string; end: string };
+type Tab = "details" | "ingredients" | "steps";
+
+let stepUid = 0;
+const newStep = (text = "", start = "", end = ""): DraftStep => ({ id: `s${stepUid++}`, text, start, end });
 
 /** "1:05" or "65" -> 65 seconds; blank/invalid -> null. */
 function parseClip(s: string): number | null {
@@ -79,19 +101,25 @@ export function RecipeSheet({
   recipe?: EditableRecipe;
 }) {
   const editing = recipe != null;
+  const [tab, setTab] = useState<Tab>("details");
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [name, setName] = useState("");
   const [baseServings, setBaseServings] = useState(2);
   const [totalMinutes, setTotalMinutes] = useState("");
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<DraftIngredient[]>([{ ingredientId: null, amount: "" }]);
-  const [steps, setSteps] = useState<DraftStep[]>([{ text: "", start: "", end: "" }]);
+  const [steps, setSteps] = useState<DraftStep[]>([newStep()]);
   // The recipe photo (data URL or existing url); null = none.
   const [photo, setPhoto] = useState<string | null>(null);
   // Non-photo media (video/youtube) preserved across edits.
   const [otherMedia, setOtherMedia] = useState<Media[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -105,6 +133,7 @@ export function RecipeSheet({
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setTab("details");
     if (recipe) {
       setName(recipe.name);
       setBaseServings(recipe.baseServings || 1);
@@ -117,8 +146,8 @@ export function RecipeSheet({
       );
       setSteps(
         recipe.steps.length
-          ? recipe.steps.map((s) => ({ text: s.text, start: fmtClip(s.startSeconds), end: fmtClip(s.endSeconds) }))
-          : [{ text: "", start: "", end: "" }],
+          ? recipe.steps.map((s) => newStep(s.text, fmtClip(s.startSeconds), fmtClip(s.endSeconds)))
+          : [newStep()],
       );
       const media = recipe.media ?? [];
       setPhoto(media.find((m) => m.kind === "photo")?.url ?? null);
@@ -129,7 +158,7 @@ export function RecipeSheet({
       setTotalMinutes("");
       setNotes("");
       setLines([{ ingredientId: null, amount: "" }]);
-      setSteps([{ text: "", start: "", end: "" }]);
+      setSteps([newStep()]);
       setPhoto(null);
       setOtherMedia([]);
     }
@@ -142,8 +171,28 @@ export function RecipeSheet({
     setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
   }
 
+  function insertStep(at: number) {
+    setSteps((prev) => [...prev.slice(0, at), newStep(), ...prev.slice(at)]);
+  }
+  function updateStep(id: string, patch: Partial<DraftStep>) {
+    setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  }
+  function removeStep(id: string) {
+    setSteps((prev) => (prev.length > 1 ? prev.filter((s) => s.id !== id) : prev));
+  }
+  function onStepDragEnd(e: DragEndEvent) {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    setSteps((prev) => {
+      const oldIndex = prev.findIndex((s) => s.id === active.id);
+      const newIndex = prev.findIndex((s) => s.id === over.id);
+      return arrayMove(prev, oldIndex, newIndex);
+    });
+  }
+
   async function submit() {
     if (!name.trim()) {
+      setTab("details");
       setError("Please give the recipe a name.");
       return;
     }
@@ -178,190 +227,175 @@ export function RecipeSheet({
   return (
     <Sheet open={open} title={editing ? "Edit recipe" : "New recipe"} onClose={onClose}>
       <div className="sh-body">
-        <label className="field">
-          <span className="field-label">Name</span>
-          <input
-            type="text"
-            className="input"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Sunday Pancakes"
-          />
-        </label>
-
-        <div className="servings-row">
-          <span className="field-label" style={{ marginBottom: 0 }}>Base servings</span>
-          <Stepper value={baseServings} min={1} onChange={setBaseServings} />
+        <div className="tabs" role="tablist" style={{ marginBottom: 4 }}>
+          <button type="button" aria-pressed={tab === "details"} onClick={() => setTab("details")}>Details</button>
+          <button type="button" aria-pressed={tab === "ingredients"} onClick={() => setTab("ingredients")}>Ingredients</button>
+          <button type="button" aria-pressed={tab === "steps"} onClick={() => setTab("steps")}>Steps</button>
         </div>
 
-        <label className="field">
-          <span className="field-label">Total time (min)</span>
-          <input
-            type="text"
-            inputMode="numeric"
-            className="input mono"
-            value={totalMinutes}
-            onChange={(e) => setTotalMinutes(e.target.value.replace(/[^0-9]/g, ""))}
-            placeholder="Optional, e.g. 15"
-          />
-        </label>
-
-        <div className="field">
-          <span className="field-label">Ingredients</span>
-          <div className="stack-sm">
-            {lines.map((line, idx) => (
-              <div key={idx} className="stack-sm" style={{ gap: 6 }}>
-                <Dropdown
-                  value={line.ingredientId}
-                  options={ingredientOptions}
-                  placeholder={
-                    ingredients.length === 0 ? "No ingredients yet" : "Choose ingredient…"
-                  }
-                  onChange={(id) => updateLine(idx, { ingredientId: Number(id) })}
-                />
-                <div style={{ position: "relative" }}>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    className="input mono"
-                    value={line.amount}
-                    onChange={(e) => updateLine(idx, { amount: e.target.value })}
-                    placeholder="Amount (e.g. 300)"
-                    aria-label="Amount"
-                  />
-                  {(() => {
-                    const unit = ingredients.find((i) => i.id === line.ingredientId)?.canonicalUnit;
-                    return unit ? (
-                      <span
-                        className="mono"
-                        style={{
-                          position: "absolute",
-                          right: 12,
-                          top: "50%",
-                          transform: "translateY(-50%)",
-                          opacity: 0.5,
-                          pointerEvents: "none",
-                        }}
-                      >
-                        {unit}
-                      </span>
-                    ) : null;
-                  })()}
-                </div>
-              </div>
-            ))}
-            <button
-              type="button"
-              className="trigger add"
-              onClick={() => setLines((prev) => [...prev, { ingredientId: null, amount: "" }])}
-            >
-              + Add ingredient
-            </button>
-          </div>
-        </div>
-
-        <div className="field">
-          <span className="field-label">Steps</span>
-          {hasVideo ? (
-            <span className="body" style={{ color: "var(--sage)", marginBottom: 6, display: "block" }}>
-              Add a video clip (start–end, e.g. 1:05) to play that moment in cook mode.
-            </span>
-          ) : null}
-          <div className="stack-sm">
-            {steps.map((step, idx) => {
-              const setStep = (patch: Partial<DraftStep>) =>
-                setSteps((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
-              return (
-                <div key={idx} className="stack-sm" style={{ gap: 6 }}>
-                  <input
-                    type="text"
-                    className="input"
-                    value={step.text}
-                    onChange={(e) => setStep({ text: e.target.value })}
-                    placeholder={`Step ${idx + 1}`}
-                    aria-label={`Step ${idx + 1}`}
-                  />
-                  {hasVideo ? (
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        className="input mono"
-                        value={step.start}
-                        onChange={(e) => setStep({ start: e.target.value })}
-                        placeholder="Clip start (0:30)"
-                        aria-label={`Step ${idx + 1} clip start`}
-                      />
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        className="input mono"
-                        value={step.end}
-                        onChange={(e) => setStep({ end: e.target.value })}
-                        placeholder="Clip end (0:48)"
-                        aria-label={`Step ${idx + 1} clip end`}
-                      />
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
-            <button
-              type="button"
-              className="trigger add"
-              onClick={() => setSteps((prev) => [...prev, { text: "", start: "", end: "" }])}
-            >
-              + Add step
-            </button>
-          </div>
-        </div>
-
-        <div className="field">
-          <span className="field-label">Photo</span>
-          {photo ? (
-            <div className="media" style={{ marginBottom: 8 }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={photo} alt="Recipe" />
-            </div>
-          ) : null}
-          <div className="stack-sm" style={{ flexDirection: "row", gap: 8 }}>
-            <label className="trigger add" style={{ cursor: "pointer" }}>
-              {photo ? "Replace photo" : "Add photo"}
+        {tab === "details" && (
+          <>
+            <label className="field">
+              <span className="field-label">Name</span>
               <input
-                type="file"
-                accept="image/*"
-                style={{ display: "none" }}
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = "";
-                  if (!file) return;
-                  try {
-                    setPhoto(await fileToPhotoDataUrl(file));
-                  } catch {
-                    setError("Couldn't read that image.");
-                  }
-                }}
+                type="text"
+                className="input"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Sunday Pancakes"
               />
             </label>
-            {photo ? (
-              <button type="button" className="trigger add" onClick={() => setPhoto(null)}>
-                Remove
-              </button>
-            ) : null}
-          </div>
-        </div>
 
-        <label className="field">
-          <span className="field-label">Notes</span>
-          <textarea
-            className="input"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Optional"
-            rows={2}
-            style={{ resize: "vertical" }}
-          />
-        </label>
+            <div className="servings-row">
+              <span className="field-label" style={{ marginBottom: 0 }}>Base servings</span>
+              <Stepper value={baseServings} min={1} onChange={setBaseServings} />
+            </div>
+
+            <label className="field">
+              <span className="field-label">Total time (min)</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                className="input mono"
+                value={totalMinutes}
+                onChange={(e) => setTotalMinutes(e.target.value.replace(/[^0-9]/g, ""))}
+                placeholder="Optional, e.g. 15"
+              />
+            </label>
+
+            <div className="field">
+              <span className="field-label">Photo</span>
+              {photo ? (
+                <div className="media" style={{ marginBottom: 8 }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={photo} alt="Recipe" />
+                </div>
+              ) : null}
+              <div className="stack-sm" style={{ flexDirection: "row", gap: 8 }}>
+                <label className="trigger add" style={{ cursor: "pointer" }}>
+                  {photo ? "Replace photo" : "Add photo"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (!file) return;
+                      try {
+                        setPhoto(await fileToPhotoDataUrl(file));
+                      } catch {
+                        setError("Couldn't read that image.");
+                      }
+                    }}
+                  />
+                </label>
+                {photo ? (
+                  <button type="button" className="trigger add" onClick={() => setPhoto(null)}>
+                    Remove
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            <label className="field">
+              <span className="field-label">Notes</span>
+              <textarea
+                className="input"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Optional"
+                rows={2}
+                style={{ resize: "vertical" }}
+              />
+            </label>
+          </>
+        )}
+
+        {tab === "ingredients" && (
+          <div className="field">
+            <span className="field-label">Ingredients</span>
+            <div className="stack-sm">
+              {lines.map((line, idx) => {
+                const unit = ingredients.find((i) => i.id === line.ingredientId)?.canonicalUnit;
+                return (
+                  <div key={idx} className="ing-edit">
+                    <div className="ing-edit-sel">
+                      <Dropdown
+                        value={line.ingredientId}
+                        options={ingredientOptions}
+                        placeholder={ingredients.length === 0 ? "No ingredients yet" : "Choose…"}
+                        onChange={(id) => updateLine(idx, { ingredientId: Number(id) })}
+                      />
+                    </div>
+                    <div className="ing-edit-qty">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        className="input mono"
+                        value={line.amount}
+                        onChange={(e) => updateLine(idx, { amount: e.target.value })}
+                        placeholder="Amount"
+                        aria-label="Amount"
+                      />
+                      {unit ? <span className="ing-edit-unit mono">{unit}</span> : null}
+                    </div>
+                    <button
+                      type="button"
+                      className="icon-x"
+                      aria-label="Remove ingredient"
+                      onClick={() => setLines((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev))}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                );
+              })}
+              <button
+                type="button"
+                className="trigger add"
+                onClick={() => setLines((prev) => [...prev, { ingredientId: null, amount: "" }])}
+              >
+                + Add ingredient
+              </button>
+            </div>
+          </div>
+        )}
+
+        {tab === "steps" && (
+          <div className="field">
+            <span className="field-label">Steps</span>
+            {hasVideo ? (
+              <span className="body" style={{ color: "var(--sage)", marginBottom: 6, display: "block" }}>
+                Add a clip (start–end, e.g. 1:05) to play that moment in cook mode. Drag the handle to reorder.
+              </span>
+            ) : (
+              <span className="body" style={{ color: "var(--sage)", marginBottom: 6, display: "block" }}>
+                Drag the handle to reorder. Use + to insert a step.
+              </span>
+            )}
+            <div className="stack-sm">
+              <InsertLine onClick={() => insertStep(0)} />
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onStepDragEnd}>
+                <SortableContext items={steps.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+                  {steps.map((step, idx) => (
+                    <div key={step.id} className="stack-sm" style={{ gap: 0 }}>
+                      <SortableStep
+                        step={step}
+                        index={idx}
+                        hasVideo={hasVideo}
+                        canRemove={steps.length > 1}
+                        onChange={(patch) => updateStep(step.id, patch)}
+                        onRemove={() => removeStep(step.id)}
+                      />
+                      <InsertLine onClick={() => insertStep(idx + 1)} />
+                    </div>
+                  ))}
+                </SortableContext>
+              </DndContext>
+            </div>
+          </div>
+        )}
 
         {error ? <p className="notice">{error}</p> : null}
 
@@ -370,5 +404,88 @@ export function RecipeSheet({
         </button>
       </div>
     </Sheet>
+  );
+}
+
+function InsertLine({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" className="step-insert" aria-label="Insert step here" onClick={onClick}>
+      <Plus size={14} />
+    </button>
+  );
+}
+
+function SortableStep({
+  step,
+  index,
+  hasVideo,
+  canRemove,
+  onChange,
+  onRemove,
+}: {
+  step: DraftStep;
+  index: number;
+  hasVideo: boolean;
+  canRemove: boolean;
+  onChange: (patch: Partial<DraftStep>) => void;
+  onRemove: () => void;
+}) {
+  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id: step.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.6 : 1 };
+  return (
+    <div ref={setNodeRef} style={style} className="step-edit">
+      <button
+        type="button"
+        className="step-grip"
+        aria-label={`Reorder step ${index + 1}`}
+        style={{ touchAction: "none" }}
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical size={18} />
+      </button>
+      <span className="step-edit-num mono">{index + 1}</span>
+      <div className="step-edit-body">
+        <input
+          type="text"
+          className="input"
+          value={step.text}
+          onChange={(e) => onChange({ text: e.target.value })}
+          placeholder={`Step ${index + 1}`}
+          aria-label={`Step ${index + 1}`}
+        />
+        {hasVideo ? (
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              type="text"
+              inputMode="numeric"
+              className="input mono"
+              value={step.start}
+              onChange={(e) => onChange({ start: e.target.value })}
+              placeholder="Clip start (0:30)"
+              aria-label={`Step ${index + 1} clip start`}
+            />
+            <input
+              type="text"
+              inputMode="numeric"
+              className="input mono"
+              value={step.end}
+              onChange={(e) => onChange({ end: e.target.value })}
+              placeholder="Clip end (0:48)"
+              aria-label={`Step ${index + 1} clip end`}
+            />
+          </div>
+        ) : null}
+      </div>
+      <button
+        type="button"
+        className="icon-x"
+        aria-label={`Remove step ${index + 1}`}
+        disabled={!canRemove}
+        onClick={onRemove}
+      >
+        <X size={16} />
+      </button>
+    </div>
   );
 }
