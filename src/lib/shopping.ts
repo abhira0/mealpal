@@ -185,7 +185,7 @@ export function deleteExtra(db: Db, householdId: number, id: number) {
 export interface ShoppingLine {
   ingredientId: number; ingredientName: string;
   needed: number;        // canonical units short
-  product: { id: number; name: string } | null; // top-priority available product
+  product: { id: number; name: string; packSize: number } | null; // top-priority available product
 }
 
 /**
@@ -219,7 +219,7 @@ export function buyRecommendation(
     const shopKey = shop?.name ?? "Unassigned";
     const line: ShoppingLine = {
       ingredientId, ingredientName: nameById.get(ingredientId) ?? "?",
-      needed, product: product ? { id: product.id, name: product.name } : null,
+      needed, product: product ? { id: product.id, name: product.name, packSize: product.packSize } : null,
     };
     if (!result.has(shopKey)) result.set(shopKey, []);
     result.get(shopKey)!.push(line);
