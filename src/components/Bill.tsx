@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { Ticket } from "@/components/ShopTicket";
+import { Dropdown } from "@/components/Dropdown";
 import { centsToDollars } from "@/lib/money";
 
 type Pending = {
@@ -162,17 +163,12 @@ function BillRow({
     <div className="ticket-row">
       <div className="tk-main">
         {alts.length > 1 ? (
-          <select
-            className="input mono tk-name"
+          <Dropdown
+            label="What did you buy?"
             value={row.productId}
-            disabled={busy}
-            onChange={(e) => swap(Number(e.target.value))}
-            aria-label={`Product bought instead of ${row.productName}`}
-          >
-            {alts.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
+            options={alts.map((p) => ({ id: p.id, label: p.name }))}
+            onChange={(id) => swap(Number(id))}
+          />
         ) : (
           <div className="tk-name">{row.productName}</div>
         )}
