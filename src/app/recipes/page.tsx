@@ -1,98 +1,52 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { useState } from "react";
+import { EntityList } from "@/components/EntityList";
 import { RecipeSheet } from "@/components/RecipeSheet";
+import type { ListConfig } from "@/app/manage/entities";
 
-type Recipe = {
-  id: number;
-  name: string;
-  baseServings: number;
-  notes: string | null;
-  costCents: number | null;
+const RECIPE_LIST: ListConfig = {
+  label: "Recipes",
+  listPath: "/api/recipes",
+  itemPath: (id) => `/api/recipes/${id}`, // unused (canDelete: false), edit happens on detail page
+  canEdit: true,
+  canDelete: false,
+  columns: [
+    { key: "name", label: "Name" },
+    {
+      key: "meta",
+      label: "", // label-less meta line: "Serves 4 · $3.20/meal"
+      format: (r) => {
+        const servings = Number(r.baseServings);
+        const cents = r.costCents == null ? null : Number(r.costCents);
+        const perMeal =
+          cents != null && servings > 0
+            ? ` · $${(cents / servings / 100).toFixed(2)}/meal`
+            : "";
+        return `Serves ${servings}${perMeal}`;
+      },
+    },
+  ],
 };
 
 export default function RecipesPage() {
-  const [recipes, setRecipes] = useState<Recipe[] | null>(null);
-  const [query, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
-
-  async function loadRecipes() {
-    const res = await fetch("/api/recipes");
-    if (res.ok) setRecipes(await res.json());
-  }
-
-  useEffect(() => {
-    loadRecipes();
-  }, []);
-
-  const filtered = useMemo(() => {
-    if (!recipes) return [];
-    const q = query.trim().toLowerCase();
-    if (!q) return recipes;
-    return recipes.filter((r) => r.name.toLowerCase().includes(q));
-  }, [recipes, query]);
+  const [reload, setReload] = useState(0);
 
   return (
     <>
-      <header className="chrome">
-        <Link href="/manage" className="chrome-back">← Catalog</Link>
-        <h1>Recipes</h1>
-      </header>
-
-      <div className="content stack-sm">
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <div className="search" style={{ flex: 1 }}>
-            <span className="search-icon" aria-hidden="true">⌕</span>
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search recipes"
-              aria-label="Search recipes"
-              className="input"
-            />
-          </div>
-          <button type="button" className="btn" style={{ flex: "0 0 auto" }} onClick={() => setCreateOpen(true)}>
-            + New recipe
-          </button>
-        </div>
-
-        {recipes === null ? (
-          <p className="loading">Loading…</p>
-        ) : filtered.length === 0 ? (
-          <p className="empty">
-            {recipes.length === 0
-              ? "No recipes yet — add one to start planning."
-              : "No recipes match your search."}
-          </p>
-        ) : (
-          filtered.map((r) => (
-            <Link key={r.id} href={`/recipes/${r.id}`} className="row">
-              <span className="row-link">
-                <span className="thumb" aria-hidden="true" />
-                <span className="row-main">
-                  <span className="title" style={{ display: "block" }}>{r.name}</span>
-                  <span className="meta">
-                    Serves {r.baseServings}
-                    {r.costCents != null && r.baseServings > 0
-                      ? ` · $${(r.costCents / r.baseServings / 100).toFixed(2)}/meal`
-                      : ""}
-                  </span>
-                </span>
-              </span>
-              <ChevronRight className="arrow" size={16} aria-hidden="true" />
-            </Link>
-          ))
-        )}      </div>
-
+      <EntityList
+        config={RECIPE_LIST}
+        detailHref={(r) => `/recipes/${r.id}`}
+        create={{ label: "+ New", onClick: () => setCreateOpen(true) }}
+        reloadToken={reload}
+      />
       <RecipeSheet
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onSaved={() => {
           setCreateOpen(false);
-          loadRecipes();
+          setReload((n) => n + 1);
         }}
       />
     </>

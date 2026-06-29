@@ -32,13 +32,14 @@ export type ColumnDef = {
   format?: (row: Record<string, unknown>) => string;
 };
 
-export type EntityConfig = {
+// What EntityList needs to render a list. EntityConfig extends this with the
+// extra bits the create/edit form needs. Recipes supplies a bare ListConfig
+// (it has a bespoke form) so it can reuse EntityList.
+export type ListConfig = {
   label: string;
-  singular: string;
   listPath: string; // GET (list) + POST (create)
   itemPath: (id: string | number) => string; // PATCH + DELETE
   columns: ColumnDef[];
-  fields: FieldDef[];
   // If set, the list shows a brand favicon for each row.
   icon?: (row: Record<string, unknown>) => {
     name: string;
@@ -49,6 +50,11 @@ export type EntityConfig = {
   bigImage?: boolean;
   canEdit: boolean;
   canDelete: boolean;
+};
+
+export type EntityConfig = ListConfig & {
+  singular: string;
+  fields: FieldDef[];
   // If set, the New form shows an "Import from site" button that POSTs here
   // and prefills any returned key matching a field name.
   importPath?: string;

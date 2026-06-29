@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronRight } from "lucide-react";
-import { ENTITIES, type ColumnDef, type EntitySlug } from "@/app/manage/entities";
+import { ENTITIES, type ColumnDef, type EntitySlug, type ListConfig } from "@/app/manage/entities";
 import { Favicon } from "@/components/Favicon";
 
 type Row = Record<string, unknown> & { id: number | string };
@@ -15,8 +15,20 @@ async function getJSON(url: string): Promise<unknown> {
   return res.json();
 }
 
-export function EntityList({ slug }: { slug: EntitySlug }) {
-  const config = ENTITIES[slug];
+// Generic entities pass `slug` and everything defaults off ENTITIES. Bespoke
+// lists (recipes) pass their own config + detailHref + create action, and bump
+// reloadToken to refetch after their own form saves.
+export function EntityList(props: {
+  slug?: EntitySlug;
+  config?: ListConfig;
+  detailHref?: (row: Row) => string;
+  create?: { label: string; href?: string; onClick?: () => void };
+  reloadToken?: number;
+}) {
+  const { slug, reloadToken = 0 } = props;
+  const config = props.config ?? ENTITIES[slug!];
+  const detailHref = props.detailHref ?? ((row: Row) => `/manage/${slug}/${row.id}`);
+  const create = props.create ?? { label: "+ New", href: `/manage/${slug}/new` };
   const [rows, setRows] = useState<Row[]>([]);
   const [refs, setRefs] = useState<RefMaps>({});
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +79,7 @@ export function EntityList({ slug }: { slug: EntitySlug }) {
     return () => {
       cancelled = true;
     };
-  }, [config.listPath, refSlugs]);
+  }, [config.listPath, refSlugs, reloadToken]);
 
   async function remove(id: string | number) {
     setError(null);
@@ -122,13 +134,24 @@ export function EntityList({ slug }: { slug: EntitySlug }) {
               />
             </div>
           )}
-          <Link
-            href={`/manage/${slug}/new`}
-            className="btn"
-            style={{ flex: rows.length > 0 ? "0 0 auto" : 1, textDecoration: "none" }}
-          >
-            + New
-          </Link>
+          {create.href ? (
+            <Link
+              href={create.href}
+              className="btn"
+              style={{ flex: rows.length > 0 ? "0 0 auto" : 1, textDecoration: "none" }}
+            >
+              {create.label}
+            </Link>
+          ) : (
+            <button
+              type="button"
+              className="btn"
+              style={{ flex: rows.length > 0 ? "0 0 auto" : 1 }}
+              onClick={create.onClick}
+            >
+              {create.label}
+            </button>
+          )}
         </div>
 
         {loaded && rows.length === 0 && !error && (
@@ -148,7 +171,7 @@ export function EntityList({ slug }: { slug: EntitySlug }) {
           );
           const details = config.columns.slice(1).map((col) => (
             <span key={col.key} className="meta" style={{ display: "block" }}>
-              {col.label}: {cellValue(row, col)}
+              {col.label ? `${col.label}: ` : ""}{cellValue(row, col)}
             </span>
           ));
 
@@ -179,7 +202,7 @@ export function EntityList({ slug }: { slug: EntitySlug }) {
           return (
             <div key={String(row.id)} className="row">
               {config.canEdit ? (
-                <Link href={`/manage/${slug}/${row.id}`} className="row-link">
+                <Link href={detailHref(row)} className="row-link">
                   {badge}
                   {main}
                   <ChevronRight className="arrow" size={16} aria-hidden="true" />
