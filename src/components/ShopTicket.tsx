@@ -83,7 +83,7 @@ export function Ticket({
   return (
     <div className="ticket">
       <div className="ticket-head">
-        <p className="eb">Stop</p>
+        <p className="eb">{shopName === "Generic" ? "Buy anywhere" : "Stop"}</p>
         <h2>
           <Favicon name={shopName} website={website} iconUrl={iconUrl} size={22} />
           {shopName}

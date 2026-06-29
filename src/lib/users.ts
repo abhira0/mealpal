@@ -20,6 +20,11 @@ export async function registerHousehold(db: Db, input: RegisterInput) {
       .values({ name: input.householdName })
       .returning()
       .all();
+    // Generic "buy anywhere" shop for staples (onions, tomatoes) you don't
+    // source from a specific store. ponytail: name is the marker the UI keys on.
+    tx.insert(schema.shops)
+      .values({ householdId: household.id, name: "Generic" })
+      .run();
     const [user] = tx
       .insert(schema.users)
       .values({
