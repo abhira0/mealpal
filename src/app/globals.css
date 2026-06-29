@@ -80,8 +80,17 @@ input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:#a9a496;whit
 
 /* ---------- trigger / dropdown ---------- */
 .trigger{background:var(--paper-raised);border:1px solid var(--line);border-radius:8px;padding:11px 13px;display:flex;justify-content:space-between;align-items:center;font-family:var(--body);font-weight:600;font-size:15px;width:100%;min-height:44px;color:var(--ink);cursor:pointer;gap:8px;text-align:left}
+.trigger.open{border-color:var(--enamel);box-shadow:0 0 0 3px rgba(17,94,89,.15)}
 .trigger .caret{color:var(--sage);font-size:12px}
 .trigger .placeholder{color:#a9a496}
+.dropdown-pop{background:var(--paper-raised);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.18);overflow-y:auto;max-height:min(280px,60dvh);z-index:50}
+.dropdown-pop .o{padding:13px 14px;font-size:15px;font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;background:none;border:none;cursor:pointer;text-align:left;color:var(--ink);min-height:44px}
+.dropdown-pop .o + .o{border-top:1px solid var(--line-soft)}
+.dropdown-pop .o[aria-selected="true"]{color:var(--enamel-dark);background:rgba(17,94,89,.06)}
+.dropdown-pop .o[data-active="true"]{background:rgba(17,94,89,.10)}
+.dropdown-search{position:sticky;top:0;border:none;border-bottom:1px solid var(--line);border-radius:12px 12px 0 0;min-height:46px}
+.dropdown-empty{padding:14px;font-size:14px;color:var(--sage);text-align:center}
+.dropdown-pop .o .tick{color:var(--enamel)}
 
 /* ---------- sheet ---------- */
 .scrim{position:fixed;inset:0;background:rgba(20,25,28,.32);z-index:40}

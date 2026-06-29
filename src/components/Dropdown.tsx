@@ -30,9 +30,16 @@ export function Dropdown({
   onChange,
 }: DropdownProps) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const selected = options.find((o) => o.id === value) ?? null;
+  // Show a filter box only for long lists; short ones don't need it.
+  const searchable = options.length > 8;
+  const shown = query
+    ? options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()))
+    : options;
   const selectedIndex = selected ? options.findIndex((o) => o.id === selected.id) : 0;
   const [active, setActive] = useState(Math.max(0, selectedIndex));
   const [rect, setRect] = useState<DOMRect | null>(null);
@@ -50,9 +57,16 @@ export function Dropdown({
     };
   }, [open]);
 
+  function openMenu() {
+    setQuery("");
+    setActive(Math.max(0, selectedIndex)); // start on the selected row
+    setOpen(true);
+  }
+
+  // Focus the filter box when a searchable menu opens.
   useEffect(() => {
-    if (open) setActive(Math.max(0, selectedIndex));
-  }, [open, selectedIndex]);
+    if (open && searchable) searchRef.current?.focus();
+  }, [open, searchable]);
 
   // Close on outside mousedown / Escape.
   useEffect(() => {
@@ -82,20 +96,20 @@ export function Dropdown({
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      if (!open) setOpen(true);
-      else if (options.length) setActive((i) => (i + 1) % options.length);
+      if (!open) openMenu();
+      else if (shown.length) setActive((i) => (i + 1) % shown.length);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      if (options.length) setActive((i) => (i - 1 + options.length) % options.length);
-    } else if (e.key === "Enter" || e.key === " ") {
+      if (shown.length) setActive((i) => (i - 1 + shown.length) % shown.length);
+    } else if (e.key === "Enter") {
       e.preventDefault();
-      if (open && options[active]) commit(options[active].id);
-      else setOpen(true);
+      if (open && shown[active]) commit(shown[active].id);
+      else openMenu();
     }
   }
 
   // Flip up when the estimated panel won't fit below but fits above.
-  const panelH = Math.min(options.length, 6) * ROW_H + 2;
+  const panelH = Math.min(shown.length, 6) * ROW_H + (searchable ? 52 : 2);
   const flipUp =
     rect != null &&
     rect.bottom + 6 + panelH > window.innerHeight &&
@@ -109,7 +123,7 @@ export function Dropdown({
         className={open ? "trigger open" : "trigger"}
         aria-haspopup="listbox"
         aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => (open ? setOpen(false) : openMenu())}
         onKeyDown={onKeyDown}
       >
         <span className={selected ? undefined : "placeholder"}>
@@ -133,7 +147,22 @@ export function Dropdown({
               : { top: rect.bottom + 6 }),
           }}
         >
-          {options.map((o, i) => {
+          {searchable && (
+            <input
+              ref={searchRef}
+              className="input dropdown-search"
+              type="text"
+              placeholder="Search…"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setActive(0);
+              }}
+              onKeyDown={onKeyDown}
+            />
+          )}
+          {shown.length === 0 && <div className="dropdown-empty">No matches</div>}
+          {shown.map((o, i) => {
             const isSelected = o.id === value;
             return (
               <button
