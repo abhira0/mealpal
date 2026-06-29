@@ -40,7 +40,7 @@ button{font-family:inherit}
 
 /* ---------- cards ---------- */
 .card{background:var(--paper-raised);border:1px solid var(--line);border-radius:8px;padding:14px}
-.card-row{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.card-row{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px}
 .title{font-family:var(--display);font-weight:800;font-size:16px;letter-spacing:-.01em}
 .meta{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--sage);margin-top:2px}
 .body{font-size:14px;line-height:1.45}
@@ -65,7 +65,7 @@ button{font-family:inherit}
 /* ---------- form fields ---------- */
 .field{display:block}
 .field-label{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--sage);display:block;margin-bottom:6px}
-.input{font-family:var(--body);font-size:15px;color:var(--ink);background:var(--paper-raised);border:1px solid var(--line);border-radius:8px;padding:12px 13px;width:100%;min-height:44px}
+.input{font-family:var(--body);font-size:15px;line-height:1.2;color:var(--ink);background:var(--paper-raised);border:1px solid var(--line);border-radius:8px;padding:12px 13px;width:100%;min-height:44px}
 .input::placeholder{color:#a9a496}
 .input.mono{font-family:var(--mono);font-size:14px}
 .search{position:relative}
@@ -177,7 +177,7 @@ button{font-family:inherit}
 .step{display:flex;gap:12px;padding:10px 0;align-items:flex-start}
 .step .num{flex:none;width:28px;height:28px;border-radius:6px;background:var(--enamel);color:var(--paper);font-family:var(--mono);font-weight:700;font-size:13px;display:grid;place-items:center}
 .step .step-text{font-size:15px;line-height:1.45;padding-top:3px}
-.servings-row{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.servings-row{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px}
 
 /* ---------- tabs ---------- */
 .tab{font-family:var(--mono);font-weight:700;font-size:11px;letter-spacing:.08em;text-transform:uppercase;background:var(--paper-raised);border:1px solid var(--line);border-radius:8px;padding:9px 12px;min-height:40px;color:var(--ink);cursor:pointer}
