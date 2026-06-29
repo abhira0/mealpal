@@ -105,39 +105,53 @@ export function EntityList({ slug }: { slug: EntitySlug }) {
 
         {rows.map((row) => {
           const icon = config.icon?.(row);
-          const main = (
-            <span className="row-main">
-              <span className="title" style={{ display: "block", fontSize: 15 }}>
-                {cellValue(row, config.columns[0])}
-              </span>
-              {config.columns.slice(1).map((col) => (
-                <span key={col.key} className="meta" style={{ display: "block" }}>
-                  {col.label}: {cellValue(row, col)}
-                </span>
-              ))}
+          const iconBadge = icon && (
+            <span className="icon-badge">
+              <Favicon name={icon.name} website={icon.website} iconUrl={icon.iconUrl} size={32} />
             </span>
           );
+          const details = config.columns.slice(1).map((col) => (
+            <span key={col.key} className="meta" style={{ display: "block" }}>
+              {col.label}: {cellValue(row, col)}
+            </span>
+          ));
+
+          // bigImage: name on its own row, then [image 40%][details 60%].
+          const main =
+            config.bigImage && icon ? (
+              <span className="row-main">
+                <span className="title" style={{ display: "block", fontSize: 15, marginBottom: 8 }}>
+                  {cellValue(row, config.columns[0])}
+                </span>
+                <span style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                  <span style={{ flex: "0 0 40%" }}>
+                    <Favicon name={icon.name} website={icon.website} iconUrl={icon.iconUrl} size={120} />
+                  </span>
+                  <span style={{ flex: "1 1 auto", minWidth: 0 }}>{details}</span>
+                </span>
+              </span>
+            ) : (
+              <span className="row-main">
+                <span className="title" style={{ display: "block", fontSize: 15 }}>
+                  {cellValue(row, config.columns[0])}
+                </span>
+                {details}
+              </span>
+            );
+          const badge = config.bigImage ? null : iconBadge;
 
           return (
             <div key={String(row.id)} className="row">
               {config.canEdit ? (
                 <Link href={`/manage/${slug}/${row.id}`} className="row-link">
-                  {icon && (
-                    <span className="icon-badge">
-                      <Favicon name={icon.name} website={icon.website} iconUrl={icon.iconUrl} size={32} />
-                    </span>
-                  )}
+                  {badge}
                   {main}
                   <span className="arrow" aria-hidden="true">›</span>
                 </Link>
               ) : (
                 <>
                   <span className="row-link" style={{ cursor: "default" }}>
-                    {icon && (
-                      <span className="icon-badge">
-                        <Favicon name={icon.name} website={icon.website} iconUrl={icon.iconUrl} size={32} />
-                      </span>
-                    )}
+                    {badge}
                     {main}
                   </span>
                   {config.canDelete && (

@@ -117,12 +117,28 @@ async function sendJSON(url: string, method: "POST" | "PATCH", body: unknown) {
   return res.json().catch(() => ({}));
 }
 
-export function EntityForm({ slug, id }: { slug: EntitySlug; id?: string }) {
+export function EntityForm({
+  slug,
+  id,
+  // Embedded: render inside a sheet — no page chrome, and call onDone after a
+  // successful save/delete instead of navigating to the list.
+  embedded = false,
+  onDone,
+  // Field values forced on and hidden from the form (e.g. a pre-set ingredient).
+  lockedValues,
+}: {
+  slug: EntitySlug;
+  id?: string;
+  embedded?: boolean;
+  onDone?: () => void;
+  lockedValues?: Record<string, string>;
+}) {
   const config = ENTITIES[slug];
   const router = useRouter();
   const editing = Boolean(id);
+  const done = () => (onDone ? onDone() : router.push(`/manage/${slug}`));
 
-  const [values, setValues] = useState<Record<string, string>>({});
+  const [values, setValues] = useState<Record<string, string>>(() => ({ ...lockedValues }));
   const [row, setRow] = useState<Row | null>(null);
   const [options, setOptions] = useState<OptionMap>({});
   const [optionRows, setOptionRows] = useState<Record<string, Row[]>>({});
@@ -213,7 +229,7 @@ export function EntityForm({ slug, id }: { slug: EntitySlug; id?: string }) {
       } else {
         await sendJSON(config.listPath, "POST", config.toCreatePayload(values));
       }
-      router.push(`/manage/${slug}`);
+      done();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setBusy(false);
@@ -226,7 +242,7 @@ export function EntityForm({ slug, id }: { slug: EntitySlug; id?: string }) {
     setError(null);
     const res = await fetch(config.itemPath(id), { method: "DELETE" });
     if (res.ok) {
-      router.push(`/manage/${slug}`);
+      done();
       return;
     }
     const j = await res.json().catch(() => ({}));
@@ -354,16 +370,20 @@ export function EntityForm({ slug, id }: { slug: EntitySlug; id?: string }) {
     );
   }
 
+  const visibleFields = config.fields.filter((f) => !(lockedValues && f.name in lockedValues));
+
   return (
     <>
-      <header className="chrome">
-        <Link href={`/manage/${slug}`} className="chrome-back">← {config.label}</Link>
-        <h1>
-          {editing ? "Edit" : "New"} {config.singular.toLowerCase()}
-        </h1>
-      </header>
+      {!embedded && (
+        <header className="chrome">
+          <Link href={`/manage/${slug}`} className="chrome-back">← {config.label}</Link>
+          <h1>
+            {editing ? "Edit" : "New"} {config.singular.toLowerCase()}
+          </h1>
+        </header>
+      )}
 
-      <div className="content">
+      <div className={embedded ? "stack" : "content"}>
         {error && <p className="notice" style={{ marginBottom: 12 }}>{error}</p>}
 
         <form onSubmit={onSubmit} className="card stack">
@@ -378,7 +398,7 @@ export function EntityForm({ slug, id }: { slug: EntitySlug; id?: string }) {
             <img src={values.imageUrl} alt="" style={{ display: "block", maxHeight: 160, borderRadius: 8, margin: "0 auto" }} />
           )}
 
-          {config.fields.map((f) => (
+          {visibleFields.map((f) => (
             <label className="field" key={f.name} htmlFor={f.name}>
               <span className="field-label">
                 {f.label}
