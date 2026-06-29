@@ -63,7 +63,17 @@ export function listAllProducts(db: Db, householdId: number) {
       url: schema.products.url,
       imageUrl: schema.products.imageUrl,
       nutritionPhoto: schema.products.nutritionPhoto,
+      servingSize: schema.products.servingSize,
       calories: schema.products.calories,
+      fatG: schema.products.fatG,
+      satFatG: schema.products.satFatG,
+      transFatG: schema.products.transFatG,
+      cholesterolMg: schema.products.cholesterolMg,
+      sodiumMg: schema.products.sodiumMg,
+      carbsG: schema.products.carbsG,
+      fiberG: schema.products.fiberG,
+      sugarG: schema.products.sugarG,
+      proteinG: schema.products.proteinG,
     })
     .from(schema.products)
     .where(eq(schema.products.householdId, householdId))
@@ -154,6 +164,8 @@ export interface ProductPatch {
   url?: string | null;
   // public-folder path to the label photo (set by the nutrition upload route)
   nutritionPhoto?: string | null;
+  // one serving in canonical units; per-serving label = per-unit value × this.
+  servingSize?: number | null;
   // nutrition per canonical unit; filled from the label photo. null = unknown.
   calories?: number | null;
   fatG?: number | null;

@@ -59,6 +59,8 @@ export const products = sqliteTable("products", {
   imageUrl: text("image_url"),
   // public-folder path to the uploaded nutrition-facts label photo, e.g. "/nutrition/3.jpg"
   nutritionPhoto: text("nutrition_photo"),
+  // one serving, in the ingredient's canonical unit (e.g. 30 g). null = unknown.
+  servingSize: real("serving_size"),
   // nutrition values PER CANONICAL UNIT (e.g. kcal per gram), read off the label
   // photo. null = not filled in yet. See drizzle/.../nutrition-counter design.
   calories: real("calories"),
