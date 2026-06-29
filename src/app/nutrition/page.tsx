@@ -12,8 +12,6 @@ function todayISO(): string {
   return `${t.getFullYear()}-${z(t.getMonth() + 1)}-${z(t.getDate())}`;
 }
 
-const round = (n: number) => Math.round(n);
-
 export default function NutritionPage() {
   const [tab, setTab] = useState<"overview" | "breakdown">("overview");
   const [mode, setMode] = useState<"day" | "week">("day");
@@ -322,43 +320,31 @@ function CalorieMacroRing({ cal, macros, goal }: { cal: number; macros: Analysis
   return <EChart option={option as never} height={240} />;
 }
 
-function CaloriesByMeal({ meals }: { meals: MealLine[] }) {
-  const max = Math.max(...meals.map((m) => m.calories), 1);
-  return (
-    <>
-      <p className="section-label">Calories by meal</p>
-      {meals.map((m, i) => (
-        <div key={i} style={{ margin: "6px 0" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-            <span>{m.estimate ? "≈ " : ""}<b>{m.slotName}</b> <span style={{ opacity: 0.6 }}>{m.recipeName}</span></span>
-            <span className="mono" style={{ fontSize: 11, color: "var(--sage)" }}>{round(m.calories)} kcal</span>
-          </div>
-          <div style={{ height: 6, borderRadius: 99, background: "#e3ddcc", overflow: "hidden", marginTop: 2 }}>
-            <div style={{ height: "100%", width: `${(m.calories / max) * 100}%`, background: MACRO_COLOR.protein }} />
-          </div>
-        </div>
-      ))}
-    </>
-  );
+// Shared rows for the nutrient tables: calories + the FDA label rows.
+const LABEL_ROWS: { key: keyof Nutrients; label: string; unit: string; bold: boolean; indent: boolean }[] = [
+  { key: "calories", label: "Calories", unit: "", bold: true, indent: false },
+  ...FACT_ROWS.map((r) => ({
+    key: r.key as keyof Nutrients, label: r.label, unit: r.unit,
+    bold: "bold" in r ? !!r.bold : false, indent: "indent" in r ? !!r.indent : false,
+  })),
+];
+
+// Goal per nutrient: user goals for calories/protein/carbs/fat, FDA Daily Values otherwise.
+function goalFor(key: keyof Nutrients, goals: Goals): number | null {
+  if (key === "calories") return goals.calorieGoal;
+  if (key === "proteinG") return goals.proteinG;
+  if (key === "carbsG") return goals.carbsG;
+  if (key === "fatG") return goals.fatG;
+  const row = FACT_ROWS.find((r) => r.key === key);
+  return row && "dv" in row ? row.dv : null;
 }
 
-// Full nutrient list (calories + the FDA label rows), each vs its goal:
-// user goals for calories/protein/carbs/fat, FDA Daily Values for the rest.
+const pctOf = (value: number, goal: number | null) =>
+  goal && goal > 0 ? Math.round((value / goal) * 100) : null;
+
+const STICKY = { position: "sticky" as const, left: 0, background: "var(--paper)" };
+
 function NutrientTable({ n, goals }: { n: Nutrients; goals: Goals }) {
-  const goalFor = (key: string): number | null => {
-    if (key === "proteinG") return goals.proteinG;
-    if (key === "carbsG") return goals.carbsG;
-    if (key === "fatG") return goals.fatG;
-    const row = FACT_ROWS.find((r) => r.key === key);
-    return row && "dv" in row ? row.dv : null;
-  };
-  const rows: { label: string; value: number; unit: string; goal: number | null; bold?: boolean; indent?: boolean }[] = [
-    { label: "Calories", value: n.calories, unit: "", goal: goals.calorieGoal, bold: true },
-    ...FACT_ROWS.map((r) => ({
-      label: r.label, value: n[r.key], unit: r.unit, goal: goalFor(r.key),
-      bold: "bold" in r ? r.bold : false, indent: "indent" in r ? r.indent : false,
-    })),
-  ];
   return (
     <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
       <thead>
@@ -370,20 +356,62 @@ function NutrientTable({ n, goals }: { n: Nutrients; goals: Goals }) {
         </tr>
       </thead>
       <tbody>
-        {rows.map((r, i) => {
-          const pct = r.goal && r.goal > 0 ? Math.round((r.value / r.goal) * 100) : null;
+        {LABEL_ROWS.map((r) => {
+          const goal = goalFor(r.key, goals);
+          const pct = pctOf(n[r.key], goal);
           const over = pct != null && pct > 100;
           return (
-            <tr key={i} style={{ borderTop: "1px solid var(--line)" }}>
-              <th scope="row" style={{ textAlign: "left", fontWeight: r.bold ? 700 : 400, paddingLeft: r.indent ? 14 : 0, padding: "4px 8px 4px 0" }}>{r.label}</th>
-              <td style={{ textAlign: "right", padding: "4px 8px", fontWeight: r.bold ? 700 : 400 }}>{nfmt(r.value)}{r.unit}</td>
-              <td style={{ textAlign: "right", padding: "4px 8px", color: "var(--sage)" }}>{r.goal != null ? `${r.goal}${r.unit}` : "—"}</td>
+            <tr key={r.key} style={{ borderTop: "1px solid var(--line)" }}>
+              <th scope="row" style={{ textAlign: "left", fontWeight: r.bold ? 700 : 400, padding: "4px 8px 4px 0", paddingLeft: r.indent ? 14 : 0 }}>{r.label}</th>
+              <td style={{ textAlign: "right", padding: "4px 8px", fontWeight: r.bold ? 700 : 400 }}>{nfmt(n[r.key])}{r.unit}</td>
+              <td style={{ textAlign: "right", padding: "4px 8px", color: "var(--sage)" }}>{goal != null ? `${goal}${r.unit}` : "—"}</td>
               <td style={{ textAlign: "right", padding: "4px 0", fontWeight: 600, color: over ? "#9c3a1f" : "var(--ink)" }}>{pct != null ? `${pct}%` : "—"}</td>
             </tr>
           );
         })}
       </tbody>
     </table>
+  );
+}
+
+// Same table, plus a column per meal (day mode). Horizontal-scrolls; first column sticky.
+function MealNutrientTable({ n, goals, meals }: { n: Nutrients; goals: Goals; meals: MealLine[] }) {
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table className="mono" style={{ borderCollapse: "collapse", fontSize: 12, whiteSpace: "nowrap" }}>
+        <thead>
+          <tr style={{ color: "var(--sage)" }}>
+            <th style={{ ...STICKY, textAlign: "left", padding: "4px 10px 4px 0", fontWeight: 600 }}>Nutrient</th>
+            <th style={{ textAlign: "right", padding: "4px 8px", fontWeight: 600 }}>Total</th>
+            <th style={{ textAlign: "right", padding: "4px 8px", fontWeight: 600 }}>Goal</th>
+            <th style={{ textAlign: "right", padding: "4px 8px", fontWeight: 600 }}>%</th>
+            {meals.map((m, i) => (
+              <th key={i} title={m.recipeName} style={{ textAlign: "right", padding: "4px 8px", fontWeight: 600 }}>
+                {m.estimate ? "≈ " : ""}{m.slotName}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {LABEL_ROWS.map((r) => {
+            const goal = goalFor(r.key, goals);
+            const pct = pctOf(n[r.key], goal);
+            const over = pct != null && pct > 100;
+            return (
+              <tr key={r.key} style={{ borderTop: "1px solid var(--line)" }}>
+                <th scope="row" style={{ ...STICKY, textAlign: "left", fontWeight: r.bold ? 700 : 400, padding: "4px 10px 4px 0", paddingLeft: r.indent ? 14 : 0 }}>{r.label}</th>
+                <td style={{ textAlign: "right", padding: "4px 8px", fontWeight: r.bold ? 700 : 400 }}>{nfmt(n[r.key])}{r.unit}</td>
+                <td style={{ textAlign: "right", padding: "4px 8px", color: "var(--sage)" }}>{goal != null ? `${goal}${r.unit}` : "—"}</td>
+                <td style={{ textAlign: "right", padding: "4px 8px", fontWeight: 600, color: over ? "#9c3a1f" : "var(--ink)" }}>{pct != null ? `${pct}%` : "—"}</td>
+                {meals.map((m, i) => (
+                  <td key={i} style={{ textAlign: "right", padding: "4px 8px" }}>{nfmt(m.nutrients[r.key])}{r.unit}</td>
+                ))}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
