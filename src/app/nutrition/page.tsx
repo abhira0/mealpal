@@ -181,12 +181,16 @@ function IngredientsTable({ date }: { date: string }) {
 
 // ---------- Analysis tab ----------
 
+interface MealLine { slotName: string; recipeName: string; estimate: boolean; calories: number; }
+
 interface AnalysisData {
   mode: "day" | "week";
   goals: Goals;
   nutrients: Nutrients;
+  macros: { carbs: number; fat: number; protein: number };
   scorecards: Scorecard[];
   missing: string[];
+  meals?: MealLine[];
   monday?: string;
   daysWithMeals?: number;
   perDay?: { date: string; total: Nutrients; hasMeals: boolean }[];
@@ -294,12 +298,20 @@ function AnalysisBody({ data, mode, openCard, setOpenCard }: {
         of {goals.calorieGoal} kcal · {pct}%{mode === "week" ? " · daily avg" : ""}
       </p>
 
-      <p className="section-label">Macros{mode === "week" ? " (daily avg)" : ""} vs goal</p>
+      <p className="section-label">Macro distribution{mode === "week" ? " (daily avg)" : ""}</p>
+      <MacroDonut macros={data.macros} />
+
+      <p className="section-label">Macros vs goal</p>
       <MacroBar label="Protein" value={n.proteinG} goal={goals.proteinG} color={MACRO_COLOR.protein} />
       <MacroBar label="Carbs" value={n.carbsG} goal={goals.carbsG} color={MACRO_COLOR.carbs} />
       <MacroBar label="Fat" value={n.fatG} goal={goals.fatG} color={MACRO_COLOR.fat} />
 
-      {mode === "week" && data.perDay && <WeekTrend perDay={data.perDay} goal={goals.calorieGoal} />}
+      {mode === "day" && data.meals && data.meals.length > 0 && <CaloriesByMeal meals={data.meals} />}
+
+      {mode === "week" && data.perDay && <WeekTrend perDay={data.perDay} />}
+
+      <p className="section-label">Nutrients{mode === "week" ? " (daily avg)" : ""} vs goal</p>
+      <NutrientTable n={n} goals={goals} />
 
       <p className="section-label">Diet scorecards</p>
       <div className="filter" style={{ gap: 6 }}>
@@ -346,30 +358,118 @@ function MacroBar({ label, value, goal, color }: { label: string; value: number;
   );
 }
 
-function WeekTrend({ perDay, goal }: { perDay: NonNullable<AnalysisData["perDay"]>; goal: number }) {
+const nfmt = (x: number) => (x < 10 ? Math.round(x * 10) / 10 : Math.round(x));
+
+function MacroDonut({ macros }: { macros: AnalysisData["macros"] }) {
+  if (macros.carbs + macros.fat + macros.protein === 0)
+    return <p style={{ opacity: 0.6, textAlign: "center", margin: 0 }}>No calories logged.</p>;
+  const option = {
+    tooltip: { trigger: "item", formatter: "{b}: {c}% of calories" },
+    legend: { bottom: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 11 } },
+    series: [{
+      type: "pie", radius: ["45%", "70%"], center: ["50%", "44%"], avoidLabelOverlap: false,
+      label: { show: true, formatter: "{b}\n{d}%", fontSize: 10 },
+      data: [
+        { value: Math.round(macros.carbs), name: "Carbs", itemStyle: { color: MACRO_COLOR.carbs } },
+        { value: Math.round(macros.fat), name: "Fat", itemStyle: { color: MACRO_COLOR.fat } },
+        { value: Math.round(macros.protein), name: "Protein", itemStyle: { color: MACRO_COLOR.protein } },
+      ],
+    }],
+  };
+  return <EChart option={option as never} height={220} />;
+}
+
+function CaloriesByMeal({ meals }: { meals: MealLine[] }) {
+  const max = Math.max(...meals.map((m) => m.calories), 1);
+  return (
+    <>
+      <p className="section-label">Calories by meal</p>
+      {meals.map((m, i) => (
+        <div key={i} style={{ margin: "6px 0" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+            <span>{m.estimate ? "≈ " : ""}<b>{m.slotName}</b> <span style={{ opacity: 0.6 }}>{m.recipeName}</span></span>
+            <span className="mono" style={{ fontSize: 11, color: "var(--sage)" }}>{round(m.calories)} kcal</span>
+          </div>
+          <div style={{ height: 6, borderRadius: 99, background: "#e3ddcc", overflow: "hidden", marginTop: 2 }}>
+            <div style={{ height: "100%", width: `${(m.calories / max) * 100}%`, background: MACRO_COLOR.protein }} />
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+// Full nutrient list (calories + the FDA label rows), each vs its goal:
+// user goals for calories/protein/carbs/fat, FDA Daily Values for the rest.
+function NutrientTable({ n, goals }: { n: Nutrients; goals: Goals }) {
+  const goalFor = (key: string): number | null => {
+    if (key === "proteinG") return goals.proteinG;
+    if (key === "carbsG") return goals.carbsG;
+    if (key === "fatG") return goals.fatG;
+    const row = FACT_ROWS.find((r) => r.key === key);
+    return row && "dv" in row ? row.dv : null;
+  };
+  const rows: { label: string; value: number; unit: string; goal: number | null; bold?: boolean; indent?: boolean }[] = [
+    { label: "Calories", value: n.calories, unit: "", goal: goals.calorieGoal, bold: true },
+    ...FACT_ROWS.map((r) => ({
+      label: r.label, value: n[r.key], unit: r.unit, goal: goalFor(r.key),
+      bold: "bold" in r ? r.bold : false, indent: "indent" in r ? r.indent : false,
+    })),
+  ];
+  return (
+    <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+      <thead>
+        <tr style={{ color: "var(--sage)", textAlign: "right" }}>
+          <th style={{ textAlign: "left", padding: "4px 8px 4px 0", fontWeight: 600 }}>Nutrient</th>
+          <th style={{ padding: "4px 8px", fontWeight: 600 }}>Total</th>
+          <th style={{ padding: "4px 8px", fontWeight: 600 }}>Goal</th>
+          <th style={{ padding: "4px 0", fontWeight: 600 }}>%</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r, i) => {
+          const pct = r.goal && r.goal > 0 ? Math.round((r.value / r.goal) * 100) : null;
+          const over = pct != null && pct > 100;
+          return (
+            <tr key={i} style={{ borderTop: "1px solid var(--line)" }}>
+              <th scope="row" style={{ textAlign: "left", fontWeight: r.bold ? 700 : 400, paddingLeft: r.indent ? 14 : 0, padding: "4px 8px 4px 0" }}>{r.label}</th>
+              <td style={{ textAlign: "right", padding: "4px 8px", fontWeight: r.bold ? 700 : 400 }}>{nfmt(r.value)}{r.unit}</td>
+              <td style={{ textAlign: "right", padding: "4px 8px", color: "var(--sage)" }}>{r.goal != null ? `${r.goal}${r.unit}` : "—"}</td>
+              <td style={{ textAlign: "right", padding: "4px 0", fontWeight: 600, color: over ? "#9c3a1f" : "var(--ink)" }}>{pct != null ? `${pct}%` : "—"}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function WeekTrend({ perDay }: { perDay: NonNullable<AnalysisData["perDay"]> }) {
   const days = perDay.map((d) => shortDate(d.date));
+  // % of each day's calories from a macro (100%-stacked, like MyFitnessPal's week view).
+  const pct = (d: { total: Nutrients }, key: keyof Nutrients, factor: number) => {
+    const cal = 4 * d.total.carbsG + 9 * d.total.fatG + 4 * d.total.proteinG;
+    return cal > 0 ? Math.round((factor * d.total[key] / cal) * 100) : 0;
+  };
   const series = (key: keyof Nutrients, factor: number, name: string, color: string) => ({
-    name, type: "bar", stack: "cal", emphasis: { focus: "series" },
-    itemStyle: { color },
-    data: perDay.map((d) => Math.round((d.total[key] || 0) * factor)),
+    name, type: "bar", stack: "pct", itemStyle: { color },
+    data: perDay.map((d) => pct(d, key, factor)),
   });
   const option = {
-    grid: { left: 36, right: 8, top: 28, bottom: 20 },
+    grid: { left: 32, right: 8, top: 28, bottom: 20 },
     legend: { top: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 10 } },
-    tooltip: { trigger: "axis" },
+    tooltip: { trigger: "axis", valueFormatter: (v: number) => `${v}%` },
     xAxis: { type: "category", data: days, axisLabel: { fontSize: 9 } },
-    yAxis: { type: "value", axisLabel: { fontSize: 9 } },
+    yAxis: { type: "value", max: 100, axisLabel: { fontSize: 9, formatter: "{value}%" } },
     series: [
-      series("proteinG", 4, "Protein", MACRO_COLOR.protein),
       series("carbsG", 4, "Carbs", MACRO_COLOR.carbs),
-      { ...series("fatG", 9, "Fat", MACRO_COLOR.fat),
-        markLine: { symbol: "none", data: [{ yAxis: goal }], lineStyle: { color: "#20262B", type: "dashed" },
-          label: { formatter: "Goal", fontSize: 9 } } },
+      series("proteinG", 4, "Protein", MACRO_COLOR.protein),
+      series("fatG", 9, "Fat", MACRO_COLOR.fat),
     ],
   };
   return (
     <>
-      <p className="section-label">Calories by day (macro breakdown)</p>
+      <p className="section-label">Calories from each macro, by day</p>
       <EChart option={option as never} height={200} />
     </>
   );
