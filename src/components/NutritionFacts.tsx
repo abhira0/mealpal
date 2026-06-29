@@ -38,14 +38,17 @@ function Line({ label, value, unit, dv, bold, indent }: {
 }
 
 export function NutritionFacts({ facts, unit }: { facts: Facts; unit: string }) {
-  const s = facts.servingSize; // per-serving multiplier in canonical units
-  const per = (v: number | null) => (v == null || s == null ? null : v * s);
+  // Scale per-unit values by the serving size; with none set, fall back to one
+  // canonical unit so the numbers still show (and the header says so).
+  const s = facts.servingSize ?? 1;
+  const per = (v: number | null) => (v == null ? null : v * s);
 
   return (
     <div style={{ background: "#fff", color: "#000", border: "1px solid #000", borderRadius: 4, padding: 12, fontFamily: "Helvetica, Arial, sans-serif", maxWidth: 320 }}>
       <div style={{ fontSize: 28, fontWeight: 800, ...rule(1) }}>Nutrition Facts</div>
       <div style={{ padding: "2px 0", ...rule(8) }}>
-        Serving size <strong>{s != null ? `${round(s)}${unit}` : "—"}</strong>
+        Serving size <strong>{round(s)}{unit}</strong>
+        {facts.servingSize == null && <span style={{ fontWeight: 400 }}> (per {unit || "unit"})</span>}
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", paddingTop: 2, ...rule(4) }}>
