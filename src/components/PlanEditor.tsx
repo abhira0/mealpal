@@ -207,6 +207,7 @@ export function PlanEditor() {
                       recipeId={ev.recipeId}
                       status={ev.status}
                       onCooked={loadEvents}
+                      onDeleted={loadEvents}
                     />
                   ))}
                   <button
