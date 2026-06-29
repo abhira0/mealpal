@@ -154,7 +154,7 @@ INSERT OR IGNORE INTO meal_slots VALUES(12,8,'Breakfast','08:00');
 INSERT OR IGNORE INTO meal_slots VALUES(14,8,'Lunch','12:00');
 INSERT OR IGNORE INTO meal_slots VALUES(15,8,'Dinner','20:00');
 INSERT OR IGNORE INTO meal_slots VALUES(16,8,'Snacks','17:00');
-INSERT OR IGNORE INTO nutrition_goals VALUES(8,2400,140,300,65);
+INSERT OR IGNORE INTO nutrition_goals VALUES(8,2300,130,300,65);
 INSERT OR IGNORE INTO products VALUES(11,8,16,9,'Kirkland Signature Organic 1% Low Fat Milk , 64 fl oz, 3-count',5670,1,1,'https://www.instacart.com/products/195869-kirkland-signature-organic-1-lowfat-milk-192-oz?retailerSlug=costco',1782690137,'https://www.instacart.com/assets/domains/product-image/file/large_46143d7f-a2b6-418b-b99f-9a820209616f.jpeg',1330,'/nutrition/11.jpg',0.4166666666666666852,0.01041666666666666609,0.006250000000000000346,0.0,0.04166666666666666436,0.4375,0.05000000000000000277,0.0,0.05000000000000000277,0.03333333333333333288,240.0,0.0,NULL,NULL,0.01041666666666666609,1.25,0.0,1.541666666666666741,0.625,NULL);
 INSERT OR IGNORE INTO products VALUES(12,8,18,9,'Kirkland Signature Liquid Egg Whites, Cage Free, 16 oz, 6-count',2700,100,1,'https://www.instacart.com/products/16460364-kirkland-signature-cage-free-egg-whites-6-16-oz-96-oz?retailerSlug=costco',1782691915,'https://www.instacart.com/assets/domains/product-image/file/large_242c91da-fac6-453b-8883-ad2d121e0f84.jpeg',1209,'/nutrition/12.jpg',0.5434782608695651885,0.0,0.0,0.0,0.0,1.630434782608695565,0.0,0.0,0.0,0.1086956521739130404,46.0,NULL,0.0,0.0,NULL,0.0,0.0,1.630434782608695565,0.0,0.0);
 INSERT OR IGNORE INTO products VALUES(13,8,17,9,'Kirkland Signature Organic Peanut Butter, 28 oz, 2-count',1560,1,1,'https://www.instacart.com/products/58041-kirkland-signature-organic-peanut-butter-2-x-28-oz-28-oz?retailerSlug=costco',1782692033,'https://www.instacart.com/assets/domains/product-image/file/large_f5988de3-127c-4c7b-97b7-cd4a850bc224.jpeg',1099,'/nutrition/13.jpg',5.625,0.46875,0.078125,0.0,0.0,2.03125,0.21875,0.09375,0.03125,0.25,32.0,0.0,NULL,NULL,0.0,0.65625,0.03125,3.28125,NULL,NULL);
@@ -268,4 +268,3 @@ INSERT OR IGNORE INTO stock_movements VALUES(105,8,18,-100,'cooked',189,NULL,178
 INSERT OR IGNORE INTO stock_movements VALUES(106,8,20,-1,'cooked',189,NULL,1782759905,NULL,18);
 INSERT OR IGNORE INTO stock_movements VALUES(107,8,21,-5,'cooked',189,NULL,1782759905,NULL,19);
 INSERT OR IGNORE INTO users VALUES(8,8,'demo@demo.com','$2b$10$0h3tN.V/NToZSyeT5LjU.eKcWa/E/64Xzi45Jy36n0TfxYrfb3BAq','Demo',0);
-INSERT OR IGNORE INTO users VALUES(9999,8,'analysisverify@m.test','$2b$10$sBxb88WQ7TT1AZrQ3C14UOH64jcVfeI0TTYps9FIgZzB.BKaJCRlK','Verify',1782761301);
