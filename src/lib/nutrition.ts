@@ -31,11 +31,14 @@ function addScaled(acc: Nutrients, n: Nutrients, factor: number) {
 type ProductRow = typeof schema.products.$inferSelect;
 
 /**
- * Has nutrition been filled in? True when any nutrient is non-null and
- * non-zero — covers manual entry of just protein/etc. without calories, and
- * photo-less manual saves. (calories alone is not the sentinel.)
+ * Has nutrition been filled in? True when serving size, a nutrition photo, or
+ * any nutrient is non-null and non-zero. Serving size or a photo alone counts
+ * as "facts entered" (the product then contributes zeros, not missing data) so
+ * this matches the card checkmark in app/manage/entities.tsx.
  */
 export function hasNutrition(p: ProductRow): boolean {
+  if (p.nutritionPhoto) return true;
+  if (((p.servingSize as number | null) ?? 0) !== 0) return true;
   return NUTRIENT_KEYS.some((k) => ((p[k] as number | null) ?? 0) !== 0);
 }
 
