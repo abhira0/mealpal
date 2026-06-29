@@ -166,13 +166,14 @@ export function EntityForm({
         if (conv != null) data.packSize = Math.round(conv);
       }
 
-      // Auto-select the shop matching the scraped retailer, by name or website.
+      // Auto-select the shop matching any scraped retailer candidate (store slug
+      // or JSON-LD seller names), by name or website.
       if (typeof data.shop === "string" && !values.shopId) {
-        const key = norm(data.shop);
+        const keys = data.shop.split("|").map(norm).filter(Boolean);
         const shop = (optionRows.shopId ?? []).find((r) => {
           const name = norm(String(r.name ?? ""));
           const dom = norm(domainFrom(r.website as string | null) ?? "");
-          return key !== "" && (name === key || name.includes(key) || key.includes(name) || (dom !== "" && (dom.includes(key) || key.includes(dom))));
+          return keys.some((key) => name === key || name.includes(key) || key.includes(name) || (dom !== "" && (dom.includes(key) || key.includes(dom))));
         });
         if (shop) data.shopId = shop.id;
       }
