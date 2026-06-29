@@ -9,15 +9,22 @@ import { MealCard } from "@/components/MealCard";
 
 type Slot = { id: number; name: string; timeOfDay: string };
 type Recipe = { id: number; name: string; baseServings: number };
+type Product = { id: number; name: string };
+type Ingredient = { id: number; name: string; canonicalUnit: string };
 type MealEvent = {
   id: number;
   date: string;
   slotId: number;
-  recipeId: number;
+  recipeId: number | null;
   servings: number;
+  ingredientId: number | null;
+  productId: number | null;
+  variantId: number | null;
+  amount: number | null;
   status: string;
   ruleId: number | null;
 };
+type AddKind = "recipe" | "product" | "ingredient";
 
 function isoOf(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -74,13 +81,26 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
 
   const [slots, setSlots] = useState<Slot[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [variantName, setVariantName] = useState<Map<number, string>>(new Map());
   const [events, setEvents] = useState<MealEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Add-meal sheet state.
+  // Add wizard state: one bottom-right button → slot → type → details.
+  const [adding, setAdding] = useState(false);
+  const [step, setStep] = useState<"slot" | "type" | "details">("slot");
   const [addSlot, setAddSlot] = useState<Slot | null>(null);
+  const [kind, setKind] = useState<AddKind>("recipe");
   const [pickRecipe, setPickRecipe] = useState<number | null>(null);
   const [pickServings, setPickServings] = useState(2);
+  // direct product item
+  const [pickProduct, setPickProduct] = useState<number | null>(null);
+  const [pickVariant, setPickVariant] = useState<number | null>(null);
+  const [variants, setVariants] = useState<{ id: number; name: string }[]>([]);
+  // direct ingredient item
+  const [pickIngredient, setPickIngredient] = useState<number | null>(null);
+  const [pickAmount, setPickAmount] = useState("");
   const [saving, setSaving] = useState(false);
 
   // Repeat (recurring rule) state.
@@ -92,20 +112,36 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
 
   const loadEvents = useCallback(async () => {
     const res = await fetch(`/api/events?from=${from}&to=${to}`);
-    if (res.ok) setEvents((await res.json()) as MealEvent[]);
+    if (!res.ok) return;
+    const evs = (await res.json()) as MealEvent[];
+    setEvents(evs);
+    // resolve variant names for any direct product-variant items shown
+    const pids = [...new Set(evs.filter((e) => e.variantId != null && e.productId != null).map((e) => e.productId!))];
+    if (pids.length) {
+      const lists = await Promise.all(
+        pids.map((pid) => fetch(`/api/products/${pid}/variants`).then((r) => (r.ok ? r.json() : []))),
+      );
+      const m = new Map<number, string>();
+      for (const list of lists) for (const v of list as { id: number; name: string }[]) m.set(v.id, v.name);
+      setVariantName(m);
+    }
   }, [from, to]);
 
-  // Slots and recipes don't depend on the date range — fetch once.
+  // Slots, recipes, products, ingredients don't depend on the date range — fetch once.
   useEffect(() => {
     let alive = true;
     (async () => {
-      const [sRes, rRes] = await Promise.all([
+      const [sRes, rRes, pRes, iRes] = await Promise.all([
         fetch("/api/slots"),
         fetch("/api/recipes"),
+        fetch("/api/products"),
+        fetch("/api/ingredients"),
       ]);
       if (!alive) return;
       if (sRes.ok) setSlots((await sRes.json()) as Slot[]);
       if (rRes.ok) setRecipes((await rRes.json()) as Recipe[]);
+      if (pRes.ok) setProducts((await pRes.json()) as Product[]);
+      if (iRes.ok) setIngredients((await iRes.json()) as Ingredient[]);
       setLoading(false);
     })();
     return () => {
@@ -128,6 +164,18 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
     () => new Map(recipes.map((r) => [r.id, r.name])),
     [recipes],
   );
+  const productName = useMemo(() => new Map(products.map((p) => [p.id, p.name])), [products]);
+  const ingredientName = useMemo(() => new Map(ingredients.map((i) => [i.id, i.name])), [ingredients]);
+  const ingredientUnit = useMemo(() => new Map(ingredients.map((i) => [i.id, i.canonicalUnit])), [ingredients]);
+
+  // A meal event's display title, whichever kind it is.
+  function eventTitle(ev: MealEvent): string {
+    if (ev.recipeId != null) return recipeName.get(ev.recipeId) ?? "Recipe";
+    if (ev.variantId != null) return variantName.get(ev.variantId) ?? productName.get(ev.productId!) ?? "Item";
+    if (ev.productId != null) return productName.get(ev.productId) ?? "Item";
+    if (ev.ingredientId != null) return ingredientName.get(ev.ingredientId) ?? "Item";
+    return "Item";
+  }
 
   const isToday = selected === todayIso;
   const selectedDate = new Date(selected + "T00:00:00");
@@ -145,7 +193,7 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
         <MealCard
           key={ev.id}
           eventId={ev.id}
-          title={recipeName.get(ev.recipeId) ?? "Recipe"}
+          title={eventTitle(ev)}
           servings={ev.servings}
           recipeId={ev.recipeId}
           status={ev.status}
@@ -156,48 +204,76 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
       ));
   }
 
-  function openAdd(slot: Slot) {
+  // Step 1 of the Add wizard: open the sheet and ask for a slot.
+  function openAdd() {
+    setAddSlot(null);
+    setStep("slot");
+    setAdding(true);
+  }
+
+  // Step 1 → 2: slot chosen, ask for the kind.
+  function chooseSlot(slot: Slot) {
     setAddSlot(slot);
+    setStep("type");
+  }
+
+  // Step 2 → 3: kind chosen, show the matching picker with sensible defaults.
+  function chooseKind(k: AddKind) {
+    setKind(k);
     setPickRecipe(recipes[0]?.id ?? null);
-    setPickServings(recipes[0]?.baseServings ?? 2);
+    setPickServings(k === "recipe" ? recipes[0]?.baseServings ?? 2 : 1);
+    setPickProduct(null);
+    setPickVariant(null);
+    setVariants([]);
+    setPickIngredient(ingredients[0]?.id ?? null);
+    setPickAmount("");
     setRepeat(false);
     setRepeatDays(Array(7).fill(true));
     setIntervalN(1);
     setUnit("day");
     setUntil("");
+    setStep("details");
+  }
+
+  // Load a chosen product's variants (assorted packs need a variant pick).
+  async function selectProduct(id: number) {
+    setPickProduct(id);
+    setPickVariant(null);
+    setVariants([]);
+    const res = await fetch(`/api/products/${id}/variants`);
+    if (res.ok) setVariants((await res.json()) as { id: number; name: string }[]);
   }
 
   async function saveMeal() {
-    if (!addSlot || pickRecipe == null || saving) return;
+    if (!addSlot || saving) return;
+    let body: Record<string, unknown> | null = null;
+    let url = "/api/events";
+    if (kind === "recipe") {
+      if (pickRecipe == null) return;
+      if (repeat) {
+        url = "/api/rules";
+        body = {
+          startDate: selected, slotId: addSlot.id, recipeId: pickRecipe, servings: pickServings,
+          intervalN, unit, daysOfWeek: repeatDays.map((d) => (d ? "1" : "0")).join(""), untilDate: until || null,
+        };
+      } else {
+        body = { date: selected, slotId: addSlot.id, recipeId: pickRecipe, servings: pickServings };
+      }
+    } else if (kind === "product") {
+      if (pickProduct == null || (variants.length > 0 && pickVariant == null)) return;
+      body = { date: selected, slotId: addSlot.id, productId: pickProduct, variantId: pickVariant, servings: pickServings };
+    } else {
+      const amount = Number(pickAmount);
+      if (pickIngredient == null || !Number.isFinite(amount) || amount <= 0) return;
+      body = { date: selected, slotId: addSlot.id, ingredientId: pickIngredient, amount };
+    }
     setSaving(true);
-    const res = repeat
-      ? await fetch("/api/rules", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            startDate: selected,
-            slotId: addSlot.id,
-            recipeId: pickRecipe,
-            servings: pickServings,
-            intervalN,
-            unit,
-            daysOfWeek: repeatDays.map((d) => (d ? "1" : "0")).join(""),
-            untilDate: until || null,
-          }),
-        })
-      : await fetch("/api/events", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            date: selected,
-            slotId: addSlot.id,
-            recipeId: pickRecipe,
-            servings: pickServings,
-          }),
-        });
+    const res = await fetch(url, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
     setSaving(false);
     if (res.ok) {
-      setAddSlot(null);
+      setAdding(false);
       await loadEvents();
     }
   }
@@ -295,11 +371,6 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
             <p className="loading">Loading…</p>
           ) : slots.length === 0 ? (
             <p className="body">No meal slots yet. Add some in Manage.</p>
-          ) : recipes.length === 0 ? (
-            <p className="body">
-              No recipes yet. <Link href="/recipes">Add a recipe</Link> to start
-              planning meals.
-            </p>
           ) : (
             <div className="timeline">
               {slots.map((slot) => {
@@ -313,15 +384,9 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
                     <p className="slot" style={{ marginBottom: 8 }}>
                       {slot.name}
                     </p>
-                    {cards.length ? <div className="stack-sm">{cards}</div> : null}
-                    <button
-                      type="button"
-                      className="btn-add"
-                      style={cards.length ? { marginTop: 8 } : undefined}
-                      onClick={() => openAdd(slot)}
-                    >
-                      + Add a meal
-                    </button>
+                    {cards.length ? <div className="stack-sm">{cards}</div> : (
+                      <p className="meta" style={{ opacity: 0.6 }}>Nothing planned.</p>
+                    )}
                   </div>
                 );
               })}
@@ -330,11 +395,53 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
         </div>
       </div>
 
+      {/* one Add button, bottom-right; opens the slot → type → details wizard */}
+      {!loading && slots.length > 0 && (
+        <button
+          type="button"
+          className="btn fab"
+          aria-label="Add to the plan"
+          onClick={openAdd}
+          style={{
+            position: "fixed", right: 20, bottom: 84, zIndex: 20,
+            width: 56, height: 56, borderRadius: 28, fontSize: 28, lineHeight: 1,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 4px 14px rgba(0,0,0,.2)",
+          }}
+        >
+          +
+        </button>
+      )}
+
       <Sheet
-        open={addSlot !== null}
-        title={addSlot ? `Add to ${addSlot.name}` : "Add a meal"}
-        onClose={() => setAddSlot(null)}
+        open={adding}
+        title={
+          step === "slot" ? "Add to which meal?"
+          : step === "type" ? `${addSlot?.name ?? ""} — what are you adding?`
+          : `Add to ${addSlot?.name ?? ""}`
+        }
+        onClose={() => setAdding(false)}
       >
+        {step === "slot" && (
+          <div className="sh-body stack-sm">
+            {slots.map((slot) => (
+              <button key={slot.id} type="button" className="btn block" onClick={() => chooseSlot(slot)}>
+                {slot.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {step === "type" && (
+          <div className="sh-body stack-sm">
+            <button type="button" className="btn block" onClick={() => chooseKind("recipe")}>Meal (recipe)</button>
+            <button type="button" className="btn block" onClick={() => chooseKind("product")}>Product</button>
+            <button type="button" className="btn block" onClick={() => chooseKind("ingredient")}>Ingredient</button>
+            <button type="button" className="btn-add" onClick={() => setStep("slot")}>← Back</button>
+          </div>
+        )}
+
+        {step === "details" && kind === "recipe" && (
         <div className="sh-body">
           <div className="field">
             <span className="field-label">Recipe</span>

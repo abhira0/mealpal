@@ -37,7 +37,7 @@ export function MealCard({
   eventId: number;
   title: string;
   servings: number;
-  recipeId: number;
+  recipeId: number | null;
   status: string;
   recurring?: boolean;
   onCooked?: () => void;
@@ -108,9 +108,13 @@ export function MealCard({
   return (
     <div className="card">
       <div className="card-row">
-        <Link href={`/recipes/${recipeId}`} className="title row-main">
-          {title}
-        </Link>
+        {recipeId != null ? (
+          <Link href={`/recipes/${recipeId}`} className="title row-main">
+            {title}
+          </Link>
+        ) : (
+          <span className="title row-main">{title}</span>
+        )}
         <QuantityChip value={shortServings(servings)} />
       </div>
       <div className="card-row" style={{ marginTop: 12 }}>
