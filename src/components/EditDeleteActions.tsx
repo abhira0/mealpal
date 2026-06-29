@@ -19,9 +19,10 @@ export function EditDeleteActions({
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
 
   async function remove() {
-    if (!confirm(`Delete this ${singular}?`)) return;
+    dialogRef.current?.close();
     setError(null);
     const res = await fetch(deletePath, { method: "DELETE" });
     if (res.ok) {
@@ -38,11 +39,22 @@ export function EditDeleteActions({
         <button type="button" className="btn block" onClick={onEdit} aria-label={`Edit ${singular}`}>
           <Pencil size={18} />
         </button>
-        <button type="button" className="btn block danger" onClick={remove} aria-label={`Delete ${singular}`}>
+        <button type="button" className="btn block danger" onClick={() => dialogRef.current?.showModal()} aria-label={`Delete ${singular}`}>
           <Trash2 size={18} />
         </button>
       </div>
       {error && <p className="notice" style={{ marginTop: 0 }}>{error}</p>}
+      <dialog ref={dialogRef} className="confirm">
+        <p>Delete this {singular}?</p>
+        <div className="row">
+          <button type="button" className="btn" onClick={() => dialogRef.current?.close()}>
+            Cancel
+          </button>
+          <button type="button" className="btn danger" onClick={remove}>
+            Delete
+          </button>
+        </div>
+      </dialog>
     </>
   );
 }
