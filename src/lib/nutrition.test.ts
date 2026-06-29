@@ -5,7 +5,7 @@ import { schema } from "@/db";
 import { createRecipe } from "@/lib/recipes";
 import { recordPurchase } from "@/lib/shopping";
 import { recordCooked, unstockedIngredients } from "@/lib/consumption";
-import { dayNutrition, scorecards, zeroNutrients, mondayOf } from "@/lib/nutrition";
+import { dayNutrition, scorecards, zeroNutrients, mondayOf, macroSplit } from "@/lib/nutrition";
 
 let db: TestDb;
 let hid: number;
@@ -123,6 +123,20 @@ describe("scorecards", () => {
 
   it("passes nothing on an empty day (zero calories)", () => {
     expect(scorecards(zeroNutrients()).every((c) => !c.pass)).toBe(true);
+  });
+});
+
+describe("macroSplit", () => {
+  it("splits calories across macros (4/4/9) and sums to ~100", () => {
+    const s = macroSplit({ ...zeroNutrients(), carbsG: 100, fatG: 100, proteinG: 100 });
+    // cal = 400 + 900 + 400 = 1700
+    expect(Math.round(s.carbs)).toBe(24);
+    expect(Math.round(s.fat)).toBe(53);
+    expect(Math.round(s.protein)).toBe(24);
+    expect(Math.round(s.carbs + s.fat + s.protein)).toBe(100);
+  });
+  it("is all zeros for an empty day", () => {
+    expect(macroSplit(zeroNutrients())).toEqual({ carbs: 0, fat: 0, protein: 0 });
   });
 });
 

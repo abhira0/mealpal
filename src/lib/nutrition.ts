@@ -308,6 +308,18 @@ export function setGoals(db: Db, householdId: number, g: Goals): Goals {
   return g;
 }
 
+/**
+ * Share of calories from each macro (MyFitnessPal's macro pie). Uses 4/4/9
+ * kcal-per-gram; an empty day is all zeros. Percentages are 0–100 and sum to
+ * ~100 (rounding aside) when there are calories.
+ */
+export function macroSplit(n: Nutrients): { carbs: number; fat: number; protein: number } {
+  const c = 4 * n.carbsG, f = 9 * n.fatG, p = 4 * n.proteinG;
+  const cal = c + f + p;
+  if (cal <= 0) return { carbs: 0, fat: 0, protein: 0 };
+  return { carbs: (c / cal) * 100, fat: (f / cal) * 100, protein: (p / cal) * 100 };
+}
+
 export interface Scorecard {
   key: "heartHealthy" | "lowCarb" | "highProtein";
   label: string;
