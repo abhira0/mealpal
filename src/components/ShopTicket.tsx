@@ -183,10 +183,10 @@ function ShopLineRow({
             line.needed > 1 && <QuantityChip value={`×${line.needed}`} tone="default" />
           ) : (
             <>
-              <QuantityChip value={`need ${formatNeeded(line)}`} tone="default" />
               {line.product?.packSize ? (
                 <QuantityChip value={`buy ×${Math.ceil(line.needed / line.product.packSize)}`} tone="default" />
               ) : null}
+              <QuantityChip value={`need ${formatNeeded(line)}`} tone="default" />
             </>
           )}
           {line.urgency && (
