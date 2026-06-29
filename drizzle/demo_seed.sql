@@ -148,7 +148,7 @@ INSERT OR IGNORE INTO meal_slots VALUES(12,8,'Breakfast','08:00');
 INSERT OR IGNORE INTO meal_slots VALUES(14,8,'Lunch','12:00');
 INSERT OR IGNORE INTO meal_slots VALUES(15,8,'Dinner','20:00');
 INSERT OR IGNORE INTO meal_slots VALUES(16,8,'Snacks','17:00');
-INSERT OR IGNORE INTO products VALUES(11,8,16,9,'Kirkland Signature Organic 1% Low Fat Milk , 64 fl oz, 3-count',5670,1,1,'https://www.instacart.com/products/195869-kirkland-signature-organic-1-lowfat-milk-192-oz?retailerSlug=costco',1782690137,'https://www.instacart.com/assets/domains/product-image/file/large_46143d7f-a2b6-418b-b99f-9a820209616f.jpeg',1330,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
+INSERT OR IGNORE INTO products VALUES(11,8,16,9,'Kirkland Signature Organic 1% Low Fat Milk , 64 fl oz, 3-count',5670,1,1,'https://www.instacart.com/products/195869-kirkland-signature-organic-1-lowfat-milk-192-oz?retailerSlug=costco',1782690137,'https://www.instacart.com/assets/domains/product-image/file/large_46143d7f-a2b6-418b-b99f-9a820209616f.jpeg',1330,'/nutrition/11.jpg',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
 INSERT OR IGNORE INTO products VALUES(12,8,18,9,'Kirkland Signature Liquid Egg Whites, Cage Free, 16 oz, 6-count',2700,100,1,'https://www.instacart.com/products/16460364-kirkland-signature-cage-free-egg-whites-6-16-oz-96-oz?retailerSlug=costco',1782691915,'https://www.instacart.com/assets/domains/product-image/file/large_242c91da-fac6-453b-8883-ad2d121e0f84.jpeg',1209,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
 INSERT OR IGNORE INTO products VALUES(13,8,17,9,'Kirkland Signature Organic Peanut Butter, 28 oz, 2-count',1560,1,1,'https://www.instacart.com/products/58041-kirkland-signature-organic-peanut-butter-2-x-28-oz-28-oz?retailerSlug=costco',1782692033,'https://www.instacart.com/assets/domains/product-image/file/large_f5988de3-127c-4c7b-97b7-cd4a850bc224.jpeg',1099,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
 INSERT OR IGNORE INTO products VALUES(14,8,16,9,'Kirkland Signature Organic A2 Whole Milk, Half Gallon, 3-count',5670,2,1,'https://www.instacart.com/products/22165660-kirkland-signature-a2-protein-organic-whole-milk?retailerSlug=costco',1782692875,'https://www.instacart.com/assets/domains/product-image/file/large_502e3211-e872-4bf8-825c-c8134ec19a27.jpeg',1539,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
@@ -244,4 +244,9 @@ INSERT OR IGNORE INTO stock_movements VALUES(86,8,24,3200,'manual',NULL,NULL,178
 INSERT OR IGNORE INTO stock_movements VALUES(87,8,18,0,'manual',NULL,NULL,1782719452,'2026-08-04',12);
 INSERT OR IGNORE INTO stock_movements VALUES(88,8,30,0,'manual',NULL,NULL,1782719469,'2029-03-29',27);
 INSERT OR IGNORE INTO stock_movements VALUES(89,8,28,0,'manual',NULL,NULL,1782719512,'2026-09-24',25);
+INSERT OR IGNORE INTO stock_movements VALUES(90,8,33,3300,'manual',NULL,NULL,1782719590,'2027-09-16',30);
+INSERT OR IGNORE INTO stock_movements VALUES(91,8,31,28,'manual',NULL,NULL,1782719631,'2026-07-16',28);
+INSERT OR IGNORE INTO stock_movements VALUES(92,8,19,1050,'manual',NULL,NULL,1782719695,'2027-01-14',16);
+INSERT OR IGNORE INTO stock_movements VALUES(93,8,19,1810,'manual',NULL,NULL,1782719732,'2027-11-29',15);
+INSERT OR IGNORE INTO stock_movements VALUES(94,8,32,3,'manual',NULL,NULL,1782719772,'2027-08-29',29);
 INSERT OR IGNORE INTO users VALUES(8,8,'demo@demo.com','$2b$10$0h3tN.V/NToZSyeT5LjU.eKcWa/E/64Xzi45Jy36n0TfxYrfb3BAq','Demo',0);
