@@ -251,14 +251,22 @@ export function deleteProduct(
       reason: `Can't delete: ${purchaseCount} ${purchaseCount === 1 ? "purchase references" : "purchases reference"} this product.`,
     };
   }
-  const rows = db
-    .delete(schema.products)
-    .where(
-      and(eq(schema.products.id, id), eq(schema.products.householdId, householdId)),
-    )
-    .returning()
-    .all();
-  return { ok: true, deleted: rows.length > 0 };
+  // Clear the other (nullable) FK references first, else SQLite throws a
+  // FOREIGN KEY constraint error that escapes as an unhandled 500.
+  const scope = and(eq(schema.products.id, id), eq(schema.products.householdId, householdId));
+  const deleted = db.transaction((tx) => {
+    // Keep movement history but unattribute it (null = unattributed, per schema).
+    tx.update(schema.stockMovements)
+      .set({ productId: null })
+      .where(and(eq(schema.stockMovements.householdId, householdId), eq(schema.stockMovements.productId, id)))
+      .run();
+    // A product shopping line with no productId would be a broken orphan, so drop it.
+    tx.delete(schema.shoppingExtras)
+      .where(and(eq(schema.shoppingExtras.householdId, householdId), eq(schema.shoppingExtras.productId, id)))
+      .run();
+    return tx.delete(schema.products).where(scope).returning().all().length > 0;
+  });
+  return { ok: true, deleted };
 }
 
 /**

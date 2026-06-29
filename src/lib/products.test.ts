@@ -122,6 +122,19 @@ describe("products & prices", () => {
     expect(listProductsForIngredient(db, hid, ingredientId)).toHaveLength(0);
   });
 
+  it("deletes a product with stock movements / shopping extras (clears FKs)", () => {
+    const p = createProduct(db, hid, {
+      ingredientId, shopId, name: "Flour", packSize: 1000, priority: 1, url: null,
+    });
+    db.insert(schema.stockMovements).values({ householdId: hid, ingredientId, productId: p.id, delta: 5, reason: "manual" }).run();
+    db.insert(schema.shoppingExtras).values({ householdId: hid, productId: p.id, shopId, quantity: 1 }).run();
+    expect(deleteProduct(db, hid, p.id)).toEqual({ ok: true, deleted: true });
+    expect(listProductsForIngredient(db, hid, ingredientId)).toHaveLength(0);
+    // history kept but unattributed; orphan shopping line dropped
+    expect(db.select().from(schema.stockMovements).all()[0].productId).toBeNull();
+    expect(db.select().from(schema.shoppingExtras).all()).toHaveLength(0);
+  });
+
   it("blocks deleting a product with purchases", () => {
     const p = createProduct(db, hid, {
       ingredientId, shopId, name: "Flour", packSize: 1000, priority: 1, url: null,
