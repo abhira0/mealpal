@@ -405,6 +405,8 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
                 <span className="field-label">Until (optional)</span>
                 <input
                   type="date"
+                  className="input"
+                  data-empty={until ? undefined : ""}
                   value={until}
                   min={selected}
                   onChange={(e) => setUntil(e.target.value)}
