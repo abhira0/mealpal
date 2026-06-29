@@ -58,6 +58,13 @@ export function PlanEditor() {
   const [pickServings, setPickServings] = useState(2);
   const [saving, setSaving] = useState(false);
 
+  // Repeat (recurring rule) state.
+  const [repeat, setRepeat] = useState(false);
+  const [repeatDays, setRepeatDays] = useState<boolean[]>(() => Array(7).fill(true));
+  const [intervalN, setIntervalN] = useState(1);
+  const [unit, setUnit] = useState<"day" | "week">("week");
+  const [until, setUntil] = useState("");
+
   const loadEvents = useCallback(async () => {
     const res = await fetch(`/api/events?from=${from}&to=${to}`);
     if (res.ok) setEvents((await res.json()) as MealEvent[]);
@@ -101,21 +108,41 @@ export function PlanEditor() {
     setAddSlot(slot);
     setPickRecipe(recipes[0]?.id ?? null);
     setPickServings(recipes[0]?.baseServings ?? 2);
+    setRepeat(false);
+    setRepeatDays(Array(7).fill(true));
+    setIntervalN(1);
+    setUnit("week");
+    setUntil("");
   }
 
   async function saveMeal() {
     if (!addSlot || pickRecipe == null || saving) return;
     setSaving(true);
-    const res = await fetch("/api/events", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        date: selected,
-        slotId: addSlot.id,
-        recipeId: pickRecipe,
-        servings: pickServings,
-      }),
-    });
+    const res = repeat
+      ? await fetch("/api/rules", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            startDate: selected,
+            slotId: addSlot.id,
+            recipeId: pickRecipe,
+            servings: pickServings,
+            intervalN,
+            unit,
+            daysOfWeek: repeatDays.map((d) => (d ? "1" : "0")).join(""),
+            untilDate: until || null,
+          }),
+        })
+      : await fetch("/api/events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            date: selected,
+            slotId: addSlot.id,
+            recipeId: pickRecipe,
+            servings: pickServings,
+          }),
+        });
     setSaving(false);
     if (res.ok) {
       setAddSlot(null);
@@ -217,13 +244,77 @@ export function PlanEditor() {
             </span>
             <Stepper value={pickServings} min={1} onChange={setPickServings} />
           </div>
+
+          <div className="servings-row">
+            <span className="field-label" style={{ marginBottom: 0 }}>
+              Repeat
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={repeat}
+              className={repeat ? "btn" : "btn-add"}
+              onClick={() => setRepeat((v) => !v)}
+            >
+              {repeat ? "On" : "Off"}
+            </button>
+          </div>
+
+          {repeat && (
+            <>
+              <div className="week" role="group" aria-label="Repeat on">
+                {DOW.map((label, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    aria-pressed={repeatDays[i]}
+                    className={repeatDays[i] ? "day on" : "day"}
+                    onClick={() =>
+                      setRepeatDays((ds) => ds.map((d, j) => (j === i ? !d : d)))
+                    }
+                  >
+                    <span className="dow">{label[0]}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="servings-row">
+                <span className="field-label" style={{ marginBottom: 0 }}>
+                  Every
+                </span>
+                <Stepper value={intervalN} min={1} onChange={setIntervalN} />
+                <Dropdown
+                  label="Unit"
+                  value={unit}
+                  options={[
+                    { id: "week", label: intervalN > 1 ? "weeks" : "week" },
+                    { id: "day", label: intervalN > 1 ? "days" : "day" },
+                  ]}
+                  onChange={(id) => setUnit(id === "day" ? "day" : "week")}
+                />
+              </div>
+              <div className="field">
+                <span className="field-label">Until (optional)</span>
+                <input
+                  type="date"
+                  value={until}
+                  min={selected}
+                  onChange={(e) => setUntil(e.target.value)}
+                />
+              </div>
+            </>
+          )}
+
           <button
             type="button"
             className="btn block"
             onClick={saveMeal}
-            disabled={saving || pickRecipe == null}
+            disabled={
+              saving ||
+              pickRecipe == null ||
+              (repeat && unit === "week" && !repeatDays.some(Boolean))
+            }
           >
-            {saving ? "Adding…" : "Add meal"}
+            {saving ? "Adding…" : repeat ? "Add repeating meal" : "Add meal"}
           </button>
         </div>
       </Sheet>

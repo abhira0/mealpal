@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { addEvent, listEvents } from "@/lib/plan";
+import { topUpRules } from "@/lib/rules";
+
+function today(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -9,6 +15,7 @@ export async function GET(req: Request) {
   const sp = new URL(req.url).searchParams;
   const from = sp.get("from") ?? "0000-01-01";
   const to = sp.get("to") ?? "9999-12-31";
+  topUpRules(db, session.user.householdId, today());
   return NextResponse.json(listEvents(db, session.user.householdId, from, to));
 }
 
