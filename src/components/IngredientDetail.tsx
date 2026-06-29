@@ -33,6 +33,7 @@ type Product = {
   packSize: number;
   available: boolean;
   url: string | null;
+  imageUrl: string | null;
   history: { cents: number }[];
   effectiveCents: number | null;
   costPerUnit: number | null; // cents per canonical unit
@@ -84,9 +85,8 @@ function Row({ p, unit, draggable }: { p: Product; unit: string; draggable: bool
           ⠿
         </button>
       )}
-      <span className="icon-badge">
-        <Favicon name={p.shopName} website={p.shopWebsite} iconUrl={p.shopIconUrl} size={32} />
-      </span>
+      <Favicon name={p.name} iconUrl={p.imageUrl} size={48} />
+
       <span style={{ flex: 1, minWidth: 0 }}>
         <span className="nm" style={{ display: "block" }}>
           {p.name}

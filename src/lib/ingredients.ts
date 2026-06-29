@@ -80,6 +80,7 @@ export function ingredientDetail(db: Db, householdId: number, id: number) {
       priceCents: schema.products.priceCents,
       available: schema.products.available,
       url: schema.products.url,
+      imageUrl: schema.products.imageUrl,
     })
     .from(schema.products)
     .innerJoin(schema.shops, eq(schema.products.shopId, schema.shops.id))
