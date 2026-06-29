@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
 import type { DeleteResult } from "@/lib/shops";
@@ -61,6 +61,7 @@ export function listAllProducts(db: Db, householdId: number) {
       priceCents: schema.products.priceCents,
       available: schema.products.available,
       url: schema.products.url,
+      imageUrl: schema.products.imageUrl,
     })
     .from(schema.products)
     .where(eq(schema.products.householdId, householdId))
@@ -74,12 +75,14 @@ export function listAllProducts(db: Db, householdId: number) {
       purchasedAt: schema.purchases.purchasedAt,
     })
     .from(schema.purchases)
-    .where(eq(schema.purchases.householdId, householdId))
+    // skip not-yet-priced purchases so they don't show as $0 in history/effective
+    .where(and(eq(schema.purchases.householdId, householdId), isNotNull(schema.purchases.cents)))
     .orderBy(desc(schema.purchases.purchasedAt))
     .all();
 
   const historyByProduct = new Map<number, { cents: number; purchasedAt: Date }[]>();
   for (const p of purchases) {
+    if (p.cents == null) continue; // defensive; query already filters these out
     const list = historyByProduct.get(p.productId) ?? [];
     list.push({ cents: p.cents, purchasedAt: p.purchasedAt });
     historyByProduct.set(p.productId, list);
@@ -89,6 +92,52 @@ export function listAllProducts(db: Db, householdId: number) {
     const history = historyByProduct.get(p.id) ?? [];
     const effectiveCents = p.priceCents ?? history[0]?.cents ?? null;
     return { ...p, history, effectiveCents };
+  });
+}
+
+/** Lowest-preference slot for a new product: one past the current max (or 1). */
+export function nextPriorityForIngredient(
+  db: Db,
+  householdId: number,
+  ingredientId: number,
+): number {
+  const [row] = db
+    .select({ max: sql<number | null>`max(${schema.products.priority})` })
+    .from(schema.products)
+    .where(
+      and(
+        eq(schema.products.householdId, householdId),
+        eq(schema.products.ingredientId, ingredientId),
+      ),
+    )
+    .all();
+  return (row?.max ?? 0) + 1;
+}
+
+/**
+ * Persist a drag-reorder: assign priority = 1..N in the given product order.
+ * Only ids that belong to this household + ingredient are touched; any product
+ * not listed keeps its old priority (so a stale/partial list can't scramble it).
+ */
+export function reorderProducts(
+  db: Db,
+  householdId: number,
+  ingredientId: number,
+  orderedIds: number[],
+): void {
+  const owned = new Set(
+    listProductsForIngredient(db, householdId, ingredientId).map((p) => p.id),
+  );
+  db.transaction((tx) => {
+    let rank = 1;
+    for (const id of orderedIds) {
+      if (!owned.has(id)) continue;
+      tx
+        .update(schema.products)
+        .set({ priority: rank++ })
+        .where(eq(schema.products.id, id))
+        .run();
+    }
   });
 }
 
@@ -165,7 +214,7 @@ export function effectivePrice(db: Db, productId: number): number | null {
   const [purchase] = db
     .select({ cents: schema.purchases.cents })
     .from(schema.purchases)
-    .where(eq(schema.purchases.productId, productId))
+    .where(and(eq(schema.purchases.productId, productId), isNotNull(schema.purchases.cents)))
     .orderBy(desc(schema.purchases.purchasedAt))
     .limit(1)
     .all();

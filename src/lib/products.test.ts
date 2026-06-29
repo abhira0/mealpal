@@ -9,6 +9,8 @@ import {
   effectivePrice,
   listAllProducts,
   deleteProduct,
+  reorderProducts,
+  nextPriorityForIngredient,
 } from "@/lib/products";
 
 let db: TestDb;
@@ -87,6 +89,29 @@ describe("products & prices", () => {
     expect(all[0].name).toBe("Flour");
     expect(all[0].effectiveCents).toBe(1299);
     expect(all[0].history).toHaveLength(1);
+  });
+
+  it("appends a new product at the bottom of the preference order", () => {
+    expect(nextPriorityForIngredient(db, hid, ingredientId)).toBe(1);
+    createProduct(db, hid, { ingredientId, shopId, name: "A", packSize: 1, priority: nextPriorityForIngredient(db, hid, ingredientId), url: null });
+    createProduct(db, hid, { ingredientId, shopId, name: "B", packSize: 1, priority: nextPriorityForIngredient(db, hid, ingredientId), url: null });
+    const list = listProductsForIngredient(db, hid, ingredientId);
+    expect(list.map((p) => [p.name, p.priority])).toEqual([["A", 1], ["B", 2]]);
+  });
+
+  it("reorders products to 1..N in the given order", () => {
+    const a = createProduct(db, hid, { ingredientId, shopId, name: "A", packSize: 1, priority: 1, url: null });
+    const b = createProduct(db, hid, { ingredientId, shopId, name: "B", packSize: 1, priority: 2, url: null });
+    const c = createProduct(db, hid, { ingredientId, shopId, name: "C", packSize: 1, priority: 3, url: null });
+    reorderProducts(db, hid, ingredientId, [c.id, a.id, b.id]);
+    const list = listProductsForIngredient(db, hid, ingredientId);
+    expect(list.map((p) => [p.name, p.priority])).toEqual([["C", 1], ["A", 2], ["B", 3]]);
+  });
+
+  it("reorder ignores ids outside the household/ingredient", () => {
+    const a = createProduct(db, hid, { ingredientId, shopId, name: "A", packSize: 1, priority: 1, url: null });
+    reorderProducts(db, hid, ingredientId, [99999, a.id]);
+    expect(listProductsForIngredient(db, hid, ingredientId)[0].priority).toBe(1);
   });
 
   it("deletes an unreferenced product", () => {

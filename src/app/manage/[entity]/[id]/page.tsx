@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { EntityForm } from "@/components/EntityForm";
+import { IngredientDetail } from "@/components/IngredientDetail";
 import { ENTITIES, isEntitySlug } from "../../entities";
 
 export default async function EditEntityPage({
@@ -16,6 +17,9 @@ export default async function EditEntityPage({
   if (!isEntitySlug(entity) || id === "new") notFound();
   // Entities without edit (prices) have no edit page.
   if (!ENTITIES[entity].canEdit) notFound();
+
+  // Ingredients get a rich detail/hub view; everything else is the plain form.
+  if (entity === "ingredients") return <IngredientDetail id={id} />;
 
   return <EntityForm slug={entity} id={id} />;
 }

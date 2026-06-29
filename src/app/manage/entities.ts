@@ -45,6 +45,8 @@ export type EntityConfig = {
     website?: string | null;
     iconUrl?: string | null;
   };
+  // If set, the row stacks (name on top) with a large image column beside details.
+  bigImage?: boolean;
   canEdit: boolean;
   canDelete: boolean;
   // If set, the New form shows an "Import from site" button that POSTs here
@@ -125,6 +127,11 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
       { key: "canonicalUnit", label: "Unit" },
       { key: "servingSize", label: "Serving size" },
     ],
+    icon: (row) => ({
+      name: String(row.name ?? ""),
+      iconUrl: row.imageUrl as string | null,
+    }),
+    bigImage: true,
     fields: [
       { name: "name", label: "Name", type: "text", required: true },
       { name: "canonicalUnit", label: "Unit", type: "select", options: ["g", "ml", "oz", "count"], required: true },
@@ -157,13 +164,18 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
       { key: "effectiveCents", label: "Price", format: formatPrice },
       { key: "history", label: "Purchase history", format: formatHistory },
     ],
+    icon: (row) => ({
+      name: String(row.name ?? ""),
+      iconUrl: row.imageUrl as string | null,
+    }),
+    bigImage: true,
     fields: [
       { name: "ingredientId", label: "Ingredient", type: "select", optionsFrom: "ingredients", optionLabel: "name", required: true },
       { name: "shopId", label: "Shop", type: "select", optionsFrom: "shops", optionLabel: "name", required: true },
       { name: "name", label: "Name", type: "text", required: true },
       { name: "packSize", label: "Pack size", type: "number", required: true, unitFrom: { field: "ingredientId", attr: "canonicalUnit" } },
       { name: "dollars", label: "Price ($) — manual override; blank = use latest purchase", type: "number", optional: true, prefill: (r) => (r.priceCents != null ? String(Number(r.priceCents) / 100) : "") },
-      { name: "priority", label: "Priority", type: "number", optional: true },
+      // priority is set by drag-reorder on the ingredient detail page, not here
       { name: "url", label: "URL", type: "text", optional: true },
       { name: "imageUrl", label: "Image URL", type: "text", optional: true },
     ],
@@ -176,7 +188,6 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
       name: v.name,
       packSize: num(v.packSize) || 1,
       dollars: optNum(v.dollars),
-      priority: optNum(v.priority),
       url: optStr(v.url),
       imageUrl: optStr(v.imageUrl),
     }),
@@ -187,7 +198,6 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
       packSize: num(v.packSize) || 1,
       // "" → null clears the override; absent stays absent (PATCH ignores undefined)
       dollars: v.dollars ?? undefined,
-      priority: optNum(v.priority),
       url: optStr(v.url),
       imageUrl: optStr(v.imageUrl),
     }),

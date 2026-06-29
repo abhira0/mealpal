@@ -5,6 +5,7 @@ import {
   createProduct,
   listAllProducts,
   listProductsForIngredient,
+  nextPriorityForIngredient,
 } from "@/lib/products";
 import { dollarsToCents } from "@/lib/money";
 
@@ -46,7 +47,12 @@ export async function POST(req: Request) {
     shopId,
     name,
     packSize,
-    priority: b?.priority !== undefined ? Number(b.priority) : 100,
+    // priority is set by drag-reorder on the ingredient page, not entered here;
+    // a new product lands at the bottom of its ingredient's preference order.
+    priority:
+      b?.priority !== undefined
+        ? Number(b.priority)
+        : nextPriorityForIngredient(db, session.user.householdId, ingredientId),
     priceCents,
     url: b?.url?.trim() || null,
     imageUrl: b?.imageUrl?.trim() || null,
