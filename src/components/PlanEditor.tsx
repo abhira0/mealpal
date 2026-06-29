@@ -62,6 +62,10 @@ function initials(name: string | null | undefined): string {
 export function PlanEditor({ userName }: { userName?: string | null }) {
   const todayIso = useMemo(todayISO, []);
   const [selected, setSelected] = useState<string>(todayIso);
+  // ponytail: server can't know the client's date/timezone, so all time-derived
+  // text (today, greeting, locale dates, the strip) is client-only to avoid hydration drift.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   // The strip slides to keep `selected` in view; the events range follows it.
   const days = useMemo(() => windowAround(selected), [selected]);
@@ -196,6 +200,22 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
       setAddSlot(null);
       await loadEvents();
     }
+  }
+
+  if (!mounted) {
+    return (
+      <header className="chrome">
+        <div className="chrome-row">
+          <div>
+            <p className="eb">&nbsp;</p>
+            <h1>&nbsp;</h1>
+          </div>
+          <Link href="/manage" aria-label="Manage account" className="avatar">
+            {initials(userName)}
+          </Link>
+        </div>
+      </header>
+    );
   }
 
   return (
