@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import { makeTestDb, type TestDb } from "@/test/db";
 import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
-import { createRecipe, getRecipe, listRecipes, updateRecipe } from "@/lib/recipes";
+import { createRecipe, deleteRecipe, getRecipe, listRecipes, updateRecipe } from "@/lib/recipes";
 
 let db: TestDb;
 let hid: number;
@@ -62,5 +63,32 @@ describe("recipes", () => {
     const other = seedHousehold(db, "Other");
     createRecipe(db, other, { name: "Secret", baseServings: 1, notes: null, ingredients: [], steps: [], media: [] });
     expect(listRecipes(db, hid)).toHaveLength(0);
+  });
+
+  it("deletes a recipe and its children", () => {
+    const r = createRecipe(db, hid, {
+      name: "Bread", baseServings: 2, notes: null,
+      ingredients: [{ ingredientId: flourId, amount: 500 }],
+      steps: ["Mix"], media: [{ kind: "youtube", url: "https://youtu.be/x" }],
+    });
+    expect(deleteRecipe(db, hid, r.id)).toEqual({ ok: true, deleted: true });
+    expect(getRecipe(db, hid, r.id)).toBeUndefined();
+    expect(db.select().from(schema.recipeIngredients).where(eq(schema.recipeIngredients.recipeId, r.id)).all()).toHaveLength(0);
+  });
+
+  it("won't delete a recipe used by a planned meal", () => {
+    const r = createRecipe(db, hid, { name: "Bread", baseServings: 1, notes: null, ingredients: [], steps: [], media: [] });
+    const slotId = db.insert(schema.mealSlots).values({ householdId: hid, name: "Dinner" }).returning().all()[0].id;
+    db.insert(schema.mealEvents).values({ householdId: hid, date: "2026-06-28", slotId, recipeId: r.id }).run();
+    const res = deleteRecipe(db, hid, r.id);
+    expect(res.ok).toBe(false);
+    expect(getRecipe(db, hid, r.id)).toBeTruthy();
+  });
+
+  it("won't delete another household's recipe", () => {
+    const other = seedHousehold(db, "Other");
+    const r = createRecipe(db, other, { name: "Secret", baseServings: 1, notes: null, ingredients: [], steps: [], media: [] });
+    expect(deleteRecipe(db, hid, r.id)).toEqual({ ok: true, deleted: false });
+    expect(getRecipe(db, other, r.id)?.name).toBe("Secret");
   });
 });

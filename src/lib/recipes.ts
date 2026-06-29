@@ -2,6 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
 import { effectivePrice } from "@/lib/products";
+import type { DeleteResult } from "@/lib/shops";
 
 type Db = BetterSQLite3Database<typeof schema>;
 
@@ -55,6 +56,31 @@ export function updateRecipe(db: Db, householdId: number, id: number, input: Rec
       tx.insert(schema.recipeMedia).values({ recipeId: id, kind: m.kind, url: m.url }).run();
     }
     return updated[0];
+  });
+}
+
+export function deleteRecipe(db: Db, householdId: number, id: number): DeleteResult {
+  const [recipe] = db.select().from(schema.recipes)
+    .where(and(eq(schema.recipes.id, id), eq(schema.recipes.householdId, householdId))).all();
+  if (!recipe) return { ok: true, deleted: false };
+  const eventCount = db.select().from(schema.mealEvents)
+    .where(and(eq(schema.mealEvents.householdId, householdId), eq(schema.mealEvents.recipeId, id))).all().length;
+  if (eventCount > 0) {
+    return { ok: false, reason: `Can't delete: ${eventCount} planned ${eventCount === 1 ? "meal uses" : "meals use"} this recipe.` };
+  }
+  const ruleCount = db.select().from(schema.mealRules)
+    .where(and(eq(schema.mealRules.householdId, householdId), eq(schema.mealRules.recipeId, id))).all().length;
+  if (ruleCount > 0) {
+    return { ok: false, reason: `Can't delete: ${ruleCount} recurring ${ruleCount === 1 ? "rule uses" : "rules use"} this recipe.` };
+  }
+  return db.transaction((tx) => {
+    tx.delete(schema.recipeIngredients).where(eq(schema.recipeIngredients.recipeId, id)).run();
+    tx.delete(schema.recipeSteps).where(eq(schema.recipeSteps.recipeId, id)).run();
+    tx.delete(schema.recipeMedia).where(eq(schema.recipeMedia.recipeId, id)).run();
+    const rows = tx.delete(schema.recipes)
+      .where(and(eq(schema.recipes.id, id), eq(schema.recipes.householdId, householdId)))
+      .returning().all();
+    return { ok: true, deleted: rows.length > 0 };
   });
 }
 

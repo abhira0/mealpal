@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { getRecipe, updateRecipe } from "@/lib/recipes";
+import { deleteRecipe, getRecipe, updateRecipe } from "@/lib/recipes";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -32,4 +32,14 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   });
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(getRecipe(db, session.user.householdId, Number(id)));
+}
+
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await params;
+  const result = deleteRecipe(db, session.user.householdId, Number(id));
+  if (!result.ok) return NextResponse.json({ error: result.reason }, { status: 409 });
+  if (!result.deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json({ ok: true });
 }
