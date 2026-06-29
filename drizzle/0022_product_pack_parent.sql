@@ -1,0 +1,1 @@
+ALTER TABLE `products` ADD `pack_parent_id` integer;
