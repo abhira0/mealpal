@@ -25,6 +25,15 @@ button{font-family:inherit}
 .chrome-back{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--turmeric);text-decoration:none;display:inline-block}
 .avatar{flex:none;width:38px;height:38px;border-radius:50%;background:var(--enamel-dark);color:var(--paper);display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:13px;text-decoration:none;border:1px solid rgba(255,255,255,.18)}
 
+/* ---------- chrome controls (segmented, on enamel) ---------- */
+.chrome-tabs{display:flex;gap:6px;margin-top:12px}
+.chrome-tabs button{font-family:var(--mono);font-weight:700;font-size:11px;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:8px 14px;min-height:38px;color:var(--paper);cursor:pointer}
+.chrome-tabs button[aria-pressed="true"]{background:var(--paper);border-color:var(--paper);color:var(--enamel-dark)}
+.chrome-ahead{display:flex;gap:6px;align-items:center;margin-top:10px}
+.chrome-ahead .lbl{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--turmeric);margin-right:2px}
+.chrome-ahead button{font-family:var(--mono);font-weight:700;font-size:11px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:6px;padding:6px 11px;min-height:34px;color:var(--paper);cursor:pointer}
+.chrome-ahead button[aria-pressed="true"]{background:var(--turmeric);border-color:var(--turmeric);color:var(--enamel-dark)}
+
 /* ---------- section labels ---------- */
 .section-label,.slot{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--sage)}
 .section-label{display:block;margin:4px 0 2px}
@@ -130,7 +139,10 @@ button{font-family:inherit}
 .account-row .ar-sub{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--sage);margin-top:2px}
 
 /* ---------- shop tickets ---------- */
-.ticket{background:#F8F4E8;border-radius:4px;box-shadow:0 2px 0 #e1dac4;overflow:hidden}
+/* scalloped bottom edge — reads as a torn receipt; --s = scallop width */
+.ticket{--s:14px;background:#F8F4E8;border-radius:4px 4px 0 0;overflow:hidden;filter:drop-shadow(0 2px 0 #e1dac4);
+  -webkit-mask:radial-gradient(circle calc(var(--s)/2) at 50% 0,#0000 98%,#000) 0 100%/var(--s) calc(var(--s)/2) repeat-x,linear-gradient(#000 0 0) 0 0/100% calc(100% - var(--s)/2) no-repeat;
+  mask:radial-gradient(circle calc(var(--s)/2) at 50% 0,#0000 98%,#000) 0 100%/var(--s) calc(var(--s)/2) repeat-x,linear-gradient(#000 0 0) 0 0/100% calc(100% - var(--s)/2) no-repeat}
 .ticket-head{background:var(--enamel);color:var(--paper);padding:12px 14px}
 .ticket-head .eb{margin-bottom:2px}
 .ticket-head h2{font-family:var(--display);font-weight:800;font-size:18px;display:flex;align-items:center;gap:8px}

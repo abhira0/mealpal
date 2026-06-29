@@ -91,36 +91,23 @@ export default function ShopPage() {
           {tripTotal > 0 && <> · ${centsToDollars(tripTotal).toFixed(2)}</>}
         </p>
         <h1>The run</h1>
-        <p className="eb" style={{ display: "flex", gap: ".75rem", alignItems: "center" }}>
-          <button
-            onClick={() => setTab("run")}
-            aria-pressed={tab === "run"}
-            style={{ fontWeight: tab === "run" ? 700 : 400, textDecoration: tab === "run" ? "underline" : "none" }}
-          >
+        <div className="chrome-tabs">
+          <button onClick={() => setTab("run")} aria-pressed={tab === "run"}>
             The run
           </button>
-          <button
-            onClick={() => setTab("bill")}
-            aria-pressed={tab === "bill"}
-            style={{ fontWeight: tab === "bill" ? 700 : 400, textDecoration: tab === "bill" ? "underline" : "none" }}
-          >
+          <button onClick={() => setTab("bill")} aria-pressed={tab === "bill"}>
             Bill{pendingCount > 0 && <> · {pendingCount}</>}
           </button>
-        </p>
+        </div>
         {tab === "run" && (
-          <p className="eb" style={{ display: "flex", gap: ".5rem", alignItems: "center" }}>
-            Buy ahead
+          <div className="chrome-ahead">
+            <span className="lbl">Buy ahead</span>
             {[7, 14, 30].map((d) => (
-              <button
-                key={d}
-                onClick={() => setHorizon(d)}
-                aria-pressed={horizon === d}
-                style={{ fontWeight: horizon === d ? 700 : 400, textDecoration: horizon === d ? "underline" : "none" }}
-              >
+              <button key={d} onClick={() => setHorizon(d)} aria-pressed={horizon === d}>
                 {d}d
               </button>
             ))}
-          </p>
+          </div>
         )}
       </header>
 
