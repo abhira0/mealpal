@@ -9,7 +9,12 @@ export type VariantNutrients = Partial<Record<(typeof NUTRIENT_PATCH_KEYS)[numbe
 export interface VariantInput extends VariantNutrients { name: string; nutritionPhoto?: string | null; }
 export type VariantPatch = Partial<VariantInput>;
 
+/** Create a variant under a product. Returns undefined if the product isn't in
+ *  the household (so we never orphan a variant onto a foreign product). */
 export function createVariant(db: Db, householdId: number, productId: number, input: VariantInput) {
+  const [product] = db.select({ id: schema.products.id }).from(schema.products)
+    .where(and(eq(schema.products.id, productId), eq(schema.products.householdId, householdId))).all();
+  if (!product) return undefined;
   const [row] = db.insert(schema.productVariants)
     .values({ householdId, productId, ...input })
     .returning().all();

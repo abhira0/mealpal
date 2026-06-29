@@ -22,5 +22,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const row = createVariant(db, session.user.householdId, productId, {
     name, nutritionPhoto: b?.nutritionPhoto ?? null, ...nutrients,
   });
+  if (!row) return NextResponse.json({ error: "Product not found" }, { status: 404 });
   return NextResponse.json(row, { status: 201 });
 }
