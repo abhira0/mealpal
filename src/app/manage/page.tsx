@@ -37,6 +37,8 @@ export default async function ManagePage() {
 
   const base = await origin();
   const cookie = (await headers()).get("cookie") ?? "";
+  // Recipes has a bespoke page (/recipes), not a generic ENTITIES entry.
+  const recipesCount = await count(base, "/api/recipes", cookie);
   const counts = Object.fromEntries(
     await Promise.all(
       CATALOG.map(async ({ slug }) => [
@@ -59,6 +61,16 @@ export default async function ManagePage() {
       <div className="content stack">
         <section className="stack-sm">
           <p className="section-label">Catalog</p>
+          <Link href="/recipes" className="account-row">
+            <span className="row-link">
+              <span className="icon-badge" aria-hidden="true">📖</span>
+              <span className="title">Recipes</span>
+            </span>
+            <span className="meta" style={{ marginTop: 0 }}>
+              {recipesCount ?? "—"}
+            </span>
+            <span className="arrow" aria-hidden="true">›</span>
+          </Link>
           {CATALOG.map(({ slug, emoji }) => (
             <Link key={slug} href={`/manage/${slug}`} className="account-row">
               <span className="row-link">
