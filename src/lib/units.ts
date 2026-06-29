@@ -29,3 +29,17 @@ export function formatPrice(cents: number): string {
 function trim(n: number): string {
   return Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100);
 }
+
+const G_PER_OZ = 28.3495;
+
+/**
+ * Convert a canonical amount between the app's units. Only oz↔g (mass) is
+ * possible — ml↔g would need a density we don't store, so cross-dimension
+ * pairs return null and the caller keeps the scraped number as-is.
+ */
+export function convertCanonical(amount: number, from: string, to: string): number | null {
+  if (from === to) return amount;
+  if (from === "oz" && to === "g") return amount * G_PER_OZ;
+  if (from === "g" && to === "oz") return amount / G_PER_OZ;
+  return null;
+}
