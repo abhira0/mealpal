@@ -126,6 +126,7 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
       { key: "name", label: "Name" },
       { key: "canonicalUnit", label: "Unit" },
       { key: "servingSize", label: "Serving size" },
+      { key: "stock", label: "In stock", format: (row) => `${row.stock ?? 0}${row.canonicalUnit ?? ""}` },
     ],
     icon: (row) => ({
       name: String(row.name ?? ""),
