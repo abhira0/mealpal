@@ -16,6 +16,7 @@ type MealEvent = {
   recipeId: number;
   servings: number;
   status: string;
+  ruleId: number | null;
 };
 
 function isoOf(d: Date): string {
@@ -206,6 +207,7 @@ export function PlanEditor() {
                       servings={ev.servings}
                       recipeId={ev.recipeId}
                       status={ev.status}
+                      recurring={ev.ruleId != null}
                       onCooked={loadEvents}
                       onDeleted={loadEvents}
                     />
