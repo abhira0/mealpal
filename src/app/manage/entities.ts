@@ -154,7 +154,6 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
     itemPath: (id) => `/api/products/${id}`,
     columns: [
       { key: "name", label: "Name" },
-      { key: "ingredientId", label: "Ingredient", refFrom: "ingredients", refLabel: "name" },
       { key: "shopId", label: "Shop", refFrom: "shops", refLabel: "name" },
       { key: "packSize", label: "Pack size" },
       { key: "effectiveCents", label: "Price", format: formatPrice },
