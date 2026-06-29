@@ -7,6 +7,8 @@ import { centsToDollars } from "@/lib/money";
 
 type Pending = {
   id: number;
+  productId: number;
+  ingredientId: number;
   productName: string;
   shopName: string;
   website: string | null;
@@ -16,18 +18,29 @@ type Pending = {
   hintCents: number | null;
 };
 
+type Product = { id: number; name: string; ingredientId: number };
+
 export function Bill({ onCount }: { onCount?: (n: number) => void }) {
   const [rows, setRows] = useState<Pending[] | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch("/api/purchases")
+  function reload() {
+    return fetch("/api/purchases")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((j) => {
         setRows(j as Pending[]);
         onCount?.((j as Pending[]).length);
       })
       .catch(() => setError("Couldn't load the bill."));
+  }
+
+  useEffect(() => {
+    reload();
+    fetch("/api/products")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((ps: Product[]) => setProducts(ps))
+      .catch(() => {});
     // ponytail: fetch once on mount; tab badge driven via onCount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -66,7 +79,13 @@ export function Bill({ onCount }: { onCount?: (n: number) => void }) {
           iconUrl={group[0].iconUrl}
         >
           {group.map((row) => (
-            <BillRow key={row.id} row={row} onSaved={() => drop(row.id)} />
+            <BillRow
+              key={row.id}
+              row={row}
+              alts={products.filter((p) => p.ingredientId === row.ingredientId)}
+              onSaved={() => drop(row.id)}
+              onSwapped={reload}
+            />
           ))}
         </Ticket>
       ))}
@@ -74,7 +93,17 @@ export function Bill({ onCount }: { onCount?: (n: number) => void }) {
   );
 }
 
-function BillRow({ row, onSaved }: { row: Pending; onSaved: () => void }) {
+function BillRow({
+  row,
+  alts,
+  onSaved,
+  onSwapped,
+}: {
+  row: Pending;
+  alts: Product[];
+  onSaved: () => void;
+  onSwapped: () => void;
+}) {
   const [dollars, setDollars] = useState(
     row.hintCents != null ? centsToDollars(row.hintCents).toFixed(2) : "",
   );
@@ -105,6 +134,21 @@ function BillRow({ row, onSaved }: { row: Pending; onSaved: () => void }) {
     else setError("Couldn't save.");
   }
 
+  // Bought a different product than planned (the one you wanted was out of stock).
+  async function swap(productId: number) {
+    if (productId === row.productId) return;
+    setBusy(true);
+    setError(null);
+    const res = await fetch(`/api/purchases/${row.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ productId }),
+    });
+    setBusy(false);
+    if (res.ok) onSwapped(); // may move to a different stop → reload regroups
+    else setError("Couldn't switch product.");
+  }
+
   async function remove() {
     setBusy(true);
     setError(null);
@@ -117,7 +161,21 @@ function BillRow({ row, onSaved }: { row: Pending; onSaved: () => void }) {
   return (
     <div className="ticket-row">
       <div className="tk-main">
-        <div className="tk-name">{row.productName}</div>
+        {alts.length > 1 ? (
+          <select
+            className="input mono tk-name"
+            value={row.productId}
+            disabled={busy}
+            onChange={(e) => swap(Number(e.target.value))}
+            aria-label={`Product bought instead of ${row.productName}`}
+          >
+            {alts.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        ) : (
+          <div className="tk-name">{row.productName}</div>
+        )}
 
         <div className="bill-fields">
           <label className="eb" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
