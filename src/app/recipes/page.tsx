@@ -45,8 +45,8 @@ export default function RecipesPage() {
   return (
     <>
       <header className="chrome">
-        <p className="eb">Recipes · {recipes ? recipes.length : "…"}</p>
-        <h1>Your recipes</h1>
+        <Link href="/manage" className="chrome-back">← Catalog</Link>
+        <h1>Recipes</h1>
       </header>
 
       <div className="content stack-sm">
