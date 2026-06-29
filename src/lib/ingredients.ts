@@ -9,7 +9,6 @@ type Db = BetterSQLite3Database<typeof schema>;
 export interface IngredientInput {
   name: string;
   canonicalUnit: string;
-  servingSize: number | null;
 }
 
 export function createIngredient(db: Db, householdId: number, input: IngredientInput) {

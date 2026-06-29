@@ -43,7 +43,6 @@ type Detail = {
   id: number;
   name: string;
   canonicalUnit: string;
-  servingSize: number | null;
   stock: number;
   products: Product[];
   recipes: { id: number; name: string }[];
@@ -177,9 +176,6 @@ export function IngredientDetail({ id }: { id: string }) {
           <div className="ing-row" style={{ borderBottom: "none", paddingTop: 0 }}>
             <span style={{ flex: 1 }}>
               <span className="meta" style={{ display: "block" }}>Unit: {unit}</span>
-              <span className="meta" style={{ display: "block" }}>
-                Serving size: {detail.servingSize != null ? `${detail.servingSize}${unit}` : "—"}
-              </span>
             </span>
             <span className="chip">{detail.stock}{unit} in stock</span>
             <button type="button" className="btn-link" style={{ width: "auto" }} onClick={() => setEditing(true)}>

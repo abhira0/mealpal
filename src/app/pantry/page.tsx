@@ -7,7 +7,6 @@ type Ingredient = {
   id: number;
   name: string;
   canonicalUnit: string;
-  servingSize: number | null;
 };
 
 type StockMap = Record<string, number>;
@@ -51,9 +50,7 @@ export default function PantryPage() {
 
         {ingredients?.map((ing) => {
           const qty = stock[String(ing.id)] ?? 0;
-          // Low when current stock is below one serving; if no servingSize,
-          // low only when fully out.
-          const low = ing.servingSize != null ? qty < ing.servingSize : qty <= 0;
+          const low = qty <= 0; // low only when fully out
           return (
             <div className="card" key={ing.id}>
               <div className="card-row">

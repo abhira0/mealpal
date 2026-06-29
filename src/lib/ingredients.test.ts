@@ -16,21 +16,19 @@ beforeEach(() => {
 
 describe("ingredients", () => {
   it("creates and lists ingredients scoped to a household", () => {
-    createIngredient(db, hid, { name: "Flour", canonicalUnit: "g", servingSize: 50 });
+    createIngredient(db, hid, { name: "Flour", canonicalUnit: "g" });
     const other = seedHousehold(db, "Other");
-    createIngredient(db, other, { name: "Sugar", canonicalUnit: "g", servingSize: null });
+    createIngredient(db, other, { name: "Sugar", canonicalUnit: "g" });
 
     const mine = listIngredients(db, hid);
     expect(mine).toHaveLength(1);
     expect(mine[0].name).toBe("Flour");
-    expect(mine[0].servingSize).toBe(50);
   });
 
   it("updates an ingredient within the household", () => {
     const ing = createIngredient(db, hid, {
       name: "Milk",
       canonicalUnit: "ml",
-      servingSize: 240,
     });
     const updated = updateIngredient(db, hid, ing.id, { name: "Whole Milk" });
     expect(updated?.name).toBe("Whole Milk");
@@ -41,7 +39,6 @@ describe("ingredients", () => {
     const ing = createIngredient(db, other, {
       name: "Oats",
       canonicalUnit: "g",
-      servingSize: 40,
     });
     const result = updateIngredient(db, hid, ing.id, { name: "Hacked" });
     expect(result).toBeUndefined();

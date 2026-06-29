@@ -39,7 +39,7 @@ describe("shops", () => {
     const shop = createShop(db, hid, "Costco");
     const ingredientId = db
       .insert(schema.ingredients)
-      .values({ householdId: hid, name: "Flour", canonicalUnit: "g", servingSize: 50 })
+      .values({ householdId: hid, name: "Flour", canonicalUnit: "g" })
       .returning()
       .all()[0].id;
     createProduct(db, hid, {
