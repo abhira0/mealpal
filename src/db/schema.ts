@@ -152,6 +152,8 @@ export const stockMovements = sqliteTable("stock_movements", {
   mealEventId: integer("meal_event_id").references(() => mealEvents.id),
   purchaseId: integer("purchase_id"),
   at: integer("at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  // date-only YYYY-MM-DD for manual backfill of on-hand stock; null = no expiry
+  expiresAt: text("expires_at"),
 });
 
 export const purchases = sqliteTable("purchases", {

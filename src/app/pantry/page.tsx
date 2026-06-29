@@ -10,10 +10,12 @@ type Ingredient = {
 };
 
 type StockMap = Record<string, number>;
+type ExpiryMap = Record<string, string>;
 
 export default function PantryPage() {
   const [ingredients, setIngredients] = useState<Ingredient[] | null>(null);
   const [stock, setStock] = useState<StockMap>({});
+  const [expiry, setExpiry] = useState<ExpiryMap>({});
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -23,7 +25,8 @@ export default function PantryPage() {
     ])
       .then(([ings, st]) => {
         setIngredients(ings as Ingredient[]);
-        setStock(st as StockMap);
+        setStock((st as { qty: StockMap }).qty);
+        setExpiry((st as { expiry: ExpiryMap }).expiry);
       })
       .catch(() => setError("Couldn't load the pantry yet."));
   }, []);
@@ -51,6 +54,7 @@ export default function PantryPage() {
         {ingredients?.map((ing) => {
           const qty = stock[String(ing.id)] ?? 0;
           const low = qty <= 0; // low only when fully out
+          const exp = expiry[String(ing.id)];
           return (
             <div className="card" key={ing.id}>
               <div className="card-row">
@@ -60,9 +64,13 @@ export default function PantryPage() {
                   unit={ing.canonicalUnit}
                   current={qty}
                   tone={low ? "low" : "default"}
-                  onAdjusted={(delta) => applyDelta(ing.id, delta)}
+                  onAdjusted={(delta, exp) => {
+                    applyDelta(ing.id, delta);
+                    if (exp) setExpiry((p) => ({ ...p, [ing.id]: exp }));
+                  }}
                 />
               </div>
+              {exp && <p className="meta">soonest expiry · {exp}</p>}
             </div>
           );
         })}

@@ -10,6 +10,7 @@ export interface MovementInput {
   reason: "purchase" | "cooked" | "manual";
   mealEventId?: number | null;
   purchaseId?: number | null;
+  expiresAt?: string | null;
 }
 
 export function recordMovement(db: Db, householdId: number, m: MovementInput) {
@@ -17,6 +18,7 @@ export function recordMovement(db: Db, householdId: number, m: MovementInput) {
     .values({
       householdId, ingredientId: m.ingredientId, delta: m.delta, reason: m.reason,
       mealEventId: m.mealEventId ?? null, purchaseId: m.purchaseId ?? null,
+      expiresAt: m.expiresAt ?? null,
     }).returning().all();
   return row;
 }
@@ -44,7 +46,26 @@ export function stockByIngredient(db: Db, householdId: number): Map<number, numb
   return new Map(rows.map((r) => [r.ingredientId, r.total]));
 }
 
-/** Manual correction (spills, recounts). Positive or negative. */
-export function adjustStock(db: Db, householdId: number, ingredientId: number, delta: number) {
-  return recordMovement(db, householdId, { ingredientId, delta, reason: "manual" });
+/** Manual correction (spills, recounts) or backfill. Positive or negative. */
+export function adjustStock(
+  db: Db, householdId: number, ingredientId: number, delta: number, expiresAt?: string | null,
+) {
+  return recordMovement(db, householdId, { ingredientId, delta, reason: "manual", expiresAt });
+}
+
+/** Soonest non-null expiry per ingredient among positive (still-on-hand) movements. */
+export function expiryByIngredient(db: Db, householdId: number): Map<number, string> {
+  const rows = db
+    .select({
+      ingredientId: schema.stockMovements.ingredientId,
+      soonest: sql<string>`min(${schema.stockMovements.expiresAt})`,
+    })
+    .from(schema.stockMovements)
+    .where(and(
+      eq(schema.stockMovements.householdId, householdId),
+      sql`${schema.stockMovements.expiresAt} is not null`,
+      sql`${schema.stockMovements.delta} > 0`,
+    ))
+    .groupBy(schema.stockMovements.ingredientId).all();
+  return new Map(rows.filter((r) => r.soonest).map((r) => [r.ingredientId, r.soonest]));
 }

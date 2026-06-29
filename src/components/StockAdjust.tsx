@@ -22,10 +22,11 @@ export function StockAdjust({
   unit: string;
   current: number;
   tone: Tone;
-  onAdjusted: (delta: number) => void;
+  onAdjusted: (delta: number, expiresAt: string | null) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
+  const [expiresAt, setExpiresAt] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,11 +43,11 @@ export function StockAdjust({
     const res = await fetch("/api/stock", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ingredientId, delta }),
+      body: JSON.stringify({ ingredientId, delta, expiresAt: expiresAt || null }),
     });
     setBusy(false);
     if (res.ok) {
-      onAdjusted(delta);
+      onAdjusted(delta, expiresAt || null);
       setOpen(false);
     } else {
       setError("Couldn't save.");
@@ -87,6 +88,14 @@ export function StockAdjust({
         }}
       />
       <span className="meta">{unit}</span>
+      <input
+        type="date"
+        className="input"
+        aria-label="Expires · optional"
+        value={expiresAt}
+        disabled={busy}
+        onChange={(e) => setExpiresAt(e.target.value)}
+      />
       <button type="button" className="tab" onClick={save} disabled={busy}>
         save
       </button>
