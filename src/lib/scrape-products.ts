@@ -162,6 +162,27 @@ const SAYWEEE_EXTRACTOR = `(() => {
   };
 })()`;
 
+// Trader Joe's (traderjoes.com) ships no JSON-LD. Name + image come off og:
+// tags; price and pack size live in the stats block as "$4.49" + "/24 Oz".
+// The store is always Trader Joe's.
+// ponytail: the per-unit text is the knob — pack size rides on it ("/24 Oz").
+// Count/each items ("/each") have no weight token, so packSize comes back blank.
+const TRADERJOES_EXTRACTOR = `(() => {
+  const meta = (k) => document.querySelector('meta[property="' + k + '"]')?.getAttribute('content') ?? null;
+  const txt = (sel) => { const e = document.querySelector(sel); return e ? e.textContent.trim() : null; };
+  // The rendered <h1> is the source of truth; og:title can go stale on this SPA.
+  const title = txt('h1') || meta('og:title');
+  return {
+    title,
+    imageUrl: meta('og:image'),
+    priceText: txt('[class*="ProductPrice_productPrice__price"]'),
+    weightText: txt('[class*="ProductPrice_productPrice__unit"]'), // e.g. "/24 Oz"
+    servingsText: null,
+    shopText: "Trader Joe's",
+    url: location.href,
+  };
+})()`;
+
 interface Site {
   id: string;
   match: (url: string) => boolean;
@@ -171,6 +192,7 @@ interface Site {
 const SITES: Site[] = [
   { id: "instacart", match: (u) => u.includes("instacart."), extractor: INSTACART_EXTRACTOR },
   { id: "sayweee", match: (u) => u.includes("sayweee."), extractor: SAYWEEE_EXTRACTOR },
+  { id: "traderjoes", match: (u) => u.includes("traderjoes."), extractor: TRADERJOES_EXTRACTOR },
 ];
 
 /**
