@@ -17,9 +17,30 @@ export type EditableRecipe = {
   notes: string | null;
   totalMinutes?: number | null;
   ingredients: { ingredientId: number; amount: number }[];
-  steps: { position: number; text: string }[];
+  steps: { position: number; text: string; startSeconds?: number | null; endSeconds?: number | null }[];
   media?: Media[];
 };
+
+type DraftStep = { text: string; start: string; end: string };
+
+/** "1:05" or "65" -> 65 seconds; blank/invalid -> null. */
+function parseClip(s: string): number | null {
+  const t = s.trim();
+  if (!t) return null;
+  if (t.includes(":")) {
+    const [m, sec] = t.split(":");
+    const total = Number(m) * 60 + Number(sec);
+    return Number.isFinite(total) ? total : null;
+  }
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** 65 -> "1:05"; null -> "". */
+function fmtClip(n: number | null | undefined): string {
+  if (n == null) return "";
+  return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}`;
+}
 
 /** Downscale an image file to a JPEG data URL (longest side <= max px). */
 async function fileToPhotoDataUrl(file: File, max = 1024): Promise<string> {
@@ -64,7 +85,7 @@ export function RecipeSheet({
   const [totalMinutes, setTotalMinutes] = useState("");
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<DraftIngredient[]>([{ ingredientId: null, amount: "" }]);
-  const [steps, setSteps] = useState<string[]>([""]);
+  const [steps, setSteps] = useState<DraftStep[]>([{ text: "", start: "", end: "" }]);
   // The recipe photo (data URL or existing url); null = none.
   const [photo, setPhoto] = useState<string | null>(null);
   // Non-photo media (video/youtube) preserved across edits.
@@ -94,7 +115,11 @@ export function RecipeSheet({
           ? recipe.ingredients.map((i) => ({ ingredientId: i.ingredientId, amount: String(i.amount) }))
           : [{ ingredientId: null, amount: "" }],
       );
-      setSteps(recipe.steps.length ? recipe.steps.map((s) => s.text) : [""]);
+      setSteps(
+        recipe.steps.length
+          ? recipe.steps.map((s) => ({ text: s.text, start: fmtClip(s.startSeconds), end: fmtClip(s.endSeconds) }))
+          : [{ text: "", start: "", end: "" }],
+      );
       const media = recipe.media ?? [];
       setPhoto(media.find((m) => m.kind === "photo")?.url ?? null);
       setOtherMedia(media.filter((m) => m.kind !== "photo"));
@@ -104,13 +129,14 @@ export function RecipeSheet({
       setTotalMinutes("");
       setNotes("");
       setLines([{ ingredientId: null, amount: "" }]);
-      setSteps([""]);
+      setSteps([{ text: "", start: "", end: "" }]);
       setPhoto(null);
       setOtherMedia([]);
     }
   }, [open, recipe]);
 
   const ingredientOptions = ingredients.map((i) => ({ id: i.id, label: i.name }));
+  const hasVideo = otherMedia.some((m) => m.kind === "youtube" || m.kind === "video");
 
   function updateLine(idx: number, patch: Partial<DraftIngredient>) {
     setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
@@ -131,7 +157,9 @@ export function RecipeSheet({
       ingredients: lines
         .filter((l) => l.ingredientId != null && l.amount.trim() !== "")
         .map((l) => ({ ingredientId: l.ingredientId as number, amount: Number(l.amount) || 0 })),
-      steps: steps.map((s) => s.trim()).filter(Boolean),
+      steps: steps
+        .filter((s) => s.text.trim() !== "")
+        .map((s) => ({ text: s.text.trim(), startSeconds: parseClip(s.start), endSeconds: parseClip(s.end) })),
       media: [...otherMedia, ...(photo ? [{ kind: "photo", url: photo }] : [])],
     };
     const res = await fetch(editing ? `/api/recipes/${recipe.id}` : "/api/recipes", {
@@ -234,24 +262,54 @@ export function RecipeSheet({
 
         <div className="field">
           <span className="field-label">Steps</span>
+          {hasVideo ? (
+            <span className="body" style={{ color: "var(--sage)", marginBottom: 6, display: "block" }}>
+              Add a video clip (start–end, e.g. 1:05) to play that moment in cook mode.
+            </span>
+          ) : null}
           <div className="stack-sm">
-            {steps.map((step, idx) => (
-              <input
-                key={idx}
-                type="text"
-                className="input"
-                value={step}
-                onChange={(e) =>
-                  setSteps((prev) => prev.map((s, i) => (i === idx ? e.target.value : s)))
-                }
-                placeholder={`Step ${idx + 1}`}
-                aria-label={`Step ${idx + 1}`}
-              />
-            ))}
+            {steps.map((step, idx) => {
+              const setStep = (patch: Partial<DraftStep>) =>
+                setSteps((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
+              return (
+                <div key={idx} className="stack-sm" style={{ gap: 6 }}>
+                  <input
+                    type="text"
+                    className="input"
+                    value={step.text}
+                    onChange={(e) => setStep({ text: e.target.value })}
+                    placeholder={`Step ${idx + 1}`}
+                    aria-label={`Step ${idx + 1}`}
+                  />
+                  {hasVideo ? (
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className="input mono"
+                        value={step.start}
+                        onChange={(e) => setStep({ start: e.target.value })}
+                        placeholder="Clip start (0:30)"
+                        aria-label={`Step ${idx + 1} clip start`}
+                      />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className="input mono"
+                        value={step.end}
+                        onChange={(e) => setStep({ end: e.target.value })}
+                        placeholder="Clip end (0:48)"
+                        aria-label={`Step ${idx + 1} clip end`}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
             <button
               type="button"
               className="trigger add"
-              onClick={() => setSteps((prev) => [...prev, ""])}
+              onClick={() => setSteps((prev) => [...prev, { text: "", start: "", end: "" }])}
             >
               + Add step
             </button>

@@ -160,6 +160,8 @@ export const recipeSteps = sqliteTable("recipe_steps", {
   recipeId: integer("recipe_id").notNull().references(() => recipes.id),
   position: integer("position").notNull(),
   text: text("text").notNull(),
+  startSeconds: integer("start_seconds"),
+  endSeconds: integer("end_seconds"),
 });
 
 export const recipeMedia = sqliteTable("recipe_media", {

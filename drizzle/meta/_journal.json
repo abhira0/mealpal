@@ -176,6 +176,13 @@
       "when": 1782689253994,
       "tag": "0024_recipe_total_minutes",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1782689253995,
+      "tag": "0025_recipe_step_clips",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { deleteRecipe, getRecipe, updateRecipe } from "@/lib/recipes";
+import { deleteRecipe, getRecipe, updateRecipe, normalizeStep } from "@/lib/recipes";
 import { recipeNutrition } from "@/lib/nutrition";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -28,7 +28,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     ingredients: Array.isArray(b.ingredients)
       ? b.ingredients.map((i: { ingredientId: number; amount: number }) => ({ ingredientId: Number(i.ingredientId), amount: Number(i.amount) }))
       : [],
-    steps: Array.isArray(b.steps) ? b.steps.map((s: string) => String(s)) : [],
+    steps: Array.isArray(b.steps) ? b.steps.map(normalizeStep) : [],
     media: Array.isArray(b.media)
       ? b.media.map((m: { kind: string; url: string }) => ({ kind: String(m.kind), url: String(m.url) }))
       : [],

@@ -237,7 +237,9 @@ input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:#a9a496;posi
 .cook-x{background:none;border:none;font-size:22px;color:var(--sage);cursor:pointer;line-height:1}
 .cook-step{flex:1;display:flex;flex-direction:column;justify-content:center;gap:16px;text-align:center}
 .cook-num{font-family:var(--mono);font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--sage)}
-.cook-text{font-family:var(--display);font-weight:700;font-size:clamp(24px,6vw,40px);line-height:1.25;margin:0}
+.cook-clip{width:min(100%,640px);aspect-ratio:16/9;margin:0 auto;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+.cook-clip iframe{width:100%;height:100%;border:none}
+.cook-text{font-family:var(--display);font-weight:700;font-size:clamp(20px,4.5vw,34px);line-height:1.25;margin:0}
 .cook-dots{display:flex;gap:8px;justify-content:center}
 .cook-dots span{width:8px;height:8px;border-radius:50%;background:var(--line)}
 .cook-dots span.on{background:var(--paprika)}
