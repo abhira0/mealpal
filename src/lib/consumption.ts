@@ -6,7 +6,33 @@ import { recordMovement, stockByProduct } from "@/lib/stock";
 
 type Db = BetterSQLite3Database<typeof schema>;
 
-export interface ConsumptionLine { ingredientId: number; amount: number; }
+// A unit of consumption. `productId` is set only for direct product items,
+// which attribute their stock to that exact product (not the preferred one).
+export interface ConsumptionLine { ingredientId: number; amount: number; productId?: number }
+
+type MealEvent = typeof schema.mealEvents.$inferSelect;
+
+/**
+ * Consumption lines for ANY meal event, regardless of kind:
+ * - recipe meal → the scaled recipe's per-ingredient lines.
+ * - direct ingredient → one line for that ingredient + amount.
+ * - direct product → one line on the product's ingredient + amount, attributed
+ *   to that exact product.
+ */
+export function consumptionLinesForEvent(db: Db, householdId: number, ev: MealEvent): ConsumptionLine[] {
+  if (ev.recipeId != null) {
+    const recipe = getRecipe(db, householdId, ev.recipeId);
+    return recipe ? consumptionForRecipe(recipe, ev.servings) : [];
+  }
+  const amount = ev.amount ?? 0;
+  if (ev.productId != null) {
+    const [p] = db.select({ ingredientId: schema.products.ingredientId }).from(schema.products)
+      .where(and(eq(schema.products.id, ev.productId), eq(schema.products.householdId, householdId))).all();
+    return p ? [{ ingredientId: p.ingredientId, amount, productId: ev.productId }] : [];
+  }
+  if (ev.ingredientId != null) return [{ ingredientId: ev.ingredientId, amount }];
+  return [];
+}
 
 /**
  * Products of an ingredient that currently have stock on hand, preferred
@@ -45,12 +71,11 @@ export function cookChoices(db: Db, householdId: number, eventId: number): CookC
   const [ev] = db.select().from(schema.mealEvents)
     .where(and(eq(schema.mealEvents.id, eventId), eq(schema.mealEvents.householdId, householdId))).all();
   if (!ev) return [];
-  const recipe = getRecipe(db, householdId, ev.recipeId);
-  if (!recipe) return [];
   const inStock = inStockProductsByIngredient(db, householdId);
   const onHand = stockByProduct(db, householdId);
   const choices: CookChoice[] = [];
-  for (const line of consumptionForRecipe(recipe, ev.servings)) {
+  for (const line of consumptionLinesForEvent(db, householdId, ev)) {
+    if (line.productId != null) continue; // direct product item: attribution fixed
     const ids = inStock.get(line.ingredientId) ?? [];
     if (ids.length < 2) continue; // 0 or 1 → resolved automatically
     const products = db.select({ id: schema.products.id, name: schema.products.name })
@@ -81,12 +106,14 @@ export function unstockedIngredients(db: Db, householdId: number, eventId: numbe
   const [ev] = db.select().from(schema.mealEvents)
     .where(and(eq(schema.mealEvents.id, eventId), eq(schema.mealEvents.householdId, householdId))).all();
   if (!ev) return [];
-  const recipe = getRecipe(db, householdId, ev.recipeId);
-  if (!recipe) return [];
   const inStock = inStockProductsByIngredient(db, householdId);
+  const onHand = stockByProduct(db, householdId);
   const missing: string[] = [];
-  for (const line of consumptionForRecipe(recipe, ev.servings)) {
-    if ((inStock.get(line.ingredientId) ?? []).length > 0) continue;
+  for (const line of consumptionLinesForEvent(db, householdId, ev)) {
+    // direct product item: needs stock of that exact product
+    if (line.productId != null) {
+      if ((onHand.get(line.productId) ?? 0) > 0) continue;
+    } else if ((inStock.get(line.ingredientId) ?? []).length > 0) continue;
     const ing = db.select({ name: schema.ingredients.name }).from(schema.ingredients)
       .where(eq(schema.ingredients.id, line.ingredientId)).all()[0];
     missing.push(ing?.name ?? "?");
@@ -128,6 +155,33 @@ export function recordCooked(
     const productId = (chosen && ids.includes(chosen)) ? chosen : (ids[0] ?? null);
     recordMovement(db, householdId, {
       ingredientId: line.ingredientId, productId, delta: -line.amount, reason: "cooked", mealEventId,
+    });
+  }
+  return lines;
+}
+
+/**
+ * Mark ANY meal event cooked: write negative `cooked` movements for its
+ * consumption lines. Direct product items attribute to their own product;
+ * recipe/ingredient lines use the allocation pick, else the single/preferred
+ * in-stock product (null if nothing on hand).
+ */
+export function recordCookedForEvent(
+  db: Db, householdId: number, ev: MealEvent, allocations?: Map<number, number>,
+) {
+  const inStock = inStockProductsByIngredient(db, householdId);
+  const lines = consumptionLinesForEvent(db, householdId, ev);
+  for (const line of lines) {
+    let productId: number | null;
+    if (line.productId != null) {
+      productId = line.productId; // direct product item: fixed attribution
+    } else {
+      const ids = inStock.get(line.ingredientId) ?? [];
+      const chosen = allocations?.get(line.ingredientId);
+      productId = (chosen && ids.includes(chosen)) ? chosen : (ids[0] ?? null);
+    }
+    recordMovement(db, householdId, {
+      ingredientId: line.ingredientId, productId, delta: -line.amount, reason: "cooked", mealEventId: ev.id,
     });
   }
   return lines;

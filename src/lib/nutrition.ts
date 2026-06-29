@@ -98,38 +98,62 @@ export function dayNutrition(db: Db, householdId: number, date: string): DayNutr
     db.select().from(schema.products).where(eq(schema.products.householdId, householdId)).all()
       .map((p) => [p.id, p]),
   );
+  const variantById = new Map(
+    db.select().from(schema.productVariants).where(eq(schema.productVariants.householdId, householdId)).all()
+      .map((v) => [v.id, v]),
+  );
 
   const meals: MealNutrition[] = [];
   for (const ev of events) {
-    const recipe = getRecipe(db, householdId, ev.recipeId);
-    if (!recipe) continue;
     const nutrients = zeroNutrients();
     const missing = new Set<number>();
+    let name = "Item";
 
-    if (ev.status === "cooked") {
-      const moves = db.select().from(schema.stockMovements)
-        .where(and(
-          eq(schema.stockMovements.householdId, householdId),
-          eq(schema.stockMovements.mealEventId, ev.id),
-          eq(schema.stockMovements.reason, "cooked"),
-        )).all();
-      for (const m of moves) {
-        const p = m.productId != null ? productById.get(m.productId) : undefined;
-        const pn = p ? productNutrients(p) : null;
-        if (!pn) { missing.add(m.ingredientId); continue; }
-        addScaled(nutrients, pn, Math.abs(m.delta));
+    if (ev.recipeId != null) {
+      const recipe = getRecipe(db, householdId, ev.recipeId);
+      if (!recipe) continue;
+      name = recipe.name;
+      if (ev.status === "cooked") {
+        const moves = db.select().from(schema.stockMovements)
+          .where(and(
+            eq(schema.stockMovements.householdId, householdId),
+            eq(schema.stockMovements.mealEventId, ev.id),
+            eq(schema.stockMovements.reason, "cooked"),
+          )).all();
+        for (const m of moves) {
+          const p = m.productId != null ? productById.get(m.productId) : undefined;
+          const pn = p ? productNutrients(p) : null;
+          if (!pn) { missing.add(m.ingredientId); continue; }
+          addScaled(nutrients, pn, Math.abs(m.delta));
+        }
+      } else {
+        for (const line of consumptionForRecipe(recipe, ev.servings)) {
+          const pn = preferredNutrients(db, householdId, line.ingredientId);
+          if (!pn) { missing.add(line.ingredientId); continue; }
+          addScaled(nutrients, pn, line.amount);
+        }
       }
     } else {
-      for (const line of consumptionForRecipe(recipe, ev.servings)) {
-        const pn = preferredNutrients(db, householdId, line.ingredientId);
-        if (!pn) { missing.add(line.ingredientId); continue; }
-        addScaled(nutrients, pn, line.amount);
+      // direct item: nutrition = source per-unit × amount (same planned or cooked)
+      const amount = ev.amount ?? 0;
+      if (ev.productId != null) {
+        const variant = ev.variantId != null ? variantById.get(ev.variantId) : undefined;
+        const p = productById.get(ev.productId);
+        const src = variant ? variantNutrients(variant) : (p ? productNutrients(p) : null);
+        name = variant?.name ?? p?.name ?? "Item";
+        if (src) addScaled(nutrients, src, amount);
+        else if (p) missing.add(p.ingredientId);
+      } else if (ev.ingredientId != null) {
+        const pn = preferredNutrients(db, householdId, ev.ingredientId);
+        name = ingredientName.get(ev.ingredientId) ?? "Item";
+        if (pn) addScaled(nutrients, pn, amount);
+        else missing.add(ev.ingredientId);
       }
     }
 
     meals.push({
       eventId: ev.id,
-      recipeName: recipe.name,
+      recipeName: name,
       slotName: slots.get(ev.slotId) ?? "—",
       servings: ev.servings,
       estimate: ev.status !== "cooked",
@@ -139,10 +163,6 @@ export function dayNutrition(db: Db, householdId: number, date: string): DayNutr
   }
 
   // Quick-logged snacks/packets eaten this day (not part of a recipe meal).
-  const variantById = new Map(
-    db.select().from(schema.productVariants).where(eq(schema.productVariants.householdId, householdId)).all()
-      .map((v) => [v.id, v]),
-  );
   for (const c of listEaten(db, householdId, date)) {
     const p = productById.get(c.productId);
     const variant = c.variantId != null ? variantById.get(c.variantId) : undefined;
@@ -279,50 +299,71 @@ export function dayIngredientTable(db: Db, householdId: number, date: string): I
       .map((p) => [p.id, p]),
   );
 
-  // ingredientId -> accumulating row
-  const rows = new Map<number, IngredientNutritionRow>();
-  const accumulate = (ingredientId: number, qty: number, p: ProductRow) => {
-    const ing = ingredientById.get(ingredientId);
-    let row = rows.get(ingredientId);
-    if (!row) {
-      row = { ingredientId, name: ing?.name ?? "?", unit: ing?.canonicalUnit ?? "", productName: p.name, qty: 0, values: {} };
-      rows.set(ingredientId, row);
-    }
-    row.qty += qty;
-    for (const k of NUTRIENT_PATCH_KEYS) {
-      if (p[k] == null) continue;
-      row.values[k] = (row.values[k] ?? 0) + p[k]! * qty;
-    }
-  };
-
-  for (const ev of events) {
-    const recipe = getRecipe(db, householdId, ev.recipeId);
-    if (!recipe) continue;
-    if (ev.status === "cooked") {
-      const moves = db.select().from(schema.stockMovements)
-        .where(and(
-          eq(schema.stockMovements.householdId, householdId),
-          eq(schema.stockMovements.mealEventId, ev.id),
-          eq(schema.stockMovements.reason, "cooked"),
-        )).all();
-      for (const m of moves) {
-        const p = m.productId != null ? productById.get(m.productId) : undefined;
-        if (!p || !hasNutrition(p)) continue; // no usable nutrition
-        accumulate(m.ingredientId, Math.abs(m.delta), p);
-      }
-    } else {
-      for (const line of consumptionForRecipe(recipe, ev.servings)) {
-        const p = preferredProduct(db, householdId, line.ingredientId);
-        if (!p) continue;
-        accumulate(line.ingredientId, line.amount, p);
-      }
-    }
-  }
-
   const variantById = new Map(
     db.select().from(schema.productVariants).where(eq(schema.productVariants.householdId, householdId)).all()
       .map((v) => [v.id, v]),
   );
+
+  // ingredientId -> accumulating row. `src` carries the nutrient columns (a
+  // product row, or a pack variant); `productName` labels the row.
+  const rows = new Map<number, IngredientNutritionRow>();
+  const accumulateSrc = (
+    ingredientId: number, qty: number,
+    src: Partial<Record<(typeof NUTRIENT_PATCH_KEYS)[number], number | null>>, productName: string,
+  ) => {
+    const ing = ingredientById.get(ingredientId);
+    let row = rows.get(ingredientId);
+    if (!row) {
+      row = { ingredientId, name: ing?.name ?? "?", unit: ing?.canonicalUnit ?? "", productName, qty: 0, values: {} };
+      rows.set(ingredientId, row);
+    }
+    row.qty += qty;
+    for (const k of NUTRIENT_PATCH_KEYS) {
+      const v = src[k];
+      if (v == null) continue;
+      row.values[k] = (row.values[k] ?? 0) + v * qty;
+    }
+  };
+  const accumulate = (ingredientId: number, qty: number, p: ProductRow) => accumulateSrc(ingredientId, qty, p, p.name);
+
+  for (const ev of events) {
+    if (ev.recipeId != null) {
+      const recipe = getRecipe(db, householdId, ev.recipeId);
+      if (!recipe) continue;
+      if (ev.status === "cooked") {
+        const moves = db.select().from(schema.stockMovements)
+          .where(and(
+            eq(schema.stockMovements.householdId, householdId),
+            eq(schema.stockMovements.mealEventId, ev.id),
+            eq(schema.stockMovements.reason, "cooked"),
+          )).all();
+        for (const m of moves) {
+          const p = m.productId != null ? productById.get(m.productId) : undefined;
+          if (!p || !hasNutrition(p)) continue; // no usable nutrition
+          accumulate(m.ingredientId, Math.abs(m.delta), p);
+        }
+      } else {
+        for (const line of consumptionForRecipe(recipe, ev.servings)) {
+          const p = preferredProduct(db, householdId, line.ingredientId);
+          if (!p) continue;
+          accumulate(line.ingredientId, line.amount, p);
+        }
+      }
+    } else {
+      // direct item: product/variant or ingredient (preferred product) × amount
+      const amount = ev.amount ?? 0;
+      if (ev.productId != null) {
+        const p = productById.get(ev.productId);
+        if (!p) continue;
+        const variant = ev.variantId != null ? variantById.get(ev.variantId) : undefined;
+        accumulateSrc(p.ingredientId, amount, variant ?? p, variant?.name ?? p.name);
+      } else if (ev.ingredientId != null) {
+        const p = preferredProduct(db, householdId, ev.ingredientId);
+        if (p) accumulate(ev.ingredientId, amount, p);
+      }
+    }
+  }
+
   for (const c of listEaten(db, householdId, date)) {
     const p = productById.get(c.productId);
     if (!p) continue;
