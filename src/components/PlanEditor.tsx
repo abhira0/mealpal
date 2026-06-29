@@ -280,7 +280,7 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
               No recipes yet. <Link href="/recipes">Add a recipe</Link> to start
               planning meals.
             </p>
-          ) : isToday ? (
+          ) : (
             <div className="timeline">
               {slots.map((slot) => {
                 const cards = cardsFor(slot);
@@ -293,36 +293,18 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
                     <p className="slot" style={{ marginBottom: 8 }}>
                       {slot.name}
                     </p>
-                    {cards.length ? (
-                      <div className="stack-sm">{cards}</div>
-                    ) : (
-                      <button
-                        type="button"
-                        className="btn-add"
-                        onClick={() => openAdd(slot)}
-                      >
-                        + Add a meal
-                      </button>
-                    )}
+                    {cards.length ? <div className="stack-sm">{cards}</div> : null}
+                    <button
+                      type="button"
+                      className="btn-add"
+                      style={cards.length ? { marginTop: 8 } : undefined}
+                      onClick={() => openAdd(slot)}
+                    >
+                      + Add a meal
+                    </button>
                   </div>
                 );
               })}
-            </div>
-          ) : (
-            <div className="stack" style={{ gap: 22 }}>
-              {slots.map((slot) => (
-                <div key={slot.id} className="stack-sm">
-                  <p className="slot">{slot.name}</p>
-                  {cardsFor(slot)}
-                  <button
-                    type="button"
-                    className="btn-add"
-                    onClick={() => openAdd(slot)}
-                  >
-                    + Add a meal
-                  </button>
-                </div>
-              ))}
             </div>
           )}
         </div>
