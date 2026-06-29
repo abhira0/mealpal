@@ -34,12 +34,13 @@ export function ShopTicket({
   lines: ShopLine[];
   prices: PriceMap;
 }) {
-  // ingredientId of lines that have been bought (struck, then removed).
-  const [removed, setRemoved] = useState<Set<number>>(new Set());
+  // ingredientId of lines that have been bought — struck and sunk to the bottom.
   const [struck, setStruck] = useState<Set<number>>(new Set());
 
-  const visible = lines.filter((l) => !removed.has(l.ingredientId));
-  if (visible.length === 0) return null;
+  // bought lines drop to the bottom, but stay visible
+  const ordered = [...lines].sort(
+    (a, b) => Number(struck.has(a.ingredientId)) - Number(struck.has(b.ingredientId)),
+  );
 
   return (
     <div className="ticket">
@@ -54,19 +55,15 @@ export function ShopTicket({
         </h2>
       </div>
       <div className="ticket-body">
-        {visible.map((line) => (
+        {ordered.map((line) => (
           <ShopLineRow
             key={line.ingredientId}
             line={line}
             priceCents={line.product ? prices[line.product.id] ?? null : null}
             struck={struck.has(line.ingredientId)}
-            onBought={() => {
-              setStruck((prev) => new Set(prev).add(line.ingredientId));
-              // brief strike-through, then drop the line
-              setTimeout(() => {
-                setRemoved((prev) => new Set(prev).add(line.ingredientId));
-              }, 450);
-            }}
+            onBought={() =>
+              setStruck((prev) => new Set(prev).add(line.ingredientId))
+            }
           />
         ))}
       </div>
