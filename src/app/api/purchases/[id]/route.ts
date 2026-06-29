@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { updatePurchase, deletePurchase, setPackCounts } from "@/lib/shopping";
+import { updatePurchase, deletePurchase } from "@/lib/shopping";
 import { dollarsToCents } from "@/lib/money";
 
 // Fill in / correct a purchase: price, expiry, quantity. Household-scoped.
@@ -40,16 +40,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const row = updatePurchase(db, session.user.householdId, Number(id), patch);
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-  // Assorted pack: lock in per-variant packet counts (fans restock out to the
-  // variant products). Expiry, if given, rides along to each variant's stock.
-  if (Array.isArray(b?.packCounts)) {
-    const counts = b.packCounts
-      .map((c: unknown) => ({ productId: Number((c as { productId?: unknown })?.productId), packets: Number((c as { packets?: unknown })?.packets) }))
-      .filter((c: { productId: number; packets: number }) => Number.isInteger(c.productId) && Number.isFinite(c.packets));
-    setPackCounts(db, session.user.householdId, Number(id), counts, patch.expiresAt);
-  }
-
   return NextResponse.json(row);
 }
 

@@ -8,6 +8,7 @@ import { Sheet } from "@/components/Sheet";
 import { EntityForm } from "@/components/EntityForm";
 import { EditDeleteActions } from "@/components/EditDeleteActions";
 import { NutritionFacts, type FactValues, type FactKey, FACT_ROWS } from "@/components/NutritionFacts";
+import { VariantsEditor } from "@/components/VariantsEditor";
 
 type Purchase = { cents: number; purchasedAt: string };
 type Product = {
@@ -165,6 +166,8 @@ export function ProductDetail({ id }: { id: string }) {
             )}
           </>
         )}
+
+        <VariantsEditor productId={product.id} unit={unit} />
 
         <EditDeleteActions
           singular="product"

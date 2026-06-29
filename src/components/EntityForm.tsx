@@ -381,17 +381,12 @@ export function EntityForm({
 
     // Everything else select-like uses the custom Dropdown (no native select).
     if (f.type === "select") {
-      // Optional selects get a "none" choice so a set value can be cleared.
-      const dropOpts = [
-        ...(f.optional ? [{ id: "", label: "— none —" }] : []),
-        ...opts.map((o) => ({ id: o.value, label: o.label })),
-      ];
       return (
         <Dropdown
           label={f.label}
           value={values[f.name] ?? null}
           onChange={(v) => set(f.name, String(v))}
-          options={dropOpts}
+          options={opts.map((o) => ({ id: o.value, label: o.label }))}
         />
       );
     }

@@ -1,0 +1,41 @@
+CREATE TABLE `product_variants` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`household_id` integer NOT NULL,
+	`product_id` integer NOT NULL,
+	`name` text NOT NULL,
+	`nutrition_photo` text,
+	`calories` real,
+	`fat_g` real,
+	`sat_fat_g` real,
+	`trans_fat_g` real,
+	`cholesterol_mg` real,
+	`sodium_mg` real,
+	`carbs_g` real,
+	`fiber_g` real,
+	`sugar_g` real,
+	`added_sugar_g` real,
+	`protein_g` real,
+	`poly_fat_g` real,
+	`mono_fat_g` real,
+	`vitamin_d_mcg` real,
+	`calcium_mg` real,
+	`iron_mg` real,
+	`potassium_mg` real,
+	`vitamin_a_mcg` real,
+	`vitamin_c_mg` real,
+	FOREIGN KEY (`household_id`) REFERENCES `households`(`id`),
+	FOREIGN KEY (`product_id`) REFERENCES `products`(`id`)
+);
+--> statement-breakpoint
+CREATE TABLE `consumptions` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`household_id` integer NOT NULL,
+	`date` text NOT NULL,
+	`product_id` integer NOT NULL,
+	`variant_id` integer,
+	`count` integer DEFAULT 1 NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`household_id`) REFERENCES `households`(`id`),
+	FOREIGN KEY (`product_id`) REFERENCES `products`(`id`),
+	FOREIGN KEY (`variant_id`) REFERENCES `product_variants`(`id`)
+);
