@@ -370,7 +370,7 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
           {repeat && (
             <>
               {unit === "week" && (
-                <div className="week" role="group" aria-label="Repeat on">
+                <div className="week week--repeat" role="group" aria-label="Repeat on">
                   {DOW.map((label, i) => (
                     <button
                       key={i}
