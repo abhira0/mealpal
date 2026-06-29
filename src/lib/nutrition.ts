@@ -211,24 +211,69 @@ export interface IngredientNutritionRow {
   name: string;
   unit: string;
   productName: string;
-  /** values per 100 canonical units, for cross-ingredient comparison. */
+  /** canonical units actually used across the day's meals. */
+  qty: number;
+  /** total nutrient contribution for that qty (per-unit × qty). */
   values: Partial<Record<(typeof NUTRIENT_PATCH_KEYS)[number], number>>;
 }
 
 /**
- * Every ingredient whose preferred product has nutrition, as a comparison table
- * normalized to per-100-canonical-units (the standard food-label basis).
+ * Per-ingredient breakdown of what was actually used on `date`: the same
+ * consumption dayNutrition sums (cooked → stock movements, planned → scaled
+ * recipe × preferred product), aggregated per ingredient. So the column Total
+ * equals the day total, unlike a per-100 comparison.
  */
-export function ingredientNutritionTable(db: Db, householdId: number): IngredientNutritionRow[] {
-  const ingredients = db.select().from(schema.ingredients)
-    .where(eq(schema.ingredients.householdId, householdId)).all();
-  const rows: IngredientNutritionRow[] = [];
-  for (const ing of ingredients) {
-    const p = preferredProduct(db, householdId, ing.id);
-    if (!p) continue;
-    const values: IngredientNutritionRow["values"] = {};
-    for (const k of NUTRIENT_PATCH_KEYS) if (p[k] != null) values[k] = p[k]! * 100;
-    rows.push({ ingredientId: ing.id, name: ing.name, unit: ing.canonicalUnit, productName: p.name, values });
+export function dayIngredientTable(db: Db, householdId: number, date: string): IngredientNutritionRow[] {
+  const events = db.select().from(schema.mealEvents)
+    .where(and(eq(schema.mealEvents.householdId, householdId), eq(schema.mealEvents.date, date)))
+    .all();
+  const ingredientById = new Map(
+    db.select().from(schema.ingredients).where(eq(schema.ingredients.householdId, householdId)).all()
+      .map((i) => [i.id, i]),
+  );
+  const productById = new Map(
+    db.select().from(schema.products).where(eq(schema.products.householdId, householdId)).all()
+      .map((p) => [p.id, p]),
+  );
+
+  // ingredientId -> accumulating row
+  const rows = new Map<number, IngredientNutritionRow>();
+  const accumulate = (ingredientId: number, qty: number, p: ProductRow) => {
+    const ing = ingredientById.get(ingredientId);
+    let row = rows.get(ingredientId);
+    if (!row) {
+      row = { ingredientId, name: ing?.name ?? "?", unit: ing?.canonicalUnit ?? "", productName: p.name, qty: 0, values: {} };
+      rows.set(ingredientId, row);
+    }
+    row.qty += qty;
+    for (const k of NUTRIENT_PATCH_KEYS) {
+      if (p[k] == null) continue;
+      row.values[k] = (row.values[k] ?? 0) + p[k]! * qty;
+    }
+  };
+
+  for (const ev of events) {
+    const recipe = getRecipe(db, householdId, ev.recipeId);
+    if (!recipe) continue;
+    if (ev.status === "cooked") {
+      const moves = db.select().from(schema.stockMovements)
+        .where(and(
+          eq(schema.stockMovements.householdId, householdId),
+          eq(schema.stockMovements.mealEventId, ev.id),
+          eq(schema.stockMovements.reason, "cooked"),
+        )).all();
+      for (const m of moves) {
+        const p = m.productId != null ? productById.get(m.productId) : undefined;
+        if (!p || p.calories == null) continue; // no usable nutrition
+        accumulate(m.ingredientId, Math.abs(m.delta), p);
+      }
+    } else {
+      for (const line of consumptionForRecipe(recipe, ev.servings)) {
+        const p = preferredProduct(db, householdId, line.ingredientId);
+        if (!p) continue;
+        accumulate(line.ingredientId, line.amount, p);
+      }
+    }
   }
-  return rows;
+  return [...rows.values()];
 }
