@@ -45,15 +45,11 @@ export default function NutritionPage() {
       </header>
 
       <div className="content stack">
-        <div className="filter">
+        <div className="tabs">
           <button type="button" aria-pressed={tab === "day"} onClick={() => setTab("day")}>Day</button>
           <button type="button" aria-pressed={tab === "ingredients"} onClick={() => setTab("ingredients")}>Ingredients</button>
         </div>
 
-        {tab === "ingredients" ? (
-          <IngredientsTable />
-        ) : (
-        <>
         <label className="field" htmlFor="nutrition-date">
           <span className="field-label">Date</span>
           <input
@@ -65,6 +61,10 @@ export default function NutritionPage() {
           />
         </label>
 
+        {tab === "ingredients" ? (
+          <IngredientsTable date={date} />
+        ) : (
+        <>
         {total && (
           <section className="stack">
             <p className="section-label">Day total</p>
@@ -109,24 +109,25 @@ export default function NutritionPage() {
 // Columns: Calories + the standard label rows (reused so labels/units match).
 const COLS = [{ key: "calories" as const, label: "Cal", unit: "" }, ...FACT_ROWS];
 
-function IngredientsTable() {
+function IngredientsTable({ date }: { date: string }) {
   const [rows, setRows] = useState<IngredientNutritionRow[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/nutrition/ingredients", { cache: "no-store" })
+    setRows(null);
+    fetch(`/api/nutrition/ingredients?date=${date}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : []))
       .then((d) => { if (!cancelled) setRows(d); })
       .catch(() => { if (!cancelled) setRows([]); });
     return () => { cancelled = true; };
-  }, []);
+  }, [date]);
 
   if (!rows) return <p style={{ opacity: 0.6 }}>Loading…</p>;
-  if (rows.length === 0) return <p style={{ opacity: 0.6 }}>No ingredients have nutrition filled in yet.</p>;
+  if (rows.length === 0) return <p style={{ opacity: 0.6 }}>No ingredients used on this day.</p>;
 
   return (
     <>
-      <p className="section-label">Per 100 units of each ingredient&apos;s preferred product.</p>
+      <p className="section-label">Actual quantity used per ingredient on this day.</p>
       <div style={{ overflowX: "auto" }}>
         <table className="mono" style={{ borderCollapse: "collapse", fontSize: 12, whiteSpace: "nowrap" }}>
           <thead>
@@ -143,7 +144,7 @@ function IngredientsTable() {
               <th scope="row" style={{ textAlign: "left", fontWeight: 600, padding: "6px 10px 6px 0", position: "sticky", left: 0, background: "var(--paper)" }}>Qty</th>
               <td style={{ textAlign: "right", padding: "6px 8px" }}>—</td>
               {rows.map((r) => (
-                <td key={r.ingredientId} style={{ textAlign: "right", padding: "6px 8px", opacity: 0.6 }}>100{r.unit}</td>
+                <td key={r.ingredientId} style={{ textAlign: "right", padding: "6px 8px", opacity: 0.6 }}>{Math.round(r.qty)}{r.unit}</td>
               ))}
             </tr>
             {COLS.map((c) => {
