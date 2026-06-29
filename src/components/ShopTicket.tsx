@@ -26,6 +26,7 @@ export function ShopTicket({
   total,
   lines,
   prices,
+  onCountChange,
 }: {
   shopName: string;
   website?: string | null;
@@ -33,9 +34,11 @@ export function ShopTicket({
   total: number; // running total in cents for this ticket
   lines: ShopLine[];
   prices: PriceMap;
+  /** +1 when a purchase is recorded, -1 when undone — keeps the Bill count live. */
+  onCountChange?: (delta: number) => void;
 }) {
-  // ingredientId of lines that have been bought — struck and sunk to the bottom.
-  const [struck, setStruck] = useState<Set<number>>(new Set());
+  // ingredientId -> recorded purchase id (null for lines with no product on file).
+  const [struck, setStruck] = useState<Map<number, number | null>>(new Map());
 
   // bought lines drop to the bottom, but stay visible
   const ordered = [...lines].sort(
@@ -50,9 +53,16 @@ export function ShopTicket({
           line={line}
           priceCents={line.product ? prices[line.product.id] ?? null : null}
           struck={struck.has(line.ingredientId)}
-          onBought={() =>
-            setStruck((prev) => new Set(prev).add(line.ingredientId))
-          }
+          purchaseId={struck.get(line.ingredientId) ?? null}
+          onChange={(next, purchaseId) => {
+            setStruck((prev) => {
+              const m = new Map(prev);
+              if (next) m.set(line.ingredientId, purchaseId);
+              else m.delete(line.ingredientId);
+              return m;
+            });
+            if (line.product) onCountChange?.(next ? 1 : -1);
+          }}
         />
       ))}
     </Ticket>
@@ -94,34 +104,44 @@ function ShopLineRow({
   line,
   priceCents,
   struck,
-  onBought,
+  purchaseId,
+  onChange,
 }: {
   line: ShopLine;
   priceCents: number | null;
   struck: boolean;
-  onBought: () => void;
+  purchaseId: number | null;
+  onChange: (struck: boolean, purchaseId: number | null) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // One tap = bought. Records a price-less purchase (restocks now); the price +
-  // expiry get filled in later on the bill screen. No product on file → just strike.
+  // Tap to buy, tap again to undo. Buying records a price-less purchase (restocks
+  // now); price + expiry get filled in later on the bill screen. No product on
+  // file → strike only, no purchase to record/undo.
   async function onCheck() {
-    if (struck || busy) return;
+    if (busy) return;
     if (!line.product) {
-      onBought();
+      onChange(!struck, null);
       return;
     }
     setBusy(true);
     setError(null);
-    const res = await fetch("/api/purchases", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ productId: line.product.id, quantity: 1 }),
-    });
-    setBusy(false);
-    if (res.ok) onBought();
-    else setError("Couldn't record.");
+    if (!struck) {
+      const res = await fetch("/api/purchases", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ productId: line.product.id, quantity: 1 }),
+      });
+      setBusy(false);
+      if (res.ok) onChange(true, (await res.json()).id);
+      else setError("Couldn't record.");
+    } else {
+      const res = await fetch(`/api/purchases/${purchaseId}`, { method: "DELETE" });
+      setBusy(false);
+      if (res.ok || res.status === 404) onChange(false, null);
+      else setError("Couldn't undo.");
+    }
   }
 
   return (
