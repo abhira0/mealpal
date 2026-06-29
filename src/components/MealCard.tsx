@@ -22,6 +22,7 @@ export function MealCard({
   recipeId,
   status,
   onCooked,
+  onDeleted,
 }: {
   eventId: number;
   title: string;
@@ -29,6 +30,7 @@ export function MealCard({
   recipeId: number;
   status: string;
   onCooked?: () => void;
+  onDeleted?: () => void;
 }) {
   const router = useRouter();
   const [cooking, setCooking] = useState(false);
@@ -47,6 +49,14 @@ export function MealCard({
     }
   }
 
+  async function remove() {
+    const res = await fetch(`/api/events/${eventId}`, { method: "DELETE" });
+    if (res.ok) {
+      if (onDeleted) onDeleted();
+      else router.refresh();
+    }
+  }
+
   return (
     <div className="card">
       <div className="card-row">
@@ -58,9 +68,14 @@ export function MealCard({
       <div className="card-row" style={{ marginTop: 12 }}>
         <span className="slot">{cooked ? "✓ Cooked" : "Planned"}</span>
         {!cooked && (
-          <button type="button" className="btn" onClick={cook} disabled={cooking}>
-            {cooking ? "Cooking…" : "Cook it"}
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" className="btn-add" onClick={remove} aria-label="Remove meal">
+              Remove
+            </button>
+            <button type="button" className="btn" onClick={cook} disabled={cooking}>
+              {cooking ? "Cooking…" : "Cook it"}
+            </button>
+          </div>
         )}
       </div>
     </div>
