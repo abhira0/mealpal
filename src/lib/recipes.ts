@@ -32,6 +32,31 @@ export function createRecipe(db: Db, householdId: number, input: RecipeInput) {
   });
 }
 
+export function updateRecipe(db: Db, householdId: number, id: number, input: RecipeInput) {
+  return db.transaction((tx) => {
+    const updated = tx.update(schema.recipes)
+      .set({ name: input.name, baseServings: input.baseServings, notes: input.notes })
+      .where(and(eq(schema.recipes.id, id), eq(schema.recipes.householdId, householdId)))
+      .returning().all();
+    if (updated.length === 0) return undefined; // not found / not yours
+    // ponytail: replace children wholesale instead of diffing — recipes are small
+    tx.delete(schema.recipeIngredients).where(eq(schema.recipeIngredients.recipeId, id)).run();
+    tx.delete(schema.recipeSteps).where(eq(schema.recipeSteps.recipeId, id)).run();
+    tx.delete(schema.recipeMedia).where(eq(schema.recipeMedia.recipeId, id)).run();
+    for (const ing of input.ingredients) {
+      tx.insert(schema.recipeIngredients)
+        .values({ recipeId: id, ingredientId: ing.ingredientId, amount: ing.amount }).run();
+    }
+    input.steps.forEach((text, i) => {
+      tx.insert(schema.recipeSteps).values({ recipeId: id, position: i, text }).run();
+    });
+    for (const m of input.media) {
+      tx.insert(schema.recipeMedia).values({ recipeId: id, kind: m.kind, url: m.url }).run();
+    }
+    return updated[0];
+  });
+}
+
 export function listRecipes(db: Db, householdId: number) {
   return db.select().from(schema.recipes)
     .where(eq(schema.recipes.householdId, householdId)).all();
