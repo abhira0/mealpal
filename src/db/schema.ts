@@ -50,12 +50,6 @@ export const products = sqliteTable("products", {
   name: text("name").notNull(),
   // how many of the ingredient's canonical units are in ONE unit of this product
   packSize: integer("pack_size").notNull(),
-  // assorted-pack support: if set, this product is one variant inside a parent
-  // "pack" product (e.g. a trail-mix bag). The parent is just a buyable SKU with
-  // no nutrition; buying it fans stock out to its variants at bill time. null =
-  // a normal standalone product. ponytail: plain self-ref id, no FK — a variant
-  // belongs to one pack, integrity enforced by the product picker in Manage.
-  packParentId: integer("pack_parent_id"),
   // preference rank within the ingredient (lower = preferred). default 100.
   priority: integer("priority").notNull().default(100),
   // manual price override / seed in cents; null = derive from latest purchase
@@ -92,6 +86,55 @@ export const products = sqliteTable("products", {
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
+});
+
+// An assorted product (e.g. a trail-mix bag) can carry several nutrition
+// profiles — one per assorted type. Values are PER CANONICAL UNIT of the parent
+// product's ingredient (use unit 'count' so one packet = one unit = one serving).
+// null on a field = not filled in yet, same convention as products.
+export const productVariants = sqliteTable("product_variants", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  householdId: integer("household_id").notNull().references(() => households.id),
+  productId: integer("product_id").notNull().references(() => products.id),
+  name: text("name").notNull(),
+  nutritionPhoto: text("nutrition_photo"),
+  // one packet/serving in the parent ingredient's canonical unit (e.g. 43 g).
+  // Nutrient columns below are PER CANONICAL UNIT; the editor enters per-serving
+  // and divides by this. null = treat 1 unit as 1 serving (count-based packs).
+  servingSize: real("serving_size"),
+  calories: real("calories"),
+  fatG: real("fat_g"),
+  satFatG: real("sat_fat_g"),
+  transFatG: real("trans_fat_g"),
+  cholesterolMg: real("cholesterol_mg"),
+  sodiumMg: real("sodium_mg"),
+  carbsG: real("carbs_g"),
+  fiberG: real("fiber_g"),
+  sugarG: real("sugar_g"),
+  addedSugarG: real("added_sugar_g"),
+  proteinG: real("protein_g"),
+  polyFatG: real("poly_fat_g"),
+  monoFatG: real("mono_fat_g"),
+  vitaminDMcg: real("vitamin_d_mcg"),
+  calciumMg: real("calcium_mg"),
+  ironMg: real("iron_mg"),
+  potassiumMg: real("potassium_mg"),
+  vitaminAMcg: real("vitamin_a_mcg"),
+  vitaminCMg: real("vitamin_c_mg"),
+});
+
+// The quick eat-log: one row per packet (or count) eaten on a date. variantId
+// names which nutrition profile when the product is assorted; null = the
+// product's own nutrition. Pairs with an 'eaten' stock movement that depletes
+// the product.
+export const consumptions = sqliteTable("consumptions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  householdId: integer("household_id").notNull().references(() => households.id),
+  date: text("date").notNull(), // YYYY-MM-DD, local date-only (no tz games)
+  productId: integer("product_id").notNull().references(() => products.id),
+  variantId: integer("variant_id").references(() => productVariants.id),
+  count: integer("count").notNull().default(1), // canonical units eaten
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
 export const recipes = sqliteTable("recipes", {
@@ -182,7 +225,7 @@ export const stockMovements = sqliteTable("stock_movements", {
   productId: integer("product_id").references(() => products.id),
   // signed canonical units: + purchase, - cooked, +/- manual
   delta: integer("delta").notNull(),
-  reason: text("reason").notNull(), // 'purchase' | 'cooked' | 'manual'
+  reason: text("reason").notNull(), // 'purchase' | 'cooked' | 'manual' | 'eaten'
   mealEventId: integer("meal_event_id").references(() => mealEvents.id),
   purchaseId: integer("purchase_id"),
   at: integer("at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
