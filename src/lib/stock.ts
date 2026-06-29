@@ -55,8 +55,9 @@ export function adjustStock(
 
 /**
  * Soonest non-null expiry per ingredient, from both sources: manual backfill
- * (stock_movements.expires_at, positive movements only) and purchases
- * (purchases.expires_at via product → ingredient). Earliest date wins.
+ * (stock_movements.expires_at) and purchases (purchases.expires_at via
+ * product → ingredient). Earliest date wins. Only the backfill input ever sets
+ * a date, so no delta filter is needed.
  */
 export function expiryByIngredient(db: Db, householdId: number): Map<number, string> {
   const manual = db
@@ -68,7 +69,6 @@ export function expiryByIngredient(db: Db, householdId: number): Map<number, str
     .where(and(
       eq(schema.stockMovements.householdId, householdId),
       sql`${schema.stockMovements.expiresAt} is not null`,
-      sql`${schema.stockMovements.delta} > 0`,
     ))
     .groupBy(schema.stockMovements.ingredientId).all();
 
