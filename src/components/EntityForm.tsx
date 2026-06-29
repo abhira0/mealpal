@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Dropdown } from "@/components/Dropdown";
 import { Favicon, domainFrom } from "@/components/Favicon";
 import { NutritionPhoto } from "@/components/NutritionPhoto";
-import { NutritionFactsEditor } from "@/components/NutritionFactsEditor";
+import { NutritionFactsEditor, EDITOR_KEYS } from "@/components/NutritionFactsEditor";
 import { convertCanonical } from "@/lib/units";
 import { ENTITIES, type EntitySlug, type FieldDef } from "@/app/manage/entities";
 
@@ -474,16 +474,8 @@ export function EntityForm({
               )}
               initial={{
                 servingSize: row.servingSize as number | null,
-                calories: row.calories as number | null,
-                fatG: row.fatG as number | null,
-                satFatG: row.satFatG as number | null,
-                transFatG: row.transFatG as number | null,
-                cholesterolMg: row.cholesterolMg as number | null,
-                sodiumMg: row.sodiumMg as number | null,
-                carbsG: row.carbsG as number | null,
-                fiberG: row.fiberG as number | null,
-                sugarG: row.sugarG as number | null,
-                proteinG: row.proteinG as number | null,
+                // build from EDITOR_KEYS so no nutrient is ever dropped from the prefill
+                ...Object.fromEntries(EDITOR_KEYS.map((k) => [k, (row[k] as number | null) ?? null])),
               }}
               onSaved={onDone}
             />
