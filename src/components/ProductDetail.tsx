@@ -19,6 +19,16 @@ type Product = {
   available: boolean;
   url: string | null;
   imageUrl: string | null;
+  calories: number | null;
+  fatG: number | null;
+  satFatG: number | null;
+  transFatG: number | null;
+  cholesterolMg: number | null;
+  sodiumMg: number | null;
+  carbsG: number | null;
+  fiberG: number | null;
+  sugarG: number | null;
+  proteinG: number | null;
   history: Purchase[];
   effectiveCents: number | null;
 };
@@ -26,6 +36,8 @@ type Ingredient = { id: number; name: string; canonicalUnit: string };
 type Shop = { id: number; name: string; website: string | null; iconUrl: string | null };
 
 const money = (c: number | null) => (c == null ? "—" : `$${(c / 100).toFixed(2)}`);
+const g = (n: number | null) => (n == null ? "—" : `${n}g`);
+const mg = (n: number | null) => (n == null ? "—" : `${n}mg`);
 const day = (d: string) => new Date(d).toLocaleDateString();
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -119,6 +131,24 @@ export function ProductDetail({ id }: { id: string }) {
             </Field>
           )}
         </section>
+
+        {product.calories != null && (
+          <>
+            <span className="section-label">Nutrition (per {unit || "unit"})</span>
+            <section className="card stack-sm">
+              <Field label="Calories">{product.calories}</Field>
+              <Field label="Total fat">{g(product.fatG)}</Field>
+              <Field label="Saturated fat">{g(product.satFatG)}</Field>
+              <Field label="Trans fat">{g(product.transFatG)}</Field>
+              <Field label="Cholesterol">{mg(product.cholesterolMg)}</Field>
+              <Field label="Sodium">{mg(product.sodiumMg)}</Field>
+              <Field label="Total carbs">{g(product.carbsG)}</Field>
+              <Field label="Fiber">{g(product.fiberG)}</Field>
+              <Field label="Sugar">{g(product.sugarG)}</Field>
+              <Field label="Protein">{g(product.proteinG)}</Field>
+            </section>
+          </>
+        )}
 
         <EditDeleteActions
           singular="product"
