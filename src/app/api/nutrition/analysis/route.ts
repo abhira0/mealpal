@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     macros: macroSplit(day.total),
     meals: day.meals.map((m) => ({
       slotName: m.slotName, recipeName: m.recipeName,
-      estimate: m.estimate, calories: m.nutrients.calories,
+      estimate: m.estimate, calories: m.nutrients.calories, nutrients: m.nutrients,
     })),
     scorecards: scorecards(day.total), missing: day.missing,
   });

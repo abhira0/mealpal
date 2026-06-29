@@ -5,7 +5,7 @@ import { schema } from "@/db";
 import { createRecipe } from "@/lib/recipes";
 import { recordPurchase } from "@/lib/shopping";
 import { recordCooked, unstockedIngredients } from "@/lib/consumption";
-import { dayNutrition, scorecards, zeroNutrients, mondayOf, macroSplit } from "@/lib/nutrition";
+import { dayNutrition, scorecards, zeroNutrients, mondayOf, macroSplit, dayIngredientTable, weekIngredientTable } from "@/lib/nutrition";
 
 let db: TestDb;
 let hid: number;
@@ -137,6 +137,20 @@ describe("macroSplit", () => {
   });
   it("is all zeros for an empty day", () => {
     expect(macroSplit(zeroNutrients())).toEqual({ carbs: 0, fat: 0, protein: 0 });
+  });
+});
+
+describe("weekIngredientTable", () => {
+  it("sums a planned ingredient's usage across the days of the week", () => {
+    flourProduct({ calories: 2 });
+    const r = bread().id;
+    // two planned bread events in the same Mon–Sun week (2026-06-29 .. 07-05)
+    db.insert(schema.mealEvents).values({ householdId: hid, date: "2026-06-30", slotId, recipeId: r, servings: 1, status: "planned" }).run();
+    db.insert(schema.mealEvents).values({ householdId: hid, date: "2026-07-02", slotId, recipeId: r, servings: 1, status: "planned" }).run();
+    const day = dayIngredientTable(db, hid, "2026-06-30");
+    expect(day.find((x) => x.name === "Flour")!.qty).toBe(500);
+    const week = weekIngredientTable(db, hid, mondayOf("2026-06-30"));
+    expect(week.find((x) => x.name === "Flour")!.qty).toBe(1000); // 500 + 500
   });
 });
 
