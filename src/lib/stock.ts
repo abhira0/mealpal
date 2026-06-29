@@ -6,6 +6,7 @@ type Db = BetterSQLite3Database<typeof schema>;
 
 export interface MovementInput {
   ingredientId: number;
+  productId?: number | null;
   delta: number;
   reason: "purchase" | "cooked" | "manual";
   mealEventId?: number | null;
@@ -16,7 +17,8 @@ export interface MovementInput {
 export function recordMovement(db: Db, householdId: number, m: MovementInput) {
   const [row] = db.insert(schema.stockMovements)
     .values({
-      householdId, ingredientId: m.ingredientId, delta: m.delta, reason: m.reason,
+      householdId, ingredientId: m.ingredientId, productId: m.productId ?? null,
+      delta: m.delta, reason: m.reason,
       mealEventId: m.mealEventId ?? null, purchaseId: m.purchaseId ?? null,
       expiresAt: m.expiresAt ?? null,
     }).returning().all();
@@ -46,11 +48,28 @@ export function stockByIngredient(db: Db, householdId: number): Map<number, numb
   return new Map(rows.map((r) => [r.ingredientId, r.total]));
 }
 
+/** On-hand per product (skips unattributed/null-product movements). productId -> qty. */
+export function stockByProduct(db: Db, householdId: number): Map<number, number> {
+  const rows = db
+    .select({
+      productId: schema.stockMovements.productId,
+      total: sql<number>`coalesce(sum(${schema.stockMovements.delta}), 0)`,
+    })
+    .from(schema.stockMovements)
+    .where(and(
+      eq(schema.stockMovements.householdId, householdId),
+      sql`${schema.stockMovements.productId} is not null`,
+    ))
+    .groupBy(schema.stockMovements.productId).all();
+  return new Map(rows.map((r) => [r.productId as number, r.total]));
+}
+
 /** Manual correction (spills, recounts) or backfill. Positive or negative. */
 export function adjustStock(
-  db: Db, householdId: number, ingredientId: number, delta: number, expiresAt?: string | null,
+  db: Db, householdId: number, ingredientId: number, delta: number,
+  expiresAt?: string | null, productId?: number | null,
 ) {
-  return recordMovement(db, householdId, { ingredientId, delta, reason: "manual", expiresAt });
+  return recordMovement(db, householdId, { ingredientId, productId, delta, reason: "manual", expiresAt });
 }
 
 /**

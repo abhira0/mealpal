@@ -13,12 +13,14 @@ type Tone = "default" | "low";
  */
 export function StockAdjust({
   ingredientId,
+  productId = null,
   unit,
   current,
   tone,
   onAdjusted,
 }: {
   ingredientId: number;
+  productId?: number | null;
   unit: string;
   current: number;
   tone: Tone;
@@ -43,7 +45,7 @@ export function StockAdjust({
     const res = await fetch("/api/stock", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ingredientId, delta, expiresAt: expiresAt || null }),
+      body: JSON.stringify({ ingredientId, productId, delta, expiresAt: expiresAt || null }),
     });
     setBusy(false);
     if (res.ok) {

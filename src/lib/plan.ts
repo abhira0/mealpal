@@ -99,11 +99,13 @@ export function deleteEvent(db: Db, householdId: number, eventId: number, scope:
 }
 
 /** Mark an event cooked exactly once: deplete stock and flip status. */
-export function cookEvent(db: Db, householdId: number, eventId: number) {
+export function cookEvent(
+  db: Db, householdId: number, eventId: number, allocations?: Map<number, number>,
+) {
   const [ev] = db.select().from(schema.mealEvents)
     .where(and(eq(schema.mealEvents.id, eventId), eq(schema.mealEvents.householdId, householdId))).all();
   if (!ev || ev.status === "cooked") return; // no-op if missing or already cooked
-  recordCooked(db, householdId, ev.recipeId, ev.servings, ev.id);
+  recordCooked(db, householdId, ev.recipeId, ev.servings, ev.id, allocations);
   db.update(schema.mealEvents).set({ status: "cooked" })
     .where(eq(schema.mealEvents.id, ev.id)).run();
 }
