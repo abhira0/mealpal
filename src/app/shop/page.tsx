@@ -114,31 +114,31 @@ export default function ShopPage() {
           {tripTotal > 0 && <> · ${centsToDollars(tripTotal).toFixed(2)}</>}
         </p>
         <h1>The run</h1>
-        <div className="chrome-tabs">
-          <button onClick={() => setTab("run")} aria-pressed={tab === "run"}>
-            The run
-          </button>
-          <button onClick={() => setTab("bill")} aria-pressed={tab === "bill"}>
-            Bill{pendingCount > 0 && <> · {pendingCount}</>}
-          </button>
-        </div>
-        {tab === "run" && (
-          <div className="chrome-ahead">
-            <span className="lbl">Buy ahead</span>
-            {[7, 14, 30, 60, 90].map((d) => (
-              <button key={d} onClick={() => setHorizon(d)} aria-pressed={horizon === d}>
-                {d}d
-              </button>
-            ))}
-          </div>
-        )}
       </header>
 
       <main className="content stack">
+        <div className="tabs" role="tablist">
+          <button role="tab" onClick={() => setTab("run")} aria-pressed={tab === "run"}>
+            The run
+          </button>
+          <button role="tab" onClick={() => setTab("bill")} aria-pressed={tab === "bill"}>
+            Bill{pendingCount > 0 && <> · {pendingCount}</>}
+          </button>
+        </div>
+
         {tab === "bill" ? (
           <Bill onCount={setPendingCount} />
         ) : (
           <>
+            <div className="filter">
+              <span className="lbl">Buy ahead</span>
+              {[7, 14, 30, 60, 90].map((d) => (
+                <button key={d} onClick={() => setHorizon(d)} aria-pressed={horizon === d}>
+                  {d}d
+                </button>
+              ))}
+            </div>
+
             {error && <p className="notice">{error}</p>}
 
             {data === null && !error && <p className="loading">Loading…</p>}

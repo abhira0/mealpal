@@ -25,14 +25,16 @@ button{font-family:inherit}
 .chrome-back{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--turmeric);text-decoration:none;display:inline-block}
 .avatar{flex:none;width:38px;height:38px;border-radius:50%;background:var(--enamel-dark);color:var(--paper);display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:13px;text-decoration:none;border:1px solid rgba(255,255,255,.18)}
 
-/* ---------- chrome controls (segmented, on enamel) ---------- */
-.chrome-tabs{display:flex;gap:6px;margin-top:12px}
-.chrome-tabs button{font-family:var(--mono);font-weight:700;font-size:11px;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:8px 14px;min-height:38px;color:var(--paper);cursor:pointer}
-.chrome-tabs button[aria-pressed="true"]{background:var(--paper);border-color:var(--paper);color:var(--enamel-dark)}
-.chrome-ahead{display:flex;gap:6px;align-items:center;margin-top:10px}
-.chrome-ahead .lbl{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--turmeric);margin-right:2px}
-.chrome-ahead button{font-family:var(--mono);font-weight:700;font-size:11px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:6px;padding:6px 11px;min-height:34px;color:var(--paper);cursor:pointer}
-.chrome-ahead button[aria-pressed="true"]{background:var(--turmeric);border-color:var(--turmeric);color:var(--enamel-dark)}
+/* ---------- view tabs (underlined, on paper) ---------- */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+.tabs button{font-family:var(--mono);font-weight:700;font-size:11px;letter-spacing:.08em;text-transform:uppercase;background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;padding:10px 12px;min-height:44px;color:var(--sage);cursor:pointer}
+.tabs button[aria-pressed="true"]{color:var(--enamel-dark);border-bottom-color:var(--paprika)}
+
+/* ---------- filter chips (on paper) ---------- */
+.filter{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.filter .lbl{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--sage);margin-right:2px}
+.filter button{font-family:var(--mono);font-weight:700;font-size:11px;background:var(--paper-raised);border:1px solid var(--line);border-radius:999px;padding:6px 12px;min-height:34px;color:var(--ink);cursor:pointer}
+.filter button[aria-pressed="true"]{background:var(--turmeric);border-color:var(--turmeric);color:var(--enamel-dark)}
 
 /* ---------- section labels ---------- */
 .section-label,.slot{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--sage)}
@@ -54,7 +56,7 @@ button{font-family:inherit}
 .btn-add{font-family:var(--body);font-weight:700;font-size:14px;color:var(--enamel);background:none;border:none;cursor:pointer;padding:8px 0;min-height:44px;text-align:left}
 .btn-link.danger{color:var(--paprika);justify-content:center;width:100%}
 .trigger.add{justify-content:center;color:var(--enamel)}
-.btn:focus-visible,.chip:focus-visible,.trigger:focus-visible,.input:focus-visible,.btn-link:focus-visible,.btn-add:focus-visible,.checkbox:focus-visible,.row-link:focus-visible,.account-row:focus-visible,.week .day:focus-visible,.tab:focus-visible,.unit-radio button:focus-visible,.stepper button:focus-visible,.sheet .o:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(17,94,89,.25)}
+.btn:focus-visible,.chip:focus-visible,.trigger:focus-visible,.input:focus-visible,.btn-link:focus-visible,.btn-add:focus-visible,.checkbox:focus-visible,.row-link:focus-visible,.account-row:focus-visible,.week .day:focus-visible,.tab:focus-visible,.tabs button:focus-visible,.filter button:focus-visible,.unit-radio button:focus-visible,.stepper button:focus-visible,.sheet .o:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(17,94,89,.25)}
 
 /* ---------- chips ---------- */
 .chip{font-family:var(--mono);font-weight:700;font-size:11px;background:var(--chip-bg);color:var(--ink);padding:4px 8px;border-radius:4px;border-left:3px solid var(--sage);white-space:nowrap;display:inline-block}
