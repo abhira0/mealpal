@@ -4,7 +4,7 @@ import { makeTestDb, type TestDb } from "@/test/db";
 import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
 import { createProduct } from "@/lib/products";
-import { recordPurchase } from "@/lib/shopping";
+import { recordPurchase, listPendingPurchases, updatePurchase } from "@/lib/shopping";
 import { currentStock } from "@/lib/stock";
 
 let db: TestDb;
@@ -38,5 +38,26 @@ describe("recordPurchase", () => {
   it("buying 2 adds 2x the pack size", () => {
     recordPurchase(db, hid, { productId, quantity: 2, cents: 1299 });
     expect(currentStock(db, hid, flourId)).toBe(22680);
+  });
+});
+
+describe("pending purchases (bill flow)", () => {
+  it("records price-less, lists it as pending, then fills it in", () => {
+    // check-off in the store: no price, but it restocks immediately
+    const pid = recordPurchase(db, hid, { productId, quantity: 1 }).id;
+    expect(currentStock(db, hid, flourId)).toBe(11340);
+
+    const pending = listPendingPurchases(db, hid);
+    expect(pending).toHaveLength(1);
+    expect(pending[0].id).toBe(pid);
+
+    // enter the bill at home: price + expiry, and bump qty 1 → 2
+    updatePurchase(db, hid, pid, { cents: 1499, expiresAt: "2026-07-01", quantity: 2 });
+
+    expect(listPendingPurchases(db, hid)).toHaveLength(0); // priced → no longer pending
+    expect(currentStock(db, hid, flourId)).toBe(22680);    // qty change re-synced restock
+    const row = db.select().from(schema.purchases).where(eq(schema.purchases.id, pid)).all()[0];
+    expect(row.cents).toBe(1499);
+    expect(row.expiresAt).toBe("2026-07-01");
   });
 });

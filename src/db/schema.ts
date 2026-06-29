@@ -132,7 +132,8 @@ export const purchases = sqliteTable("purchases", {
   householdId: integer("household_id").notNull().references(() => households.id),
   productId: integer("product_id").notNull().references(() => products.id),
   quantity: integer("quantity").notNull().default(1),
-  cents: integer("cents").notNull(),
+  // null = bought but not yet priced (fill in later via the bill screen)
+  cents: integer("cents"),
   // date-only YYYY-MM-DD; null = no expiry tracked
   expiresAt: text("expires_at"),
   purchasedAt: integer("purchased_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),

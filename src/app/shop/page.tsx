@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ShopTicket, type ShopLine, type PriceMap } from "@/components/ShopTicket";
 import { centsToDollars } from "@/lib/money";
@@ -21,9 +22,15 @@ export default function ShopPage() {
   const [prices, setPrices] = useState<PriceMap>({});
   const [units, setUnits] = useState<Record<number, string>>({});
   const [shopMeta, setShopMeta] = useState<Record<string, Shop>>({});
+  const [pendingCount, setPendingCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    fetch("/api/purchases")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((p: unknown[]) => setPendingCount(Array.isArray(p) ? p.length : 0))
+      .catch(() => {});
+
     fetch("/api/shopping")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((j) => setData(j as ShoppingMap))
@@ -81,6 +88,11 @@ export default function ShopPage() {
       </header>
 
       <main className="content stack">
+        {pendingCount > 0 && (
+          <Link href="/shop/bill" className="notice" style={{ display: "block", textDecoration: "none" }}>
+            {pendingCount} {pendingCount === 1 ? "item" : "items"} to price → Enter the bill
+          </Link>
+        )}
         {error && <p className="notice">{error}</p>}
 
         {data === null && !error && <p className="loading">Loading…</p>}
