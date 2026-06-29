@@ -286,3 +286,110 @@ export function dayIngredientTable(db: Db, householdId: number, date: string): I
   }
   return [...rows.values()];
 }
+
+// ---------- Analysis tab: goals, scorecards, week aggregation ----------
+
+export interface Goals { calorieGoal: number; proteinG: number; carbsG: number; fatG: number; }
+
+/** Used when a household hasn't set goals yet, so the tab still works. */
+export const DEFAULT_GOALS: Goals = { calorieGoal: 2000, proteinG: 150, carbsG: 220, fatG: 65 };
+
+export function getGoals(db: Db, householdId: number): Goals {
+  const [row] = db.select().from(schema.nutritionGoals)
+    .where(eq(schema.nutritionGoals.householdId, householdId)).all();
+  return row
+    ? { calorieGoal: row.calorieGoal, proteinG: row.proteinG, carbsG: row.carbsG, fatG: row.fatG }
+    : DEFAULT_GOALS;
+}
+
+export function setGoals(db: Db, householdId: number, g: Goals): Goals {
+  db.insert(schema.nutritionGoals).values({ householdId, ...g })
+    .onConflictDoUpdate({ target: schema.nutritionGoals.householdId, set: g }).run();
+  return g;
+}
+
+export interface Scorecard {
+  key: "heartHealthy" | "lowCarb" | "highProtein";
+  label: string;
+  pass: boolean;
+  reason: string;
+}
+
+const SODIUM_LIMIT_MG = 2300; // FDA daily limit
+// ponytail: DV-based thresholds as plain constants; tune freely if needed.
+/**
+ * Heuristic diet badges from a day's totals (or a week's daily average).
+ * Calories use the macro-derived figure (4·P + 4·C + 9·F) to avoid divide-by-zero
+ * and label rounding noise. An empty day (no calories) passes nothing.
+ */
+export function scorecards(n: Nutrients): Scorecard[] {
+  const cal = 4 * n.proteinG + 4 * n.carbsG + 9 * n.fatG;
+  const has = cal > 0;
+  const pct = (kcal: number) => (has ? kcal / cal : 0);
+  const satPct = pct(9 * n.satFatG);
+  const addedPct = pct(4 * n.addedSugarG);
+  const carbPct = pct(4 * n.carbsG);
+  const protPct = pct(4 * n.proteinG);
+  const r = (x: number) => Math.round(x * 100);
+  return [
+    {
+      key: "heartHealthy", label: "Heart-healthy",
+      pass: has && satPct < 0.10 && n.sodiumMg < SODIUM_LIMIT_MG && addedPct < 0.10,
+      reason: `Sat fat ${r(satPct)}% cal · sodium ${Math.round(n.sodiumMg)}mg · added sugar ${r(addedPct)}% cal`,
+    },
+    {
+      key: "lowCarb", label: "Low-carb",
+      pass: has && carbPct < 0.26,
+      reason: `Carbs ${r(carbPct)}% of calories`,
+    },
+    {
+      key: "highProtein", label: "High-protein",
+      pass: has && protPct >= 0.25,
+      reason: `Protein ${r(protPct)}% of calories`,
+    },
+  ];
+}
+
+/** ISO date + n days, computed in local time (no UTC drift). */
+function isoAddDays(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + n);
+  const z = (x: number) => String(x).padStart(2, "0");
+  return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
+}
+
+/** Monday (week start) of the week containing `iso`. */
+export function mondayOf(iso: string): string {
+  const dow = (new Date(`${iso}T00:00:00`).getDay() + 6) % 7; // Mon=0
+  return isoAddDays(iso, -dow);
+}
+
+export interface WeekNutrition {
+  monday: string;
+  perDay: { date: string; total: Nutrients; hasMeals: boolean }[];
+  /** average over days that have meals only (partial weeks aren't dragged down). */
+  average: Nutrients;
+  daysWithMeals: number;
+  missing: string[];
+}
+
+export function weekNutrition(db: Db, householdId: number, monday: string): WeekNutrition {
+  const perDay: WeekNutrition["perDay"] = [];
+  const sum = zeroNutrients();
+  const missing = new Set<string>();
+  let daysWithMeals = 0;
+  for (let i = 0; i < 7; i++) {
+    const date = isoAddDays(monday, i);
+    const day = dayNutrition(db, householdId, date);
+    const hasMeals = day.meals.length > 0;
+    if (hasMeals) {
+      daysWithMeals++;
+      addScaled(sum, day.total, 1);
+      for (const m of day.missing) missing.add(m);
+    }
+    perDay.push({ date, total: day.total, hasMeals });
+  }
+  const average = zeroNutrients();
+  if (daysWithMeals > 0) for (const k of NUTRIENT_KEYS) average[k] = sum[k] / daysWithMeals;
+  return { monday, perDay, average, daysWithMeals, missing: [...missing] };
+}

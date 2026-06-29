@@ -5,7 +5,7 @@ import { schema } from "@/db";
 import { createRecipe } from "@/lib/recipes";
 import { recordPurchase } from "@/lib/shopping";
 import { recordCooked, unstockedIngredients } from "@/lib/consumption";
-import { dayNutrition } from "@/lib/nutrition";
+import { dayNutrition, scorecards, zeroNutrients, mondayOf } from "@/lib/nutrition";
 
 let db: TestDb;
 let hid: number;
@@ -96,5 +96,40 @@ describe("cook block", () => {
     recordPurchase(db, hid, { productId: pid, quantity: 1 });
     const ev = event(bread().id, "planned");
     expect(unstockedIngredients(db, hid, ev.id)).toEqual([]);
+  });
+});
+
+describe("scorecards", () => {
+  const pass = (n: ReturnType<typeof zeroNutrients>, key: string) =>
+    scorecards(n).find((c) => c.key === key)!.pass;
+
+  it("passes a lean, low-sodium, high-protein day", () => {
+    // cal = 480+320+270 = 1070; protein 45%, carbs 30% (not low-carb), sat fat 4%, sugar 2%
+    const n = { ...zeroNutrients(), proteinG: 120, carbsG: 80, fatG: 30, satFatG: 5, sodiumMg: 1500, addedSugarG: 5 };
+    expect(pass(n, "heartHealthy")).toBe(true);
+    expect(pass(n, "highProtein")).toBe(true);
+    expect(pass(n, "lowCarb")).toBe(false);
+  });
+
+  it("fails heart-healthy on high sodium", () => {
+    const n = { ...zeroNutrients(), proteinG: 100, carbsG: 100, fatG: 40, satFatG: 6, sodiumMg: 3000, addedSugarG: 5 };
+    expect(pass(n, "heartHealthy")).toBe(false);
+  });
+
+  it("passes low-carb when carbs are under a quarter of calories", () => {
+    const n = { ...zeroNutrients(), proteinG: 150, carbsG: 30, fatG: 80 };
+    expect(pass(n, "lowCarb")).toBe(true);
+  });
+
+  it("passes nothing on an empty day (zero calories)", () => {
+    expect(scorecards(zeroNutrients()).every((c) => !c.pass)).toBe(true);
+  });
+});
+
+describe("mondayOf", () => {
+  it("returns the Monday of the week (June 2026 starts on a Monday)", () => {
+    expect(mondayOf("2026-06-29")).toBe("2026-06-29"); // a Monday
+    expect(mondayOf("2026-07-01")).toBe("2026-06-29"); // Wed → that Monday
+    expect(mondayOf("2026-06-28")).toBe("2026-06-22"); // Sun → prior Monday
   });
 });
