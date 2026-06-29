@@ -213,24 +213,42 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
       </header>
 
       <div className="content">
-        <div className="jump">
-          <input
-            type="date"
-            aria-label="Jump to date"
-            value={selected}
-            onChange={(e) => e.target.value && setSelected(e.target.value)}
-          />
+        <div className="week" role="tablist" aria-label="Days">
+          <label className="day day--jump">
+            <span className="visually-hidden">Jump to a date</span>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="3" y="4" width="18" height="17" rx="2" />
+              <path d="M3 9h18M8 2v4M16 2v4" />
+            </svg>
+            <span className="dow">Pick</span>
+            <input
+              type="date"
+              value={selected}
+              onChange={(e) => e.target.value && setSelected(e.target.value)}
+            />
+          </label>
           {!isToday && (
             <button
               type="button"
-              className="btn-add"
+              className="day day--today"
               onClick={() => setSelected(todayIso)}
             >
-              Today
+              <span className="dow">Today</span>
+              <span className="dnum">
+                {new Date(todayIso + "T00:00:00").getDate()}
+              </span>
             </button>
           )}
-        </div>
-        <div className="week" role="tablist" aria-label="Days">
           {days.map((d) => {
             const iso = isoOf(d);
             const on = iso === selected;
