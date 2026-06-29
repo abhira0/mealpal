@@ -12,6 +12,7 @@ export function QuickEat({ date, onLogged }: { date: string; onLogged: () => voi
   const [variants, setVariants] = useState<Variant[]>([]);
   const [variantId, setVariantId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/products").then((r) => (r.ok ? r.json() : [])).then(setProducts).catch(() => {});
@@ -31,12 +32,14 @@ export function QuickEat({ date, onLogged }: { date: string; onLogged: () => voi
   async function logIt() {
     if (productId == null) return;
     setBusy(true);
-    await fetch("/api/eaten", {
+    setError(null);
+    const res = await fetch("/api/eaten", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ date, productId, variantId, count: 1 }),
     });
     setBusy(false);
-    onLogged();
+    if (res.ok) onLogged();
+    else setError("Couldn't log that — try again.");
   }
 
   return (
@@ -51,6 +54,7 @@ export function QuickEat({ date, onLogged }: { date: string; onLogged: () => voi
       <button type="button" className="btn" disabled={busy || productId == null} onClick={logIt}>
         {busy ? "…" : "Ate it"}
       </button>
+      {error && <p className="notice" style={{ color: "var(--paprika)" }}>{error}</p>}
     </section>
   );
 }
