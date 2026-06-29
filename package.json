@@ -9,6 +9,7 @@
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:seed": "sqlite3 \"${DATABASE_URL:-./mealpal.db}\" < drizzle/demo_seed.sql",
     "db:reseed": "bash scripts/reseed-demo.sh",
     "test": "vitest run"
   },
