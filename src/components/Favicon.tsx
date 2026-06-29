@@ -34,7 +34,6 @@ export function Favicon({
           justifyContent: "center",
           width: size,
           height: size,
-          borderRadius: 6,
           background: "var(--line)",
           fontSize: size * 0.55,
           fontWeight: 700,
@@ -54,7 +53,7 @@ export function Favicon({
       width={size}
       height={size}
       onError={() => setFailed(true)}
-      style={{ borderRadius: 6, objectFit: "contain", verticalAlign: "middle", flexShrink: 0 }}
+      style={{ objectFit: "contain", verticalAlign: "middle", flexShrink: 0 }}
     />
   );
 }
