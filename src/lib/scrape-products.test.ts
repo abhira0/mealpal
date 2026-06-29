@@ -48,6 +48,11 @@ describe("parseScraped", () => {
       .toMatchObject({ name: t, packSize: 18, unit: "count", shop: "Weee" });
   });
 
+  it("handles a Trader Joe's stats block (price + per-unit weight)", () => {
+    expect(parseScraped({ title: "Sprouted Wheat Multigrain Bread", priceText: "$4.49", weightText: "/24 Oz", shopText: "Trader Joe's" }))
+      .toMatchObject({ name: "Sprouted Wheat Multigrain Bread", dollars: 4.49, packSize: 24, unit: "oz", shop: "Trader Joe's" });
+  });
+
   it("extracts a servings count", () => {
     expect(parseScraped({ servingsText: "About 20 servings per container" }).servings).toBe(20);
   });
