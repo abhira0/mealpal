@@ -15,7 +15,7 @@ function todayISO(): string {
 const round = (n: number) => Math.round(n);
 
 export default function NutritionPage() {
-  const [tab, setTab] = useState<"overview" | "meals" | "nutrients">("overview");
+  const [tab, setTab] = useState<"overview" | "breakdown">("overview");
   const [mode, setMode] = useState<"day" | "week">("day");
   const [date, setDate] = useState(todayISO);
   const [data, setData] = useState<AnalysisData | null>(null);
@@ -46,8 +46,7 @@ export default function NutritionPage() {
       <div className="content stack">
         <div className="tabs">
           <button type="button" aria-pressed={tab === "overview"} onClick={() => setTab("overview")}>Overview</button>
-          <button type="button" aria-pressed={tab === "meals"} onClick={() => setTab("meals")}>Meals</button>
-          <button type="button" aria-pressed={tab === "nutrients"} onClick={() => setTab("nutrients")}>Nutrients</button>
+          <button type="button" aria-pressed={tab === "breakdown"} onClick={() => setTab("breakdown")}>Breakdown</button>
         </div>
 
         <div className="filter">
@@ -78,10 +77,8 @@ export default function NutritionPage() {
         ) : tab === "overview" ? (
           <OverviewBody data={data} mode={mode} openCard={openCard} setOpenCard={setOpenCard}
             editing={editing} setEditing={setEditing} reload={() => setReloadKey((k) => k + 1)} />
-        ) : tab === "meals" ? (
-          <MealsBody data={data} mode={mode} date={date} />
         ) : (
-          <NutrientsBody data={data} mode={mode} />
+          <BreakdownBody data={data} mode={mode} date={date} />
         )}
       </div>
     </>
@@ -158,7 +155,7 @@ function IngredientsTable({ date, mode }: { date: string; mode: "day" | "week" }
 
 // ---------- Analysis tab ----------
 
-interface MealLine { slotName: string; recipeName: string; estimate: boolean; calories: number; }
+interface MealLine { slotName: string; recipeName: string; estimate: boolean; calories: number; nutrients: Nutrients; }
 
 interface AnalysisData {
   mode: "day" | "week";
@@ -207,32 +204,13 @@ function OverviewBody({ data, mode, openCard, setOpenCard, editing, setEditing, 
   const cal = Math.round(n.calories);
   const pct = goals.calorieGoal > 0 ? Math.round((cal / goals.calorieGoal) * 100) : 0;
 
-  const ringOption = {
-    series: [{
-      type: "gauge", startAngle: 90, endAngle: -270, radius: "100%",
-      min: 0, max: goals.calorieGoal || 1,
-      progress: { show: true, width: 16, roundCap: true, itemStyle: { color: MACRO_COLOR.protein } },
-      axisLine: { lineStyle: { width: 16, color: [[1, "#e3ddcc"]] } },
-      pointer: { show: false }, axisTick: { show: false }, splitLine: { show: false }, axisLabel: { show: false },
-      anchor: { show: false },
-      detail: {
-        valueAnimation: true, offsetCenter: [0, "-8%"], fontSize: 26, fontWeight: 800,
-        color: "#20262B", formatter: (v: number) => String(Math.round(v)),
-      },
-      title: { show: false },
-      data: [{ value: cal }],
-    }],
-  } as const;
-
   return (
     <>
-      <EChart option={ringOption as never} height={180} />
+      <p className="section-label">Calories &amp; macros{mode === "week" ? " (daily avg)" : ""}</p>
+      <CalorieMacroRing cal={cal} macros={data.macros} goal={goals.calorieGoal} />
       <p className="mono" style={{ textAlign: "center", margin: "-8px 0 0", fontSize: 12, color: "var(--sage)" }}>
         of {goals.calorieGoal} kcal · {pct}%{mode === "week" ? " · daily avg" : ""}
       </p>
-
-      <p className="section-label">Macro distribution{mode === "week" ? " (daily avg)" : ""}</p>
-      <MacroDonut macros={data.macros} />
 
       <p className="section-label">Macros vs goal</p>
       <MacroBar label="Protein" value={n.proteinG} goal={goals.proteinG} color={MACRO_COLOR.protein} />
@@ -267,51 +245,21 @@ function OverviewBody({ data, mode, openCard, setOpenCard, editing, setEditing, 
   );
 }
 
-// Meals lens: what you ate — calories per meal (day) or per day (week), plus
-// the actual ingredient quantities used.
-function MealsBody({ data, mode, date }: { data: AnalysisData; mode: "day" | "week"; date: string }) {
-  return (
-    <>
-      {mode === "day" ? (
-        data.meals && data.meals.length > 0
-          ? <CaloriesByMeal meals={data.meals} />
-          : <p style={{ opacity: 0.6 }}>No meals planned for this day.</p>
-      ) : (
-        data.perDay && <CaloriesPerDay perDay={data.perDay} />
-      )}
-      <IngredientsTable date={date} mode={mode} />
-    </>
-  );
-}
-
-// Nutrients lens: the full nutrient table, plus the week macro-trend chart.
-function NutrientsBody({ data, mode }: { data: AnalysisData; mode: "day" | "week" }) {
+// Breakdown lens: the full nutrient table (Total/Goal/% + a column per meal in
+// day mode), the week macro-trend chart, and actual ingredient quantities used.
+function BreakdownBody({ data, mode, date }: { data: AnalysisData; mode: "day" | "week"; date: string }) {
+  const dayMeals = mode === "day" && data.meals && data.meals.length > 0 ? data.meals : null;
   return (
     <>
       {mode === "week" && data.perDay && <WeekTrend perDay={data.perDay} />}
-      <p className="section-label">Nutrients{mode === "week" ? " (daily avg)" : ""} vs goal</p>
-      <NutrientTable n={data.nutrients} goals={data.goals} />
+      <p className="section-label">
+        Nutrients{mode === "week" ? " (daily avg) vs goal" : " — total, goal & by meal"}
+      </p>
+      {dayMeals
+        ? <MealNutrientTable n={data.nutrients} goals={data.goals} meals={dayMeals} />
+        : <NutrientTable n={data.nutrients} goals={data.goals} />}
+      <IngredientsTable date={date} mode={mode} />
       <MissingNotice missing={data.missing} />
-    </>
-  );
-}
-
-function CaloriesPerDay({ perDay }: { perDay: NonNullable<AnalysisData["perDay"]> }) {
-  const max = Math.max(...perDay.map((d) => d.total.calories), 1);
-  return (
-    <>
-      <p className="section-label">Calories by day</p>
-      {perDay.map((d, i) => (
-        <div key={i} style={{ margin: "6px 0" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-            <b>{shortDate(d.date)}</b>
-            <span className="mono" style={{ fontSize: 11, color: "var(--sage)" }}>{round(d.total.calories)} kcal</span>
-          </div>
-          <div style={{ height: 6, borderRadius: 99, background: "#e3ddcc", overflow: "hidden", marginTop: 2 }}>
-            <div style={{ height: "100%", width: `${(d.total.calories / max) * 100}%`, background: MACRO_COLOR.protein }} />
-          </div>
-        </div>
-      ))}
     </>
   );
 }
@@ -333,23 +281,45 @@ function MacroBar({ label, value, goal, color }: { label: string; value: number;
 
 const nfmt = (x: number) => (x < 10 ? Math.round(x * 10) / 10 : Math.round(x));
 
-function MacroDonut({ macros }: { macros: AnalysisData["macros"] }) {
+// Combined view: inner donut = macro split, outer thin arc = calorie progress
+// toward goal, calorie total in the center. One chart instead of two.
+function CalorieMacroRing({ cal, macros, goal }: { cal: number; macros: AnalysisData["macros"]; goal: number }) {
   if (macros.carbs + macros.fat + macros.protein === 0)
     return <p style={{ opacity: 0.6, textAlign: "center", margin: 0 }}>No calories logged.</p>;
+  const r = (x: number) => Math.round(x);
   const option = {
     tooltip: { trigger: "item", formatter: "{b}: {c}% of calories" },
-    legend: { bottom: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 11 } },
-    series: [{
-      type: "pie", radius: ["45%", "70%"], center: ["50%", "44%"], avoidLabelOverlap: false,
-      label: { show: true, formatter: "{b}\n{d}%", fontSize: 10 },
-      data: [
-        { value: Math.round(macros.carbs), name: "Carbs", itemStyle: { color: MACRO_COLOR.carbs } },
-        { value: Math.round(macros.fat), name: "Fat", itemStyle: { color: MACRO_COLOR.fat } },
-        { value: Math.round(macros.protein), name: "Protein", itemStyle: { color: MACRO_COLOR.protein } },
-      ],
-    }],
+    legend: {
+      bottom: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 11 },
+      data: ["Carbs", "Fat", "Protein"],
+    },
+    series: [
+      {
+        name: "Macros", type: "pie", radius: ["42%", "62%"], center: ["50%", "46%"],
+        avoidLabelOverlap: false, label: { show: false }, labelLine: { show: false },
+        data: [
+          { value: r(macros.carbs), name: "Carbs", itemStyle: { color: MACRO_COLOR.carbs } },
+          { value: r(macros.fat), name: "Fat", itemStyle: { color: MACRO_COLOR.fat } },
+          { value: r(macros.protein), name: "Protein", itemStyle: { color: MACRO_COLOR.protein } },
+        ],
+      },
+      {
+        type: "gauge", radius: "92%", center: ["50%", "46%"], startAngle: 90, endAngle: -270,
+        min: 0, max: goal || 1, silent: true,
+        progress: { show: true, width: 7, roundCap: true, itemStyle: { color: MACRO_COLOR.protein } },
+        axisLine: { lineStyle: { width: 7, color: [[1, "#e3ddcc"]] } },
+        pointer: { show: false }, axisTick: { show: false }, splitLine: { show: false }, axisLabel: { show: false },
+        anchor: { show: false },
+        detail: {
+          offsetCenter: [0, "-4%"], fontSize: 24, fontWeight: 800, color: "#20262B",
+          formatter: (v: number) => String(Math.round(v)),
+        },
+        title: { show: false },
+        data: [{ value: cal }],
+      },
+    ],
   };
-  return <EChart option={option as never} height={220} />;
+  return <EChart option={option as never} height={240} />;
 }
 
 function CaloriesByMeal({ meals }: { meals: MealLine[] }) {
