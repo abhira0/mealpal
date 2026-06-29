@@ -54,13 +54,16 @@ export function CookMode({
   if (steps.length === 0) return null;
 
   const step = steps[i];
-  // Show the step's video clip when it has a start time and the recipe has a YouTube video.
-  const clip =
-    videoId && step.startSeconds != null
-      ? `https://www.youtube.com/embed/${videoId}?start=${step.startSeconds}` +
-        (step.endSeconds != null ? `&end=${step.endSeconds}` : "") +
-        "&autoplay=1&mute=1&rel=0"
-      : null;
+  // Only show a clip when the step defines a real range (end after start) and the
+  // recipe has a YouTube video. No time given (null, or a 0/0 placeholder) = no video.
+  const hasClip =
+    videoId != null &&
+    step.startSeconds != null &&
+    step.endSeconds != null &&
+    step.endSeconds > step.startSeconds;
+  const clip = hasClip
+    ? `https://www.youtube.com/embed/${videoId}?start=${step.startSeconds}&end=${step.endSeconds}&autoplay=1&mute=1&rel=0`
+    : null;
 
   return (
     <div className="cook-overlay" role="dialog" aria-label={`Cooking: ${title}`}>
