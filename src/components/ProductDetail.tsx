@@ -92,6 +92,7 @@ export function ProductDetail({ id }: { id: string }) {
       <div className="content stack-sm">
         {error && <p className="notice">{error}</p>}
 
+        <span className="section-label">Details</span>
         <section className="card stack-sm">
           {product.imageUrl && (
             // eslint-disable-next-line @next/next/no-img-element
@@ -126,8 +127,8 @@ export function ProductDetail({ id }: { id: string }) {
           onEdit={() => setEditing(true)}
         />
 
+        <span className="section-label">Price history</span>
         <section className="card stack-sm">
-          <span className="section-label">Price history</span>
           {product.history.length === 0 ? (
             <p className="empty">No purchases recorded yet.</p>
           ) : (

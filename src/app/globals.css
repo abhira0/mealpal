@@ -38,7 +38,8 @@ button{font-family:inherit}
 
 /* ---------- section labels ---------- */
 .section-label,.slot{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--sage)}
-.section-label{display:block;margin:4px 0 2px}
+.section-label{display:block;font-weight:700;font-size:12px;color:var(--enamel-dark);margin:10px 0 2px;padding-top:14px;border-top:1px solid var(--line)}
+.section-label:first-child{margin-top:0;padding-top:0;border-top:none}
 
 /* ---------- cards ---------- */
 .card{background:var(--paper-raised);border:1px solid var(--line);border-radius:8px;padding:14px}
