@@ -162,7 +162,6 @@ INSERT OR IGNORE INTO products VALUES(28,8,31,13,'Franco Uncooked Phulka 18ct 1.
 INSERT OR IGNORE INTO products VALUES(29,8,32,13,'Deep Aloo Paratha Frozen 4pc 13.5 oz',4,1,1,'https://www.sayweee.com/en/products/Deep-Aloo-Paratha-Frozen-4pc/102708?trace_id=027915f0-12de-4b0c-bb36-2e9998ae81a9&keyword=aloo+paratha&trigger_type=search_active',1782700034,'https://img08.weeecdn.net/product/image/744/874/569B2E5783C34425.png!c864x0_q80.auto',379);
 INSERT OR IGNORE INTO purchases VALUES(12,8,11,1,1330,NULL,1782702017);
 INSERT OR IGNORE INTO purchases VALUES(13,8,13,1,1099,NULL,1782702470);
-INSERT OR IGNORE INTO purchases VALUES(15,8,11,1,NULL,NULL,1782702559);
 INSERT OR IGNORE INTO recipe_ingredients VALUES(19,11,16,200);
 INSERT OR IGNORE INTO recipe_ingredients VALUES(20,11,17,32);
 INSERT OR IGNORE INTO recipe_ingredients VALUES(21,11,18,100);
@@ -212,5 +211,4 @@ INSERT OR IGNORE INTO stock_movements VALUES(58,8,16,5670,'purchase',NULL,12,178
 INSERT OR IGNORE INTO stock_movements VALUES(59,8,17,1560,'purchase',NULL,13,1782702470,NULL,13);
 INSERT OR IGNORE INTO stock_movements VALUES(60,8,16,-5670,'manual',NULL,NULL,1782702524,NULL,11);
 INSERT OR IGNORE INTO stock_movements VALUES(61,8,17,-1560,'manual',NULL,NULL,1782702531,NULL,13);
-INSERT OR IGNORE INTO stock_movements VALUES(63,8,16,5670,'purchase',NULL,15,1782702559,NULL,11);
 INSERT OR IGNORE INTO users VALUES(8,8,'demo@demo.com','$2b$10$0h3tN.V/NToZSyeT5LjU.eKcWa/E/64Xzi45Jy36n0TfxYrfb3BAq','Demo',0);
