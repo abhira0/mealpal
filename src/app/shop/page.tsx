@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ShopTicket, type ShopLine, type PriceMap } from "@/components/ShopTicket";
+import { Bill } from "@/components/Bill";
 import { centsToDollars } from "@/lib/money";
 
 type RawLine = {
@@ -25,6 +25,7 @@ export default function ShopPage() {
   const [shopMeta, setShopMeta] = useState<Record<string, Shop>>({});
   const [pendingCount, setPendingCount] = useState(0);
   const [horizon, setHorizon] = useState(14);
+  const [tab, setTab] = useState<"run" | "bill">("run");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -90,49 +91,68 @@ export default function ShopPage() {
           {tripTotal > 0 && <> · ${centsToDollars(tripTotal).toFixed(2)}</>}
         </p>
         <h1>The run</h1>
-        <p className="eb" style={{ display: "flex", gap: ".5rem", alignItems: "center" }}>
-          Buy ahead
-          {[7, 14, 30].map((d) => (
-            <button
-              key={d}
-              onClick={() => setHorizon(d)}
-              aria-pressed={horizon === d}
-              style={{ fontWeight: horizon === d ? 700 : 400, textDecoration: horizon === d ? "underline" : "none" }}
-            >
-              {d}d
-            </button>
-          ))}
+        <p className="eb" style={{ display: "flex", gap: ".75rem", alignItems: "center" }}>
+          <button
+            onClick={() => setTab("run")}
+            aria-pressed={tab === "run"}
+            style={{ fontWeight: tab === "run" ? 700 : 400, textDecoration: tab === "run" ? "underline" : "none" }}
+          >
+            The run
+          </button>
+          <button
+            onClick={() => setTab("bill")}
+            aria-pressed={tab === "bill"}
+            style={{ fontWeight: tab === "bill" ? 700 : 400, textDecoration: tab === "bill" ? "underline" : "none" }}
+          >
+            Bill{pendingCount > 0 && <> · {pendingCount}</>}
+          </button>
         </p>
+        {tab === "run" && (
+          <p className="eb" style={{ display: "flex", gap: ".5rem", alignItems: "center" }}>
+            Buy ahead
+            {[7, 14, 30].map((d) => (
+              <button
+                key={d}
+                onClick={() => setHorizon(d)}
+                aria-pressed={horizon === d}
+                style={{ fontWeight: horizon === d ? 700 : 400, textDecoration: horizon === d ? "underline" : "none" }}
+              >
+                {d}d
+              </button>
+            ))}
+          </p>
+        )}
       </header>
 
       <main className="content stack">
-        {pendingCount > 0 && (
-          <Link href="/shop/bill" className="notice" style={{ display: "block", textDecoration: "none" }}>
-            {pendingCount} {pendingCount === 1 ? "item" : "items"} to price → Enter the bill
-          </Link>
+        {tab === "bill" ? (
+          <Bill onCount={setPendingCount} />
+        ) : (
+          <>
+            {error && <p className="notice">{error}</p>}
+
+            {data === null && !error && <p className="loading">Loading…</p>}
+
+            {data && shops.length === 0 && (
+              <p className="empty">Nothing to buy — plan some meals first.</p>
+            )}
+
+            {shops.map(([shopName, lines]) => {
+              const meta = shopMeta[shopName];
+              return (
+                <ShopTicket
+                  key={shopName}
+                  shopName={shopName}
+                  website={meta?.website}
+                  iconUrl={meta?.iconUrl}
+                  total={shopTotal(lines)}
+                  lines={toLines(lines)}
+                  prices={prices}
+                />
+              );
+            })}
+          </>
         )}
-        {error && <p className="notice">{error}</p>}
-
-        {data === null && !error && <p className="loading">Loading…</p>}
-
-        {data && shops.length === 0 && (
-          <p className="empty">Nothing to buy — plan some meals first.</p>
-        )}
-
-        {shops.map(([shopName, lines]) => {
-          const meta = shopMeta[shopName];
-          return (
-            <ShopTicket
-              key={shopName}
-              shopName={shopName}
-              website={meta?.website}
-              iconUrl={meta?.iconUrl}
-              total={shopTotal(lines)}
-              lines={toLines(lines)}
-              prices={prices}
-            />
-          );
-        })}
       </main>
     </>
   );
