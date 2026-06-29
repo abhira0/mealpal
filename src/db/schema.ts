@@ -223,3 +223,14 @@ export const users = sqliteTable("users", {
     .notNull()
     .$defaultFn(() => new Date()),
 });
+
+// One row per household: daily calorie + macro targets for the Analysis tab.
+export const nutritionGoals = sqliteTable("nutrition_goals", {
+  householdId: integer("household_id")
+    .primaryKey()
+    .references(() => households.id),
+  calorieGoal: integer("calorie_goal").notNull(),
+  proteinG: integer("protein_g").notNull(),
+  carbsG: integer("carbs_g").notNull(),
+  fatG: integer("fat_g").notNull(),
+});
