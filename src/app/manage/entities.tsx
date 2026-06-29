@@ -1,6 +1,10 @@
 // Config-driven Manage section. One entry per entity, keyed by URL slug.
 // EntityList + EntityForm read from this so we don't hand-write 15 pages.
 
+import type { ReactNode } from "react";
+import { Check, X } from "lucide-react";
+import { Favicon } from "@/components/Favicon";
+
 export type FieldDef = {
   name: string;
   label: string;
@@ -30,6 +34,9 @@ export type ColumnDef = {
   refLabel?: string;
   // Custom formatter (e.g. cents → dollars). Receives the raw row.
   format?: (row: Record<string, unknown>) => string;
+  // Render arbitrary JSX for this cell (e.g. a logo, a check/cross). Takes
+  // precedence over format. Not searchable.
+  renderCell?: (row: Record<string, unknown>) => ReactNode;
 };
 
 // What EntityList needs to render a list. EntityConfig extends this with the
@@ -48,6 +55,9 @@ export type ListConfig = {
   };
   // If set, the row stacks (name on top) with a large image column beside details.
   bigImage?: boolean;
+  // Like bigImage, but title gets its own top row; below it, image | details
+  // sit in two columns. Used by products.
+  titleTop?: boolean;
   canEdit: boolean;
   canDelete: boolean;
 };
@@ -81,13 +91,6 @@ function dollars(cents: unknown): string {
 // Effective price = manual override ?? latest purchase (computed server-side).
 function formatPrice(row: Record<string, unknown>): string {
   return dollars(row.effectiveCents);
-}
-
-// Compact purchase history, newest first: "$13.49 · $12.99 · $11.99".
-function formatHistory(row: Record<string, unknown>): string {
-  const history = (row.history as { cents: number }[] | undefined) ?? [];
-  if (history.length === 0) return "—";
-  return history.slice(0, 5).map((h) => dollars(h.cents)).join(" · ");
 }
 
 export const ENTITIES: Record<EntitySlug, EntityConfig> = {
@@ -160,16 +163,36 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
     itemPath: (id) => `/api/products/${id}`,
     columns: [
       { key: "name", label: "Name" },
-      { key: "shopId", label: "Shop", refFrom: "shops", refLabel: "name" },
-      { key: "packSize", label: "Pack size" },
+      {
+        key: "shopId",
+        label: "",
+        renderCell: (row) => (
+          <Favicon
+            name={String(row.shopName ?? "")}
+            website={row.shopWebsite as string | null}
+            iconUrl={row.shopIconUrl as string | null}
+            size={20}
+          />
+        ),
+      },
+      { key: "packSize", label: "Pack size", format: (row) => `${row.packSize ?? "—"}${row.canonicalUnit ?? ""}` },
       { key: "effectiveCents", label: "Price", format: formatPrice },
-      { key: "history", label: "Purchase history", format: formatHistory },
+      {
+        key: "nutritionPhoto",
+        label: "Nutrition label",
+        renderCell: (row) =>
+          row.nutritionPhoto ? (
+            <Check size={14} style={{ color: "var(--ok, green)", verticalAlign: "middle" }} />
+          ) : (
+            <X size={14} style={{ color: "var(--muted, #999)", verticalAlign: "middle" }} />
+          ),
+      },
     ],
     icon: (row) => ({
       name: String(row.name ?? ""),
       iconUrl: row.imageUrl as string | null,
     }),
-    bigImage: true,
+    titleTop: true,
     fields: [
       { name: "ingredientId", label: "Ingredient", type: "select", optionsFrom: "ingredients", optionLabel: "name", required: true },
       { name: "shopId", label: "Shop", type: "select", optionsFrom: "shops", optionLabel: "name", required: true },

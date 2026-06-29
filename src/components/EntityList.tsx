@@ -169,15 +169,38 @@ export function EntityList(props: {
               <Favicon name={icon.name} website={icon.website} iconUrl={icon.iconUrl} size={32} />
             </span>
           );
-          const details = config.columns.slice(1).map((col) => (
+          // titleTop puts columns[1] as a leading icon next to the title, so its
+          // details start at column 2; every other layout details start at 1.
+          const detailCols = config.columns.slice(config.titleTop ? 2 : 1);
+          const details = detailCols.map((col) => (
             <span key={col.key} className="meta" style={{ display: "block" }}>
-              {col.label ? `${col.label}: ` : ""}{cellValue(row, col)}
+              {col.label ? `${col.label}: ` : ""}
+              {col.renderCell ? col.renderCell(row) : cellValue(row, col)}
             </span>
           ));
 
+          // titleTop: row1 = [shop icon][title]; row2 = [product image][details].
+          const titleTopMain =
+            config.titleTop && icon ? (
+              <span className="row-main">
+                <span style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                  {config.columns[1]?.renderCell?.(row)}
+                  <span className="title" style={{ fontSize: 15 }}>
+                    {cellValue(row, config.columns[0])}
+                  </span>
+                </span>
+                <span style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                  <span style={{ flex: "0 0 auto" }}>
+                    <Favicon name={icon.name} website={icon.website} iconUrl={icon.iconUrl} size={64} />
+                  </span>
+                  <span style={{ flex: "1 1 auto", minWidth: 0 }}>{details}</span>
+                </span>
+              </span>
+            ) : null;
+
           // bigImage: [image][title + details] on one row.
-          const main =
-            config.bigImage && icon ? (
+          const main = titleTopMain ??
+            (config.bigImage && icon ? (
               <span className="row-main" style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
                 <span style={{ flex: "0 0 auto" }}>
                   <Favicon name={icon.name} website={icon.website} iconUrl={icon.iconUrl} size={64} />
@@ -196,8 +219,8 @@ export function EntityList(props: {
                 </span>
                 {details}
               </span>
-            );
-          const badge = config.bigImage ? null : iconBadge;
+            ));
+          const badge = config.bigImage || config.titleTop ? null : iconBadge;
 
           return (
             <div key={String(row.id)} className="row">
