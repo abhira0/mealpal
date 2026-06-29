@@ -4,6 +4,7 @@ import { schema } from "@/db";
 import { getRecipe } from "@/lib/recipes";
 import { consumptionForRecipe } from "@/lib/consumption";
 import { NUTRIENT_PATCH_KEYS } from "@/lib/products";
+import { listEaten } from "@/lib/eaten";
 
 type Db = BetterSQLite3Database<typeof schema>;
 
@@ -44,6 +45,13 @@ function productNutrients(p: ProductRow): Nutrients | null {
   return Object.fromEntries(
     NUTRIENT_KEYS.map((k) => [k, (p[k] as number | null) ?? 0]),
   ) as Nutrients;
+}
+
+type VariantRow = typeof schema.productVariants.$inferSelect;
+/** A variant's per-unit nutrients, or null if nothing is filled in. */
+function variantNutrients(v: VariantRow): Nutrients | null {
+  if (!NUTRIENT_KEYS.some((k) => ((v[k] as number | null) ?? 0) !== 0)) return null;
+  return Object.fromEntries(NUTRIENT_KEYS.map((k) => [k, (v[k] as number | null) ?? 0])) as Nutrients;
 }
 
 export interface MealNutrition {
@@ -127,6 +135,30 @@ export function dayNutrition(db: Db, householdId: number, date: string): DayNutr
       estimate: ev.status !== "cooked",
       nutrients,
       missing: [...missing].map((id) => ingredientName.get(id) ?? "?"),
+    });
+  }
+
+  // Quick-logged snacks/packets eaten this day (not part of a recipe meal).
+  const variantById = new Map(
+    db.select().from(schema.productVariants).where(eq(schema.productVariants.householdId, householdId)).all()
+      .map((v) => [v.id, v]),
+  );
+  for (const c of listEaten(db, householdId, date)) {
+    const p = productById.get(c.productId);
+    const n = c.variantId != null ? (variantById.get(c.variantId) && variantNutrients(variantById.get(c.variantId)!))
+                                   : (p ? productNutrients(p) : null);
+    const nutrients = zeroNutrients();
+    const miss = new Set<number>();
+    if (n) addScaled(nutrients, n, c.count);
+    else if (p) miss.add(p.ingredientId);
+    meals.push({
+      eventId: -c.id, // negative id namespace so it can't collide with mealEvents
+      recipeName: c.variantId != null ? (variantById.get(c.variantId)?.name ?? p?.name ?? "Snack") : (p?.name ?? "Snack"),
+      slotName: "Snack",
+      servings: c.count,
+      estimate: false,
+      nutrients,
+      missing: [...miss].map((id) => ingredientName.get(id) ?? "?"),
     });
   }
 
@@ -284,6 +316,31 @@ export function dayIngredientTable(db: Db, householdId: number, date: string): I
       }
     }
   }
+
+  const variantById = new Map(
+    db.select().from(schema.productVariants).where(eq(schema.productVariants.householdId, householdId)).all()
+      .map((v) => [v.id, v]),
+  );
+  for (const c of listEaten(db, householdId, date)) {
+    const p = productById.get(c.productId);
+    if (!p) continue;
+    const src = c.variantId != null ? variantById.get(c.variantId) : p;
+    if (!src) continue;
+    const ing = ingredientById.get(p.ingredientId);
+    const rowKey = p.ingredientId;
+    let row = rows.get(rowKey);
+    if (!row) {
+      row = { ingredientId: rowKey, name: ing?.name ?? "?", unit: ing?.canonicalUnit ?? "", productName: c.variantId != null ? (variantById.get(c.variantId)?.name ?? p.name) : p.name, qty: 0, values: {} };
+      rows.set(rowKey, row);
+    }
+    row.qty += c.count;
+    for (const k of NUTRIENT_PATCH_KEYS) {
+      const val = (src as Record<string, unknown>)[k] as number | null | undefined;
+      if (val == null) continue;
+      row.values[k] = (row.values[k] ?? 0) + val * c.count;
+    }
+  }
+
   return [...rows.values()];
 }
 
