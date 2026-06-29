@@ -6,6 +6,9 @@ import { createRecipe } from "@/lib/recipes";
 import { recordPurchase } from "@/lib/shopping";
 import { recordCooked, unstockedIngredients } from "@/lib/consumption";
 import { dayNutrition, scorecards, zeroNutrients, mondayOf, macroSplit, dayIngredientTable, weekIngredientTable } from "@/lib/nutrition";
+import { createVariant } from "@/lib/variants";
+import { logEaten } from "@/lib/eaten";
+import { createProduct } from "@/lib/products";
 
 let db: TestDb;
 let hid: number;
@@ -159,5 +162,29 @@ describe("mondayOf", () => {
     expect(mondayOf("2026-06-29")).toBe("2026-06-29"); // a Monday
     expect(mondayOf("2026-07-01")).toBe("2026-06-29"); // Wed → that Monday
     expect(mondayOf("2026-06-28")).toBe("2026-06-22"); // Sun → prior Monday
+  });
+});
+
+describe("dayNutrition includes the eat-log", () => {
+  let eatDb: TestDb;
+  let eatHid: number;
+  let eatProductId: number;
+
+  beforeEach(() => {
+    eatDb = makeTestDb();
+    eatHid = seedHousehold(eatDb);
+    const ingId = eatDb.insert(schema.ingredients).values({ householdId: eatHid, name: "Trail Mix", canonicalUnit: "count" }).returning().all()[0].id;
+    const shopId = eatDb.insert(schema.shops).values({ householdId: eatHid, name: "Costco" }).returning().all()[0].id;
+    eatProductId = createProduct(eatDb, eatHid, { ingredientId: ingId, shopId, name: "Power Up Bag (16)", packSize: 16, priority: 1, url: null }).id;
+    // record a purchase so stock is available for logEaten to deplete
+    recordPurchase(eatDb, eatHid, { productId: eatProductId, quantity: 1 });
+  });
+
+  it("adds an eaten variant's nutrition to the day total", () => {
+    const v = createVariant(eatDb, eatHid, eatProductId, { name: "Mega Omega", calories: 180, proteinG: 6 });
+    logEaten(eatDb, eatHid, { date: "2026-06-29", productId: eatProductId, variantId: v.id, count: 2 });
+    const day = dayNutrition(eatDb, eatHid, "2026-06-29");
+    expect(day.total.calories).toBe(360); // 180 × 2
+    expect(day.total.proteinG).toBe(12);
   });
 });
