@@ -7,6 +7,7 @@ import { Favicon } from "@/components/Favicon";
 import { Sheet } from "@/components/Sheet";
 import { EntityForm } from "@/components/EntityForm";
 import { EditDeleteActions } from "@/components/EditDeleteActions";
+import { NutritionFacts } from "@/components/NutritionFacts";
 
 type Purchase = { cents: number; purchasedAt: string };
 type Product = {
@@ -19,6 +20,7 @@ type Product = {
   available: boolean;
   url: string | null;
   imageUrl: string | null;
+  servingSize: number | null;
   calories: number | null;
   fatG: number | null;
   satFatG: number | null;
@@ -36,8 +38,6 @@ type Ingredient = { id: number; name: string; canonicalUnit: string };
 type Shop = { id: number; name: string; website: string | null; iconUrl: string | null };
 
 const money = (c: number | null) => (c == null ? "—" : `$${(c / 100).toFixed(2)}`);
-const g = (n: number | null) => (n == null ? "—" : `${n}g`);
-const mg = (n: number | null) => (n == null ? "—" : `${n}mg`);
 const day = (d: string) => new Date(d).toLocaleDateString();
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -134,19 +134,11 @@ export function ProductDetail({ id }: { id: string }) {
 
         {product.calories != null && (
           <>
-            <span className="section-label">Nutrition (per {unit || "unit"})</span>
-            <section className="card stack-sm">
-              <Field label="Calories">{product.calories}</Field>
-              <Field label="Total fat">{g(product.fatG)}</Field>
-              <Field label="Saturated fat">{g(product.satFatG)}</Field>
-              <Field label="Trans fat">{g(product.transFatG)}</Field>
-              <Field label="Cholesterol">{mg(product.cholesterolMg)}</Field>
-              <Field label="Sodium">{mg(product.sodiumMg)}</Field>
-              <Field label="Total carbs">{g(product.carbsG)}</Field>
-              <Field label="Fiber">{g(product.fiberG)}</Field>
-              <Field label="Sugar">{g(product.sugarG)}</Field>
-              <Field label="Protein">{g(product.proteinG)}</Field>
-            </section>
+            <span className="section-label">Nutrition facts</span>
+            {product.servingSize == null && (
+              <p className="empty">Set a serving size to see per-serving values.</p>
+            )}
+            <NutritionFacts facts={product} unit={unit} />
           </>
         )}
 

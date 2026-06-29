@@ -38,6 +38,7 @@ export async function PATCH(
     ...(b?.shopId !== undefined ? { shopId: Number(b.shopId) } : {}),
     ...(b?.name !== undefined ? { name: String(b.name).trim() } : {}),
     ...(b?.packSize !== undefined ? { packSize: Number(b.packSize) } : {}),
+    ...(b?.servingSize !== undefined ? { servingSize: b.servingSize === null || b.servingSize === "" ? null : Number(b.servingSize) } : {}),
     ...(b?.priority !== undefined ? { priority: Number(b.priority) } : {}),
     ...(pricePatch(b) ?? {}),
     ...(b?.available !== undefined ? { available: Boolean(b.available) } : {}),
