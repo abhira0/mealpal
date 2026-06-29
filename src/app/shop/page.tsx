@@ -119,7 +119,7 @@ export default function ShopPage() {
       <main className="content stack">
         <div className="tabs" role="tablist">
           <button role="tab" onClick={() => setTab("run")} aria-pressed={tab === "run"}>
-            The run
+            Stops
           </button>
           <button role="tab" onClick={() => setTab("bill")} aria-pressed={tab === "bill"}>
             Bill{pendingCount > 0 && <> · {pendingCount}</>}
