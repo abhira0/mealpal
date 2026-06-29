@@ -35,4 +35,14 @@ describe("stock ledger", () => {
     recordMovement(db, hid, { ingredientId: flourId, delta: -200, reason: "cooked", expiresAt: null });
     expect(expiryByIngredient(db, hid).get(flourId)).toBe("2026-07-03");
   });
+  it("takes the earliest expiry across manual and purchase sources", () => {
+    recordMovement(db, hid, { ingredientId: flourId, delta: 500, reason: "manual", expiresAt: "2026-07-10" });
+    const shopId = db.insert(schema.shops).values({ householdId: hid, name: "Mart" }).returning().all()[0].id;
+    const productId = db.insert(schema.products)
+      .values({ householdId: hid, ingredientId: flourId, shopId, name: "Flour 1kg", packSize: 1000 })
+      .returning().all()[0].id;
+    db.insert(schema.purchases)
+      .values({ householdId: hid, productId, quantity: 1, expiresAt: "2026-07-05" }).run();
+    expect(expiryByIngredient(db, hid).get(flourId)).toBe("2026-07-05");
+  });
 });
