@@ -15,7 +15,7 @@ beforeEach(() => {
   ingId = db.insert(schema.ingredients).values({ householdId: hid, name: "Trail Mix", canonicalUnit: "count" }).returning().all()[0].id;
   const shop = db.insert(schema.shops).values({ householdId: hid, name: "Costco" }).returning().all()[0].id;
   productId = createProduct(db, hid, { ingredientId: ingId, shopId: shop, name: "Power Up Bag (16)", packSize: 16, priority: 1, url: null }).id;
-  variantId = createVariant(db, hid, productId, { name: "Mega Omega", calories: 180 }).id;
+  variantId = createVariant(db, hid, productId, { name: "Mega Omega", calories: 180 })!.id;
   recordPurchase(db, hid, { productId, quantity: 1 }); // +16 count in stock
 });
 

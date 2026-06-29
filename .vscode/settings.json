@@ -1,0 +1,5 @@
+{
+  "workbench.externalBrowser": "default",
+  "remote.autoForwardPortsSource": "process",
+  "remote.autoForwardPorts": false
+}
