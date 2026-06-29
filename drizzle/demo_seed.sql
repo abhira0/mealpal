@@ -160,6 +160,7 @@ INSERT OR IGNORE INTO products VALUES(26,8,29,9,'Kirkland Signature, Organic Ext
 INSERT OR IGNORE INTO products VALUES(27,8,30,14,'Nutrex Research Creatine Monohydrate, Unflavored',300,1,1,'https://www.amazon.com/Nutrex-Research-Creatine-Drive-Gram/dp/B009EO0FSU?th=1',1782698526,'https://m.media-amazon.com/images/I/71R7hEDOLhL._AC_SL1500_.jpg',2160);
 INSERT OR IGNORE INTO products VALUES(28,8,31,13,'Franco Uncooked Phulka 18ct 1.31 lb',18,1,1,'https://www.sayweee.com/en/products/Franco-Uncooked-Phulka-18ct/100486?trace_id=9f820ccf-4a75-4ac5-8a65-26e05fb8aeff&keyword=roti&trigger_type=search_active',1782699975,'https://img08.weeecdn.net/product/image/946/394/480184DE8FD0A299.png!c864x0_q80.auto',649);
 INSERT OR IGNORE INTO products VALUES(29,8,32,13,'Deep Aloo Paratha Frozen 4pc 13.5 oz',4,1,1,'https://www.sayweee.com/en/products/Deep-Aloo-Paratha-Frozen-4pc/102708?trace_id=027915f0-12de-4b0c-bb36-2e9998ae81a9&keyword=aloo+paratha&trigger_type=search_active',1782700034,'https://img08.weeecdn.net/product/image/744/874/569B2E5783C34425.png!c864x0_q80.auto',379);
+INSERT OR IGNORE INTO purchases VALUES(12,8,11,1,NULL,NULL,1782702017);
 INSERT OR IGNORE INTO recipe_ingredients VALUES(19,11,16,200);
 INSERT OR IGNORE INTO recipe_ingredients VALUES(20,11,17,32);
 INSERT OR IGNORE INTO recipe_ingredients VALUES(21,11,18,100);
@@ -204,4 +205,6 @@ INSERT OR IGNORE INTO stock_movements VALUES(49,8,23,4,'manual',NULL,NULL,178270
 INSERT OR IGNORE INTO stock_movements VALUES(50,8,28,1707,'manual',NULL,NULL,1782701037,NULL,25);
 INSERT OR IGNORE INTO stock_movements VALUES(51,8,28,-1707,'manual',NULL,NULL,1782701040,NULL,NULL);
 INSERT OR IGNORE INTO stock_movements VALUES(52,8,16,-5670,'manual',NULL,NULL,1782701060,NULL,11);
+INSERT OR IGNORE INTO stock_movements VALUES(57,8,16,5670,'manual',NULL,NULL,1782701917,NULL,11);
+INSERT OR IGNORE INTO stock_movements VALUES(58,8,16,5670,'purchase',NULL,12,1782702017,NULL,11);
 INSERT OR IGNORE INTO users VALUES(8,8,'demo@demo.com','$2b$10$0h3tN.V/NToZSyeT5LjU.eKcWa/E/64Xzi45Jy36n0TfxYrfb3BAq','Demo',0);
