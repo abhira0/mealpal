@@ -27,6 +27,8 @@ export default function ShopPage() {
   const [units, setUnits] = useState<Record<number, string>>({});
   const [shopMeta, setShopMeta] = useState<Record<string, Shop>>({});
   const [pendingCount, setPendingCount] = useState(0);
+  // lineKey -> purchase id; lives here so checks survive the Bill tab round-trip.
+  const [struck, setStruck] = useState<Map<string, number | null>>(new Map());
   const [horizon, setHorizon] = useState(14);
   const [tab, setTab] = useState<"run" | "bill">("run");
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +87,21 @@ export default function ShopPage() {
 
   function toLines(lines: RawLine[]): ShopLine[] {
     return lines.map((l) => ({ ...l, unit: units[l.ingredientId] }));
+  }
+
+  function handleStruck(key: string, next: boolean, purchaseId: number | null) {
+    setStruck((prev) => {
+      const m = new Map(prev);
+      if (next) m.set(key, purchaseId);
+      else m.delete(key);
+      return m;
+    });
+    // Keep the Bill badge live: recording a purchase +1, undoing one -1.
+    if (next) {
+      if (purchaseId != null) setPendingCount((c) => c + 1);
+    } else if (struck.get(key) != null) {
+      setPendingCount((c) => Math.max(0, c - 1));
+    }
   }
 
   const stopCount = shops.length;
@@ -147,7 +164,8 @@ export default function ShopPage() {
                   total={shopTotal(lines)}
                   lines={toLines(lines)}
                   prices={prices}
-                  onCountChange={(d) => setPendingCount((c) => Math.max(0, c + d))}
+                  struck={struck}
+                  onStruck={handleStruck}
                 />
               );
             })}

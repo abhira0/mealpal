@@ -22,7 +22,7 @@ export type ShopLine = {
 export type PriceMap = Record<number, number | null>;
 
 // Stable key: extras all share ingredientId 0, so key on the extra instead.
-const lineKey = (l: ShopLine) => (l.extraId != null ? `x${l.extraId}` : `i${l.ingredientId}`);
+export const lineKey = (l: ShopLine) => (l.extraId != null ? `x${l.extraId}` : `i${l.ingredientId}`);
 
 export function ShopTicket({
   shopName,
@@ -31,7 +31,8 @@ export function ShopTicket({
   total,
   lines,
   prices,
-  onCountChange,
+  struck,
+  onStruck,
 }: {
   shopName: string;
   website?: string | null;
@@ -39,12 +40,11 @@ export function ShopTicket({
   total: number; // running total in cents for this ticket
   lines: ShopLine[];
   prices: PriceMap;
-  /** +1 when a purchase is recorded, -1 when undone — keeps the Bill count live. */
-  onCountChange?: (delta: number) => void;
+  /** lineKey -> recorded purchase id (null = no product). Owned by the page so
+   *  checks survive switching to the Bill tab and back. */
+  struck: Map<string, number | null>;
+  onStruck: (key: string, struck: boolean, purchaseId: number | null) => void;
 }) {
-  // lineKey -> recorded purchase id (null for lines with no product on file).
-  const [struck, setStruck] = useState<Map<string, number | null>>(new Map());
-
   // bought lines drop to the bottom, but stay visible
   const ordered = [...lines].sort(
     (a, b) => Number(struck.has(lineKey(a))) - Number(struck.has(lineKey(b))),
@@ -59,15 +59,7 @@ export function ShopTicket({
           priceCents={line.product ? prices[line.product.id] ?? null : null}
           struck={struck.has(lineKey(line))}
           purchaseId={struck.get(lineKey(line)) ?? null}
-          onChange={(next, purchaseId) => {
-            setStruck((prev) => {
-              const m = new Map(prev);
-              if (next) m.set(lineKey(line), purchaseId);
-              else m.delete(lineKey(line));
-              return m;
-            });
-            if (line.product) onCountChange?.(next ? 1 : -1);
-          }}
+          onChange={(next, purchaseId) => onStruck(lineKey(line), next, purchaseId)}
         />
       ))}
     </Ticket>
