@@ -65,6 +65,12 @@ export function NutritionFactsEditor({
   const [msg, setMsg] = useState<string | null>(null);
 
   const setVal = (k: Key, v: string) => setVals((p) => ({ ...p, [k]: v }));
+  // Blank the inputs only; nothing is removed until Save writes the nulls.
+  const clear = () => {
+    setServing("");
+    setVals(Object.fromEntries(EDITOR_KEYS.map((k) => [k, ""])) as Record<Key, string>);
+    setMsg(null);
+  };
   const dv = (k: Key, dvBase?: number) => {
     if (!dvBase) return null;
     const v = Number(vals[k]);
@@ -72,14 +78,16 @@ export function NutritionFactsEditor({
   };
 
   async function save() {
+    const empty = serving.trim() === "" && EDITOR_KEYS.every((k) => vals[k].trim() === "");
     const s = Number(serving);
-    if (!serving || !Number.isFinite(s) || s <= 0) {
+    // Allow saving an all-blank label (clears everything); otherwise require a serving.
+    if (!empty && (!serving || !Number.isFinite(s) || s <= 0)) {
       setMsg("Enter a serving size greater than 0.");
       return;
     }
     setBusy(true);
     setMsg(null);
-    const patch: Record<string, number | null> = { servingSize: s };
+    const patch: Record<string, number | null> = { servingSize: empty ? null : s };
     for (const k of EDITOR_KEYS) {
       const raw = vals[k].trim();
       patch[k] = raw === "" ? null : Number(raw) / s; // per-serving → per-unit
@@ -136,6 +144,9 @@ export function NutritionFactsEditor({
 
       <button type="button" className="btn block" disabled={busy} onClick={save}>
         {busy ? "…" : "Save nutrition facts"}
+      </button>
+      <button type="button" className="btn-link danger" style={{ width: "auto" }} disabled={busy} onClick={clear}>
+        Clear
       </button>
       {msg && <p className="notice" style={{ margin: "8px 0 0" }}>{msg}</p>}
     </div>
