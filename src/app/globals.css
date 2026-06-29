@@ -139,8 +139,8 @@ input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:#a9a496;posi
 
 /* ---------- week strip (Plan) ---------- */
 .week{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
-.week--repeat{overflow-x:visible}
-.week--repeat .day{flex:1 1 0;min-width:0;padding:8px 0}
+.week.week--repeat{overflow-x:visible}
+.week.week--repeat .day{flex:1 1 0;min-width:0;padding:8px 0}
 /* Date-jump card: real <input> sits invisibly on top so a tap opens the OS picker. */
 .week .day--jump{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--enamel);cursor:pointer}
 .week .day--jump .dow{color:var(--enamel)}
