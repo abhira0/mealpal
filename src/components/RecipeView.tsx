@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { QuantityChip } from "@/components/QuantityChip";
 import { Stepper } from "@/components/Stepper";
 import { RecipeSheet } from "@/components/RecipeSheet";
+import { EditDeleteActions } from "@/components/EditDeleteActions";
 
 type Media = { kind: string; url: string };
 type RecipeIngredient = { ingredientId: number; amount: number };
@@ -55,20 +55,6 @@ export function RecipeView({ id }: { id: string }) {
   const [notFound, setNotFound] = useState(false);
   const [servings, setServings] = useState(1);
   const [editOpen, setEditOpen] = useState(false);
-  const [delError, setDelError] = useState<string | null>(null);
-  const router = useRouter();
-
-  async function remove() {
-    if (!confirm("Delete this recipe?")) return;
-    setDelError(null);
-    const res = await fetch(`/api/recipes/${id}`, { method: "DELETE" });
-    if (res.ok) {
-      router.push("/recipes");
-      return;
-    }
-    const j = await res.json().catch(() => ({}));
-    setDelError(j.error ?? "Couldn't delete this recipe.");
-  }
 
   async function loadRecipe() {
     const rRes = await fetch(`/api/recipes/${id}`);
@@ -171,13 +157,12 @@ export function RecipeView({ id }: { id: string }) {
 
         {recipe.notes ? <p className="body" style={{ color: "var(--sage)" }}>{recipe.notes}</p> : null}
 
-        <button type="button" className="btn block" onClick={() => setEditOpen(true)}>
-          Edit
-        </button>
-        {delError ? <p className="body" style={{ color: "var(--danger, #c0392b)" }}>{delError}</p> : null}
-        <button type="button" className="btn-link danger" style={{ width: "auto" }} onClick={remove}>
-          Delete recipe
-        </button>
+        <EditDeleteActions
+          singular="recipe"
+          deletePath={`/api/recipes/${id}`}
+          backHref="/recipes"
+          onEdit={() => setEditOpen(true)}
+        />
       </div>
 
       <RecipeSheet
