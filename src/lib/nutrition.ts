@@ -287,6 +287,23 @@ export function dayIngredientTable(db: Db, householdId: number, date: string): I
   return [...rows.values()];
 }
 
+/** dayIngredientTable summed across the Mon–Sun week starting `monday`. */
+export function weekIngredientTable(db: Db, householdId: number, monday: string): IngredientNutritionRow[] {
+  const merged = new Map<number, IngredientNutritionRow>();
+  for (let i = 0; i < 7; i++) {
+    for (const row of dayIngredientTable(db, householdId, isoAddDays(monday, i))) {
+      const m = merged.get(row.ingredientId);
+      if (!m) { merged.set(row.ingredientId, { ...row, values: { ...row.values } }); continue; }
+      m.qty += row.qty;
+      for (const k of NUTRIENT_PATCH_KEYS) {
+        if (row.values[k] == null) continue;
+        m.values[k] = (m.values[k] ?? 0) + row.values[k]!;
+      }
+    }
+  }
+  return [...merged.values()];
+}
+
 // ---------- Analysis tab: goals, scorecards, week aggregation ----------
 
 export interface Goals { calorieGoal: number; proteinG: number; carbsG: number; fatG: number; }

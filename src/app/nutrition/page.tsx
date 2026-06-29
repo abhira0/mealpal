@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { DayNutrition, IngredientNutritionRow, Nutrients, Goals, Scorecard } from "@/lib/nutrition";
-import { NutritionFacts, FACT_ROWS } from "@/components/NutritionFacts";
+import type { IngredientNutritionRow, Nutrients, Goals, Scorecard } from "@/lib/nutrition";
+import { FACT_ROWS } from "@/components/NutritionFacts";
 import { EChart } from "@/components/EChart";
 
 function todayISO(): string {
@@ -13,30 +13,28 @@ function todayISO(): string {
 }
 
 const round = (n: number) => Math.round(n);
-const g = (n: number) => `${Math.round(n)}g`;
-
-// Compact macro line for a single meal.
-function macroLine(n: Nutrients): string {
-  return `${round(n.calories)} kcal · P ${g(n.proteinG)} · C ${g(n.carbsG)} · F ${g(n.fatG)}`;
-}
 
 export default function NutritionPage() {
-  const [tab, setTab] = useState<"day" | "ingredients" | "analysis">("day");
+  const [tab, setTab] = useState<"overview" | "meals" | "nutrients">("overview");
+  const [mode, setMode] = useState<"day" | "week">("day");
   const [date, setDate] = useState(todayISO);
-  const [data, setData] = useState<DayNutrition | null>(null);
+  const [data, setData] = useState<AnalysisData | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [openCard, setOpenCard] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const reqKey = `${mode}:${date}:${reloadKey}`;
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/nutrition?date=${date}`, { cache: "no-store" })
+    fetch(`/api/nutrition/analysis?mode=${mode}&date=${date}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (!cancelled) setData(d); })
+      .then((d) => { if (!cancelled) setData(d ? { ...d, _key: reqKey } : null); })
       .catch(() => { if (!cancelled) setData(null); });
     return () => { cancelled = true; };
-  }, [date]);
+  }, [mode, date, reqKey]);
 
-  // loading = we don't yet have data for the requested date (no setState-in-effect)
-  const loading = data?.date !== date;
-  const total = loading ? null : data?.total;
+  const loading = data?._key !== reqKey;
+  const noMeals = !loading && data && mode === "week" && data.daysWithMeals === 0;
 
   return (
     <>
@@ -47,65 +45,43 @@ export default function NutritionPage() {
 
       <div className="content stack">
         <div className="tabs">
-          <button type="button" aria-pressed={tab === "day"} onClick={() => setTab("day")}>Day</button>
-          <button type="button" aria-pressed={tab === "ingredients"} onClick={() => setTab("ingredients")}>Ingredients</button>
-          <button type="button" aria-pressed={tab === "analysis"} onClick={() => setTab("analysis")}>Analysis</button>
+          <button type="button" aria-pressed={tab === "overview"} onClick={() => setTab("overview")}>Overview</button>
+          <button type="button" aria-pressed={tab === "meals"} onClick={() => setTab("meals")}>Meals</button>
+          <button type="button" aria-pressed={tab === "nutrients"} onClick={() => setTab("nutrients")}>Nutrients</button>
         </div>
 
-        {tab !== "analysis" && (
+        <div className="filter">
+          <button type="button" aria-pressed={mode === "day"} onClick={() => setMode("day")}>Day</button>
+          <button type="button" aria-pressed={mode === "week"} onClick={() => setMode("week")}>Week</button>
+        </div>
+
+        {mode === "day" ? (
           <label className="field" htmlFor="nutrition-date">
             <span className="field-label">Date</span>
-            <input
-              id="nutrition-date"
-              className="input"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value || todayISO())}
-            />
+            <input id="nutrition-date" className="input" type="date" value={date}
+              onChange={(e) => setDate(e.target.value || todayISO())} />
           </label>
-        )}
-
-        {tab === "analysis" ? (
-          <AnalysisTab date={date} setDate={setDate} />
-        ) : tab === "ingredients" ? (
-          <IngredientsTable date={date} />
         ) : (
-        <>
-        {total && (
-          <section className="stack">
-            <p className="section-label">Day total</p>
-            <NutritionFacts values={total} servingLabel="Whole day" />
-            {data!.missing.length > 0 && (
-              <p className="notice" style={{ margin: 0 }}>
-                Missing nutrition for: {data!.missing.join(", ")}. Totals undercount until their products are filled in.
-              </p>
-            )}
-          </section>
+          <div className="filter" style={{ justifyContent: "space-between" }}>
+            <button type="button" onClick={() => setDate(isoAddDays(date, -7))}>‹ Prev</button>
+            <span className="mono" style={{ fontSize: 12 }}>
+              {data?.monday ? `${shortDate(data.monday)} – ${shortDate(isoAddDays(data.monday, 6))}` : "…"}
+            </span>
+            <button type="button" onClick={() => setDate(isoAddDays(date, 7))}>Next ›</button>
+          </div>
         )}
 
-        <p className="section-label">Meals</p>
-        {loading ? (
+        {loading || !data ? (
           <p style={{ opacity: 0.6 }}>Loading…</p>
-        ) : !data || data.meals.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No meals planned for this day.</p>
+        ) : noMeals ? (
+          <p style={{ opacity: 0.6 }}>No meals planned this week.</p>
+        ) : tab === "overview" ? (
+          <OverviewBody data={data} mode={mode} openCard={openCard} setOpenCard={setOpenCard}
+            editing={editing} setEditing={setEditing} reload={() => setReloadKey((k) => k + 1)} />
+        ) : tab === "meals" ? (
+          <MealsBody data={data} mode={mode} date={date} />
         ) : (
-          data.meals.map((m) => (
-            <div className="card" key={m.eventId}>
-              <div className="card-row">
-                <span className="title row-main">
-                  {m.estimate ? "≈ " : ""}{m.recipeName}
-                </span>
-                <span className="slot">{m.slotName}</span>
-              </div>
-              <p className="mono" style={{ margin: "8px 0 0" }}>{macroLine(m.nutrients)}</p>
-              <p style={{ margin: "4px 0 0", fontSize: 12, opacity: 0.6 }}>
-                {m.servings} srv{m.estimate ? " · estimated from plan" : " · cooked"}
-                {m.missing.length > 0 ? ` · missing: ${m.missing.join(", ")}` : ""}
-              </p>
-            </div>
-          ))
-        )}
-        </>
+          <NutrientsBody data={data} mode={mode} />
         )}
       </div>
     </>
@@ -115,25 +91,26 @@ export default function NutritionPage() {
 // Columns: Calories + the standard label rows (reused so labels/units match).
 const COLS = [{ key: "calories" as const, label: "Cal", unit: "" }, ...FACT_ROWS];
 
-function IngredientsTable({ date }: { date: string }) {
-  const [loaded, setLoaded] = useState<{ date: string; rows: IngredientNutritionRow[] } | null>(null);
+function IngredientsTable({ date, mode }: { date: string; mode: "day" | "week" }) {
+  const key = `${mode}:${date}`;
+  const [loaded, setLoaded] = useState<{ key: string; rows: IngredientNutritionRow[] } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/nutrition/ingredients?date=${date}`, { cache: "no-store" })
+    fetch(`/api/nutrition/ingredients?mode=${mode}&date=${date}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : []))
-      .then((d) => { if (!cancelled) setLoaded({ date, rows: d }); })
-      .catch(() => { if (!cancelled) setLoaded({ date, rows: [] }); });
+      .then((d) => { if (!cancelled) setLoaded({ key, rows: d }); })
+      .catch(() => { if (!cancelled) setLoaded({ key, rows: [] }); });
     return () => { cancelled = true; };
-  }, [date]);
+  }, [key, mode, date]);
 
-  if (loaded?.date !== date) return <p style={{ opacity: 0.6 }}>Loading…</p>;
+  if (loaded?.key !== key) return <p style={{ opacity: 0.6 }}>Loading…</p>;
   const rows = loaded.rows;
-  if (rows.length === 0) return <p style={{ opacity: 0.6 }}>No ingredients used on this day.</p>;
+  if (rows.length === 0) return <p style={{ opacity: 0.6 }}>No ingredients used this {mode === "week" ? "week" : "day"}.</p>;
 
   return (
     <>
-      <p className="section-label">Actual quantity used per ingredient on this day.</p>
+      <p className="section-label">Actual quantity used per ingredient this {mode === "week" ? "week" : "day"}.</p>
       <div style={{ overflowX: "auto" }}>
         <table className="mono" style={{ borderCollapse: "collapse", fontSize: 12, whiteSpace: "nowrap" }}>
           <thead>
@@ -209,65 +186,21 @@ function isoAddDays(iso: string, n: number): string {
 const shortDate = (iso: string) =>
   new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
-function AnalysisTab({ date, setDate }: { date: string; setDate: (d: string) => void }) {
-  const [mode, setMode] = useState<"day" | "week">("day");
-  const [data, setData] = useState<AnalysisData | null>(null);
-  const [openCard, setOpenCard] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
-  const [reloadKey, setReloadKey] = useState(0);
-  const reqKey = `${mode}:${date}:${reloadKey}`;
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch(`/api/nutrition/analysis?mode=${mode}&date=${date}`, { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (!cancelled) setData(d ? { ...d, _key: reqKey } : null); })
-      .catch(() => { if (!cancelled) setData(null); });
-    return () => { cancelled = true; };
-  }, [mode, date, reqKey]);
-
-  const loading = data?._key !== reqKey;
-
+function MissingNotice({ missing }: { missing: string[] }) {
+  if (missing.length === 0) return null;
   return (
-    <div className="stack">
-      <div className="filter">
-        <button type="button" aria-pressed={mode === "day"} onClick={() => setMode("day")}>Day</button>
-        <button type="button" aria-pressed={mode === "week"} onClick={() => setMode("week")}>Week</button>
-      </div>
-
-      {mode === "day" ? (
-        <label className="field" htmlFor="analysis-date">
-          <span className="field-label">Date</span>
-          <input id="analysis-date" className="input" type="date" value={date}
-            onChange={(e) => setDate(e.target.value || todayISO())} />
-        </label>
-      ) : (
-        <div className="filter" style={{ justifyContent: "space-between" }}>
-          <button type="button" onClick={() => setDate(isoAddDays(date, -7))}>‹ Prev</button>
-          <span className="mono" style={{ fontSize: 12 }}>
-            {data?.monday ? `${shortDate(data.monday)} – ${shortDate(isoAddDays(data.monday, 6))}` : "…"}
-          </span>
-          <button type="button" onClick={() => setDate(isoAddDays(date, 7))}>Next ›</button>
-        </div>
-      )}
-
-      {loading || !data ? (
-        <p style={{ opacity: 0.6 }}>Loading…</p>
-      ) : mode === "week" && data.daysWithMeals === 0 ? (
-        <p style={{ opacity: 0.6 }}>No meals planned this week.</p>
-      ) : (
-        <AnalysisBody data={data} mode={mode} openCard={openCard} setOpenCard={setOpenCard} />
-      )}
-
-      <GoalsEditor goals={data?.goals} editing={editing} setEditing={setEditing}
-        reload={() => setReloadKey((k) => k + 1)} />
-    </div>
+    <p className="notice" style={{ margin: 0 }}>
+      Missing nutrition for: {missing.join(", ")}. Totals undercount until their products are filled in.
+    </p>
   );
 }
 
-function AnalysisBody({ data, mode, openCard, setOpenCard }: {
+// Overview lens: the dashboard — calorie ring, macro split, macros vs goal,
+// scorecards, and the goals editor.
+function OverviewBody({ data, mode, openCard, setOpenCard, editing, setEditing, reload }: {
   data: AnalysisData; mode: "day" | "week";
   openCard: string | null; setOpenCard: (k: string | null) => void;
+  editing: boolean; setEditing: (b: boolean) => void; reload: () => void;
 }) {
   const n = data.nutrients;
   const goals = data.goals;
@@ -306,13 +239,6 @@ function AnalysisBody({ data, mode, openCard, setOpenCard }: {
       <MacroBar label="Carbs" value={n.carbsG} goal={goals.carbsG} color={MACRO_COLOR.carbs} />
       <MacroBar label="Fat" value={n.fatG} goal={goals.fatG} color={MACRO_COLOR.fat} />
 
-      {mode === "day" && data.meals && data.meals.length > 0 && <CaloriesByMeal meals={data.meals} />}
-
-      {mode === "week" && data.perDay && <WeekTrend perDay={data.perDay} />}
-
-      <p className="section-label">Nutrients{mode === "week" ? " (daily avg)" : ""} vs goal</p>
-      <NutrientTable n={n} goals={goals} />
-
       <p className="section-label">Diet scorecards</p>
       <div className="filter" style={{ gap: 6 }}>
         {data.scorecards.map((c) => (
@@ -334,11 +260,58 @@ function AnalysisBody({ data, mode, openCard, setOpenCard }: {
         </p>
       )}
 
-      {data.missing.length > 0 && (
-        <p className="notice" style={{ margin: 0 }}>
-          Missing nutrition for: {data.missing.join(", ")}. Totals undercount until their products are filled in.
-        </p>
+      <MissingNotice missing={data.missing} />
+
+      <GoalsEditor goals={data.goals} editing={editing} setEditing={setEditing} reload={reload} />
+    </>
+  );
+}
+
+// Meals lens: what you ate — calories per meal (day) or per day (week), plus
+// the actual ingredient quantities used.
+function MealsBody({ data, mode, date }: { data: AnalysisData; mode: "day" | "week"; date: string }) {
+  return (
+    <>
+      {mode === "day" ? (
+        data.meals && data.meals.length > 0
+          ? <CaloriesByMeal meals={data.meals} />
+          : <p style={{ opacity: 0.6 }}>No meals planned for this day.</p>
+      ) : (
+        data.perDay && <CaloriesPerDay perDay={data.perDay} />
       )}
+      <IngredientsTable date={date} mode={mode} />
+    </>
+  );
+}
+
+// Nutrients lens: the full nutrient table, plus the week macro-trend chart.
+function NutrientsBody({ data, mode }: { data: AnalysisData; mode: "day" | "week" }) {
+  return (
+    <>
+      {mode === "week" && data.perDay && <WeekTrend perDay={data.perDay} />}
+      <p className="section-label">Nutrients{mode === "week" ? " (daily avg)" : ""} vs goal</p>
+      <NutrientTable n={data.nutrients} goals={data.goals} />
+      <MissingNotice missing={data.missing} />
+    </>
+  );
+}
+
+function CaloriesPerDay({ perDay }: { perDay: NonNullable<AnalysisData["perDay"]> }) {
+  const max = Math.max(...perDay.map((d) => d.total.calories), 1);
+  return (
+    <>
+      <p className="section-label">Calories by day</p>
+      {perDay.map((d, i) => (
+        <div key={i} style={{ margin: "6px 0" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+            <b>{shortDate(d.date)}</b>
+            <span className="mono" style={{ fontSize: 11, color: "var(--sage)" }}>{round(d.total.calories)} kcal</span>
+          </div>
+          <div style={{ height: 6, borderRadius: 99, background: "#e3ddcc", overflow: "hidden", marginTop: 2 }}>
+            <div style={{ height: "100%", width: `${(d.total.calories / max) * 100}%`, background: MACRO_COLOR.protein }} />
+          </div>
+        </div>
+      ))}
     </>
   );
 }
