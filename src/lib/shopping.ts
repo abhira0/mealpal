@@ -81,6 +81,19 @@ export function updatePurchase(
   });
 }
 
+/** Undo a purchase: drop its restock movement and the purchase row. Household-scoped. */
+export function deletePurchase(db: Db, householdId: number, id: number) {
+  return db.transaction((tx) => {
+    const [purchase] = tx.select().from(schema.purchases)
+      .where(and(eq(schema.purchases.id, id), eq(schema.purchases.householdId, householdId))).all();
+    if (!purchase) return false;
+    tx.delete(schema.stockMovements).where(eq(schema.stockMovements.purchaseId, id)).run();
+    tx.delete(schema.purchases)
+      .where(and(eq(schema.purchases.id, id), eq(schema.purchases.householdId, householdId))).run();
+    return true;
+  });
+}
+
 /**
  * Per-ingredient shelf life in days, learned from purchase history:
  * median(expiresAt − purchasedAt) over that ingredient's dated purchases.

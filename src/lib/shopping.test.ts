@@ -4,7 +4,7 @@ import { makeTestDb, type TestDb } from "@/test/db";
 import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
 import { createProduct } from "@/lib/products";
-import { recordPurchase, listPendingPurchases, updatePurchase, learnedShelfLife } from "@/lib/shopping";
+import { recordPurchase, listPendingPurchases, updatePurchase, deletePurchase, learnedShelfLife } from "@/lib/shopping";
 import { currentStock } from "@/lib/stock";
 
 let db: TestDb;
@@ -38,6 +38,16 @@ describe("recordPurchase", () => {
   it("buying 2 adds 2x the pack size", () => {
     recordPurchase(db, hid, { productId, quantity: 2, cents: 1299 });
     expect(currentStock(db, hid, flourId)).toBe(22680);
+  });
+});
+
+describe("deletePurchase", () => {
+  it("removes the purchase and reverses its restock", () => {
+    const pid = recordPurchase(db, hid, { productId, quantity: 1 }).id;
+    expect(currentStock(db, hid, flourId)).toBe(11340);
+    expect(deletePurchase(db, hid, pid)).toBe(true);
+    expect(currentStock(db, hid, flourId)).toBe(0);
+    expect(listPendingPurchases(db, hid)).toHaveLength(0);
   });
 });
 

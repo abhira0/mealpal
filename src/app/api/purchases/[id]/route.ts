@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { updatePurchase } from "@/lib/shopping";
+import { updatePurchase, deletePurchase } from "@/lib/shopping";
 import { dollarsToCents } from "@/lib/money";
 
 // Fill in / correct a purchase: price, expiry, quantity. Household-scoped.
@@ -35,4 +35,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const row = updatePurchase(db, session.user.householdId, Number(id), patch);
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(row);
+}
+
+// Undo a purchase recorded by mistake (also reverses the restock). Household-scoped.
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await params;
+  const ok = deletePurchase(db, session.user.householdId, Number(id));
+  if (!ok) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return new NextResponse(null, { status: 204 });
 }

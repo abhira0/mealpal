@@ -104,6 +104,15 @@ function BillRow({ row, onSaved }: { row: Pending; onSaved: () => void }) {
     else setError("Couldn't save.");
   }
 
+  async function remove() {
+    setBusy(true);
+    setError(null);
+    const res = await fetch(`/api/purchases/${row.id}`, { method: "DELETE" });
+    setBusy(false);
+    if (res.ok) onSaved();
+    else setError("Couldn't remove.");
+  }
+
   return (
     <div className="ticket-row">
       <div className="tk-main">
@@ -145,6 +154,15 @@ function BillRow({ row, onSaved }: { row: Pending; onSaved: () => void }) {
           </label>
           <button type="button" className="btn" onClick={save} disabled={busy}>
             {busy ? "…" : "Save"}
+          </button>
+          <button
+            type="button"
+            onClick={remove}
+            disabled={busy}
+            aria-label={`Remove ${row.productName} — bought by mistake`}
+            style={{ color: "var(--paprika)" }}
+          >
+            Remove
           </button>
         </div>
         {error && <div className="eb" style={{ color: "var(--paprika)", marginTop: 6 }}>{error}</div>}
