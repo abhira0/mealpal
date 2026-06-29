@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { RecipeSheet } from "@/components/RecipeSheet";
 
 type Recipe = {
@@ -81,7 +82,7 @@ export default function RecipesPage() {
                   </span>
                 </span>
               </span>
-              <span className="arrow" aria-hidden="true">›</span>
+              <ChevronRight className="arrow" size={16} aria-hidden="true" />
             </Link>
           ))
         )}      </div>

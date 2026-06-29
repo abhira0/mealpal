@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import {
   DndContext,
@@ -19,6 +20,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { ChevronRight, GripVertical, Pencil, Trash2 } from "lucide-react";
 import { Favicon } from "@/components/Favicon";
 import { Sheet } from "@/components/Sheet";
 import { EntityForm } from "@/components/EntityForm";
@@ -81,7 +83,7 @@ function Row({ p, unit, draggable }: { p: Product; unit: string; draggable: bool
           {...attributes}
           {...listeners}
         >
-          ⠿
+          <GripVertical size={18} />
         </button>
       )}
       <Favicon name={p.name} iconUrl={p.imageUrl} size={48} />
@@ -102,6 +104,7 @@ function Row({ p, unit, draggable }: { p: Product; unit: string; draggable: bool
 }
 
 export function IngredientDetail({ id }: { id: string }) {
+  const router = useRouter();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [view, setView] = useState<"priority" | "price">("priority");
@@ -148,6 +151,17 @@ export function IngredientDetail({ id }: { id: string }) {
     }
   }
 
+  async function onDelete() {
+    setError(null);
+    const res = await fetch(`/api/ingredients/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      router.push("/manage/ingredients");
+      return;
+    }
+    const j = await res.json().catch(() => ({}));
+    setError(j.error ?? "Couldn't delete this ingredient.");
+  }
+
   if (!detail) {
     return (
       <div className="content">
@@ -178,8 +192,11 @@ export function IngredientDetail({ id }: { id: string }) {
               <span className="meta" style={{ display: "block" }}>Unit: {unit}</span>
             </span>
             <span className="chip">{detail.stock}{unit} in stock</span>
-            <button type="button" className="btn-link" style={{ width: "auto" }} onClick={() => setEditing(true)}>
-              Edit
+            <button type="button" className="icon-btn" aria-label="Edit ingredient" onClick={() => setEditing(true)}>
+              <Pencil size={18} />
+            </button>
+            <button type="button" className="icon-btn danger" aria-label="Delete ingredient" onClick={onDelete}>
+              <Trash2 size={18} />
             </button>
           </div>
         </section>
@@ -219,7 +236,7 @@ export function IngredientDetail({ id }: { id: string }) {
             {detail.recipes.map((r) => (
               <Link key={r.id} href={`/recipes/${r.id}`} className="ing-row" style={{ textDecoration: "none" }}>
                 <span className="nm" style={{ flex: 1 }}>{r.name}</span>
-                <span className="arrow" aria-hidden="true">›</span>
+                <ChevronRight className="arrow" size={16} aria-hidden="true" />
               </Link>
             ))}
           </section>

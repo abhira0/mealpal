@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { Pencil, Trash2 } from "lucide-react";
 import { Favicon } from "@/components/Favicon";
 import { Sheet } from "@/components/Sheet";
 import { EntityForm } from "@/components/EntityForm";
@@ -21,6 +23,7 @@ type Product = {
 const money = (c: number | null) => (c == null ? "—" : `$${(c / 100).toFixed(2)}`);
 
 export function ShopDetail({ id }: { id: string }) {
+  const router = useRouter();
   const [shop, setShop] = useState<Shop | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [ingredients, setIngredients] = useState<Record<number, string>>({});
@@ -54,6 +57,17 @@ export function ShopDetail({ id }: { id: string }) {
     load();
   }, [load]);
 
+  async function onDelete() {
+    setError(null);
+    const res = await fetch(`/api/shops/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      router.push("/manage/shops");
+      return;
+    }
+    const j = await res.json().catch(() => ({}));
+    setError(j.error ?? "Couldn't delete this shop.");
+  }
+
   if (!shop) {
     return (
       <div className="content">
@@ -81,8 +95,11 @@ export function ShopDetail({ id }: { id: string }) {
               )}
               <span className="chip">{products.length} {products.length === 1 ? "product" : "products"}</span>
             </span>
-            <button type="button" className="btn-link" style={{ width: "auto" }} onClick={() => setEditing(true)}>
-              Edit
+            <button type="button" className="icon-btn" aria-label="Edit shop" onClick={() => setEditing(true)}>
+              <Pencil size={18} />
+            </button>
+            <button type="button" className="icon-btn danger" aria-label="Delete shop" onClick={onDelete}>
+              <Trash2 size={18} />
             </button>
           </div>
         </section>

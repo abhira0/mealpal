@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { ExternalLink, Pencil, Trash2 } from "lucide-react";
 import { Favicon } from "@/components/Favicon";
 import { Sheet } from "@/components/Sheet";
 import { EntityForm } from "@/components/EntityForm";
@@ -123,14 +124,20 @@ export function ProductDetail({ id }: { id: string }) {
           </Field>
           {product.url && (
             <Field label="URL">
-              <a href={product.url} target="_blank" rel="noreferrer">Open ↗</a>
+              <a href={product.url} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                Open <ExternalLink size={14} />
+              </a>
             </Field>
           )}
         </section>
 
         <div style={{ display: "flex", gap: 8 }}>
-          <button type="button" className="btn block" onClick={() => setEditing(true)}>Edit</button>
-          <button type="button" className="btn-link danger" style={{ width: "auto" }} onClick={onDelete}>Delete</button>
+          <button type="button" className="btn block" onClick={() => setEditing(true)}>
+            <Pencil size={16} style={{ marginRight: 6, verticalAlign: "-2px" }} />Edit
+          </button>
+          <button type="button" className="icon-btn danger" aria-label="Delete product" onClick={onDelete}>
+            <Trash2 size={20} />
+          </button>
         </div>
 
         <section className="card stack-sm">
