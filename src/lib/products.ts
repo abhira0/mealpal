@@ -62,6 +62,8 @@ export function listAllProducts(db: Db, householdId: number) {
       available: schema.products.available,
       url: schema.products.url,
       imageUrl: schema.products.imageUrl,
+      nutritionPhoto: schema.products.nutritionPhoto,
+      calories: schema.products.calories,
     })
     .from(schema.products)
     .where(eq(schema.products.householdId, householdId))
@@ -150,7 +152,26 @@ export interface ProductPatch {
   priceCents?: number | null;
   available?: boolean;
   url?: string | null;
+  // public-folder path to the label photo (set by the nutrition upload route)
+  nutritionPhoto?: string | null;
+  // nutrition per canonical unit; filled from the label photo. null = unknown.
+  calories?: number | null;
+  fatG?: number | null;
+  satFatG?: number | null;
+  transFatG?: number | null;
+  cholesterolMg?: number | null;
+  sodiumMg?: number | null;
+  carbsG?: number | null;
+  fiberG?: number | null;
+  sugarG?: number | null;
+  proteinG?: number | null;
 }
+
+// Nutrient patch keys accepted on PATCH /api/products/[id] (per canonical unit).
+export const NUTRIENT_PATCH_KEYS = [
+  "calories", "fatG", "satFatG", "transFatG", "cholesterolMg",
+  "sodiumMg", "carbsG", "fiberG", "sugarG", "proteinG",
+] as const;
 
 export function updateProduct(
   db: Db,
