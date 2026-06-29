@@ -37,15 +37,6 @@ function roundScaled(n: number): string {
   return String(r);
 }
 
-function todayISO(): string {
-  const d = new Date();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${mm}-${dd}`;
-}
-
-type CookState = "idle" | "working" | "done" | "error";
-
 function Chrome({ children }: { children: React.ReactNode }) {
   return (
     <header className="chrome">
@@ -62,7 +53,6 @@ export function RecipeView({ id }: { id: string }) {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [notFound, setNotFound] = useState(false);
   const [servings, setServings] = useState(1);
-  const [cook, setCook] = useState<CookState>("idle");
   const [editOpen, setEditOpen] = useState(false);
 
   async function loadRecipe() {
@@ -85,38 +75,6 @@ export function RecipeView({ id }: { id: string }) {
   }, [id]);
 
   const lookup = new Map(ingredients.map((i) => [i.id, i]));
-
-  async function cookIt() {
-    if (!recipe) return;
-    setCook("working");
-    try {
-      const slotsRes = await fetch("/api/slots");
-      const slots: { id: number }[] = slotsRes.ok ? await slotsRes.json() : [];
-      if (slots.length === 0) {
-        setCook("error");
-        return;
-      }
-      const evRes = await fetch("/api/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: todayISO(),
-          slotId: slots[0].id,
-          recipeId: recipe.id,
-          servings,
-        }),
-      });
-      if (!evRes.ok) {
-        setCook("error");
-        return;
-      }
-      const event: { id: number } = await evRes.json();
-      const cookRes = await fetch(`/api/events/${event.id}/cook`, { method: "POST" });
-      setCook(cookRes.ok ? "done" : "error");
-    } catch {
-      setCook("error");
-    }
-  }
 
   if (notFound) {
     return (
@@ -143,9 +101,6 @@ export function RecipeView({ id }: { id: string }) {
     <>
       <Chrome>
         <h1>{recipe.name}</h1>
-        <button type="button" className="chrome-back" onClick={() => setEditOpen(true)}>
-          Edit
-        </button>
       </Chrome>
 
       <div className="content stack">
@@ -201,23 +156,9 @@ export function RecipeView({ id }: { id: string }) {
 
         {recipe.notes ? <p className="body" style={{ color: "var(--sage)" }}>{recipe.notes}</p> : null}
 
-        <button
-          type="button"
-          className="btn block"
-          disabled={cook === "working" || cook === "done"}
-          onClick={cookIt}
-        >
-          {cook === "working"
-            ? "Logging…"
-            : cook === "done"
-              ? "✓ Cooked · logged to today"
-              : "Cook it · logs to today"}
+        <button type="button" className="btn block" onClick={() => setEditOpen(true)}>
+          Edit
         </button>
-        {cook === "error" ? (
-          <p className="notice">
-            Couldn&apos;t log this — make sure you have a meal slot set up.
-          </p>
-        ) : null}
       </div>
 
       <RecipeSheet
