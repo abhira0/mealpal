@@ -14,10 +14,15 @@ export type ShopLine = {
   product: { id: number; name: string } | null;
   /** Run-out urgency, best-effort. e.g. "out now", "~ Mon". */
   urgency?: { label: string; tone: "run" | "low" } | null;
+  /** Set when this is a manually-added line; checking it off deletes it (and buys, if it has a product). */
+  extraId?: number;
 };
 
 /** productId -> latest/override price in cents (for prefill + meta + total). */
 export type PriceMap = Record<number, number | null>;
+
+// Stable key: extras all share ingredientId 0, so key on the extra instead.
+const lineKey = (l: ShopLine) => (l.extraId != null ? `x${l.extraId}` : `i${l.ingredientId}`);
 
 export function ShopTicket({
   shopName,
@@ -37,28 +42,28 @@ export function ShopTicket({
   /** +1 when a purchase is recorded, -1 when undone — keeps the Bill count live. */
   onCountChange?: (delta: number) => void;
 }) {
-  // ingredientId -> recorded purchase id (null for lines with no product on file).
-  const [struck, setStruck] = useState<Map<number, number | null>>(new Map());
+  // lineKey -> recorded purchase id (null for lines with no product on file).
+  const [struck, setStruck] = useState<Map<string, number | null>>(new Map());
 
   // bought lines drop to the bottom, but stay visible
   const ordered = [...lines].sort(
-    (a, b) => Number(struck.has(a.ingredientId)) - Number(struck.has(b.ingredientId)),
+    (a, b) => Number(struck.has(lineKey(a))) - Number(struck.has(lineKey(b))),
   );
 
   return (
     <Ticket shopName={shopName} website={website} iconUrl={iconUrl} total={total}>
       {ordered.map((line) => (
         <ShopLineRow
-          key={line.ingredientId}
+          key={lineKey(line)}
           line={line}
           priceCents={line.product ? prices[line.product.id] ?? null : null}
-          struck={struck.has(line.ingredientId)}
-          purchaseId={struck.get(line.ingredientId) ?? null}
+          struck={struck.has(lineKey(line))}
+          purchaseId={struck.get(lineKey(line)) ?? null}
           onChange={(next, purchaseId) => {
             setStruck((prev) => {
               const m = new Map(prev);
-              if (next) m.set(line.ingredientId, purchaseId);
-              else m.delete(line.ingredientId);
+              if (next) m.set(lineKey(line), purchaseId);
+              else m.delete(lineKey(line));
               return m;
             });
             if (line.product) onCountChange?.(next ? 1 : -1);
@@ -121,6 +126,24 @@ function ShopLineRow({
   // file → strike only, no purchase to record/undo.
   async function onCheck() {
     if (busy) return;
+    // Manual line: check it off → remove from the list (and buy/restock if it has a product).
+    if (line.extraId != null) {
+      if (struck) return; // one-way; it's gone server-side
+      setBusy(true);
+      setError(null);
+      if (line.product) {
+        const buy = await fetch("/api/purchases", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ productId: line.product.id, quantity: line.needed || 1 }),
+        });
+        if (!buy.ok) { setBusy(false); setError("Couldn't record."); return; }
+      }
+      await fetch(`/api/shopping/extras/${line.extraId}`, { method: "DELETE" });
+      setBusy(false);
+      onChange(true, null);
+      return;
+    }
     if (!line.product) {
       onChange(!struck, null);
       return;
@@ -158,11 +181,17 @@ function ShopLineRow({
       <div className="tk-main">
         <div className="tk-name">{line.ingredientName}</div>
         <div className="tk-meta">
-          {line.product ? line.product.name : "No product on file"}
+          {line.extraId != null
+            ? line.product ? line.product.name : "Added manually"
+            : line.product ? line.product.name : "No product on file"}
           {priceCents != null && <> · ~${centsToDollars(priceCents).toFixed(2)}</>}
         </div>
         <div className="tk-chips">
-          <QuantityChip value={`need ${formatNeeded(line)}`} tone="default" />
+          {line.extraId != null ? (
+            line.needed > 1 && <QuantityChip value={`×${line.needed}`} tone="default" />
+          ) : (
+            <QuantityChip value={`need ${formatNeeded(line)}`} tone="default" />
+          )}
           {line.urgency && (
             <QuantityChip value={line.urgency.label} tone={line.urgency.tone} />
           )}

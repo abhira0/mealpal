@@ -4,7 +4,7 @@ import { makeTestDb, type TestDb } from "@/test/db";
 import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
 import { createProduct } from "@/lib/products";
-import { recordPurchase, listPendingPurchases, updatePurchase, deletePurchase, learnedShelfLife } from "@/lib/shopping";
+import { recordPurchase, listPendingPurchases, updatePurchase, deletePurchase, learnedShelfLife, addExtra, listExtras, deleteExtra } from "@/lib/shopping";
 import { currentStock } from "@/lib/stock";
 
 let db: TestDb;
@@ -92,5 +92,28 @@ describe("pending purchases (bill flow)", () => {
     const row = db.select().from(schema.purchases).where(eq(schema.purchases.id, pid)).all()[0];
     expect(row.cents).toBe(1499);
     expect(row.expiresAt).toBe("2026-07-01");
+  });
+});
+
+describe("manual extras", () => {
+  it("a product extra reports the product's shop; a free-text extra uses its chosen shop", () => {
+    const trader = db.insert(schema.shops).values({ householdId: hid, name: "Trader Joe's" }).returning().all()[0].id;
+    addExtra(db, hid, { productId }); // tracked → Costco (the product's shop)
+    addExtra(db, hid, { title: "Birthday cake", shopId: trader }); // one-off → chosen stop
+    addExtra(db, hid, { title: "Random snack" }); // one-off, no stop
+
+    const extras = listExtras(db, hid);
+    expect(extras).toHaveLength(3);
+    const byProduct = extras.find((e) => e.productId);
+    expect(byProduct?.shopName).toBe("Costco");
+    expect(extras.find((e) => e.title === "Birthday cake")?.shopName).toBe("Trader Joe's");
+    expect(extras.find((e) => e.title === "Random snack")?.shopName).toBeNull();
+  });
+
+  it("deletes only the named household's extra", () => {
+    const e = addExtra(db, hid, { title: "Paper towels" });
+    expect(deleteExtra(db, hid, e.id)).toBe(true);
+    expect(listExtras(db, hid)).toHaveLength(0);
+    expect(deleteExtra(db, hid, e.id)).toBe(false); // already gone
   });
 });
