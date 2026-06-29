@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { deleteRecipe, getRecipe, updateRecipe } from "@/lib/recipes";
+import { recipeNutrition } from "@/lib/nutrition";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -9,7 +10,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const recipe = getRecipe(db, session.user.householdId, Number(id));
   if (!recipe) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json(recipe);
+  const nutrition = recipeNutrition(db, session.user.householdId, recipe);
+  return NextResponse.json({ ...recipe, nutrition });
 }
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
