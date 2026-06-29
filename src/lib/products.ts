@@ -179,6 +179,7 @@ export interface ProductPatch {
   priceCents?: number | null;
   available?: boolean;
   url?: string | null;
+  imageUrl?: string | null;
   // public-folder path to the label photo (set by the nutrition upload route)
   nutritionPhoto?: string | null;
   // one serving in canonical units; per-serving label = per-unit value × this.
