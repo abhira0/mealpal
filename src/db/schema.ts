@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, blob } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, blob } from "drizzle-orm/sqlite-core";
 
 export const households = sqliteTable("households", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -57,6 +57,20 @@ export const products = sqliteTable("products", {
   available: integer("available", { mode: "boolean" }).notNull().default(true),
   url: text("url"),
   imageUrl: text("image_url"),
+  // public-folder path to the uploaded nutrition-facts label photo, e.g. "/nutrition/3.jpg"
+  nutritionPhoto: text("nutrition_photo"),
+  // nutrition values PER CANONICAL UNIT (e.g. kcal per gram), read off the label
+  // photo. null = not filled in yet. See drizzle/.../nutrition-counter design.
+  calories: real("calories"),
+  fatG: real("fat_g"),
+  satFatG: real("sat_fat_g"),
+  transFatG: real("trans_fat_g"),
+  cholesterolMg: real("cholesterol_mg"),
+  sodiumMg: real("sodium_mg"),
+  carbsG: real("carbs_g"),
+  fiberG: real("fiber_g"),
+  sugarG: real("sugar_g"),
+  proteinG: real("protein_g"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
