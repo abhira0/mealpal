@@ -34,7 +34,7 @@ export function StockAdjust({
     const target = Number(draft);
     if (!Number.isFinite(target) || busy) return;
     const delta = target - current;
-    if (delta === 0) {
+    if (delta === 0 && !expiresAt) {
       setOpen(false);
       return;
     }
