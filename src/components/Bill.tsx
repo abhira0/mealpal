@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Trash2 } from "lucide-react";
 import { Ticket } from "@/components/ShopTicket";
 import { centsToDollars } from "@/lib/money";
 
@@ -160,9 +161,9 @@ function BillRow({ row, onSaved }: { row: Pending; onSaved: () => void }) {
             onClick={remove}
             disabled={busy}
             aria-label={`Remove ${row.productName} — bought by mistake`}
-            style={{ color: "var(--paprika)" }}
+            style={{ color: "var(--paprika)", display: "inline-flex", alignItems: "center" }}
           >
-            Remove
+            <Trash2 size={16} />
           </button>
         </div>
         {error && <div className="eb" style={{ color: "var(--paprika)", marginTop: 6 }}>{error}</div>}
