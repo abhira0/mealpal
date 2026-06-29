@@ -223,4 +223,25 @@ input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:#a9a496;posi
 .notice{font-size:13px;color:var(--run-ink);background:var(--run-bg);border-radius:6px;padding:8px 10px}
 .notice.ok{color:var(--low-ink);background:var(--low-bg)}
 
+/* recipe page */
+.recipe-meta{display:flex;justify-content:space-between;align-items:center;gap:12px;color:var(--sage)}
+.cook-btn{flex:none;width:auto;padding:8px 16px;font-size:13px}
+.gallery-strip{display:flex;gap:8px;flex-wrap:wrap}
+.gallery-thumb{width:60px;height:44px;border-radius:6px;overflow:hidden;border:2px solid var(--line);background:linear-gradient(135deg,var(--enamel),var(--enamel-dark));color:#fff;display:grid;place-items:center;cursor:pointer;padding:0}
+.gallery-thumb img{width:100%;height:100%;object-fit:cover}
+.gallery-thumb.on{border-color:var(--paprika)}
+
+.cook-overlay{position:fixed;inset:0;z-index:50;background:var(--paper);display:flex;flex-direction:column;padding:20px;gap:16px}
+.cook-top{display:flex;justify-content:space-between;align-items:center}
+.cook-title{font-family:var(--display);font-weight:800;font-size:18px}
+.cook-x{background:none;border:none;font-size:22px;color:var(--sage);cursor:pointer;line-height:1}
+.cook-step{flex:1;display:flex;flex-direction:column;justify-content:center;gap:16px;text-align:center}
+.cook-num{font-family:var(--mono);font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--sage)}
+.cook-text{font-family:var(--display);font-weight:700;font-size:clamp(24px,6vw,40px);line-height:1.25;margin:0}
+.cook-dots{display:flex;gap:8px;justify-content:center}
+.cook-dots span{width:8px;height:8px;border-radius:50%;background:var(--line)}
+.cook-dots span.on{background:var(--paprika)}
+.cook-nav{display:flex;gap:12px}
+.cook-nav .btn{flex:1}
+
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
