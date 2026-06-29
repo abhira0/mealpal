@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
 
@@ -130,6 +130,51 @@ export function learnedShelfLife(db: Db, householdId: number): Map<number, numbe
     result.set(ingredientId, median);
   }
   return result;
+}
+
+/** Add a manual line: a tracked product OR a one-off free-text title. */
+export function addExtra(
+  db: Db, householdId: number,
+  input: { productId?: number | null; title?: string | null; shopId?: number | null; quantity?: number },
+) {
+  const [row] = db.insert(schema.shoppingExtras)
+    .values({
+      householdId,
+      productId: input.productId ?? null,
+      title: input.title?.trim() || null,
+      shopId: input.shopId ?? null,
+      quantity: input.quantity && input.quantity > 0 ? input.quantity : 1,
+    })
+    .returning().all();
+  return row;
+}
+
+/** Manual lines for the run, with the shop they belong to (product's shop, else explicit, else null). */
+export function listExtras(db: Db, householdId: number) {
+  return db.select({
+    id: schema.shoppingExtras.id,
+    title: schema.shoppingExtras.title,
+    quantity: schema.shoppingExtras.quantity,
+    productId: schema.products.id,
+    productName: schema.products.name,
+    // product's shop wins; otherwise the explicitly chosen shop
+    shopName: schema.shops.name,
+  })
+    .from(schema.shoppingExtras)
+    .leftJoin(schema.products, eq(schema.products.id, schema.shoppingExtras.productId))
+    .leftJoin(
+      schema.shops,
+      eq(schema.shops.id, sql`coalesce(${schema.products.shopId}, ${schema.shoppingExtras.shopId})`),
+    )
+    .where(eq(schema.shoppingExtras.householdId, householdId))
+    .all();
+}
+
+export function deleteExtra(db: Db, householdId: number, id: number) {
+  const res = db.delete(schema.shoppingExtras)
+    .where(and(eq(schema.shoppingExtras.id, id), eq(schema.shoppingExtras.householdId, householdId)))
+    .run();
+  return res.changes > 0;
 }
 
 export interface ShoppingLine {

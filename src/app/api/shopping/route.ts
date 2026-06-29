@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import { stockByIngredient } from "@/lib/stock";
 import { plannedConsumption, runOutDates } from "@/lib/plan";
-import { buyRecommendation, learnedShelfLife } from "@/lib/shopping";
+import { buyRecommendation, learnedShelfLife, listExtras } from "@/lib/shopping";
 
 function urgency(runOut: string | undefined, from: string) {
   if (!runOut) return null;
@@ -26,5 +26,20 @@ export async function GET(req: Request) {
   const runOut = runOutDates(db, hid, from, to, stock);
   for (const lines of grouped.values())
     for (const line of lines) (line as typeof line & { urgency?: unknown }).urgency = urgency(runOut.get(line.ingredientId), from);
+
+  // Fold in manually-added lines. extraId marks them so the UI deletes (not "buys") them.
+  for (const e of listExtras(db, hid)) {
+    const shopKey = e.shopName ?? "Unassigned";
+    if (!grouped.has(shopKey)) grouped.set(shopKey, []);
+    grouped.get(shopKey)!.push({
+      ingredientId: 0,
+      ingredientName: e.title ?? e.productName ?? "Item",
+      needed: e.quantity,
+      product: e.productId ? { id: e.productId, name: e.productName ?? "" } : null,
+      extraId: e.id,
+      urgency: null,
+    } as never);
+  }
+
   return NextResponse.json(Object.fromEntries(grouped));
 }

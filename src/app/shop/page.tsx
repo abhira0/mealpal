@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ShopTicket, type ShopLine, type PriceMap } from "@/components/ShopTicket";
 import { Bill } from "@/components/Bill";
+import { AddExtra } from "@/components/AddExtra";
 import { centsToDollars } from "@/lib/money";
 
 type RawLine = {
@@ -11,16 +12,18 @@ type RawLine = {
   needed: number;
   product: { id: number; name: string } | null;
   urgency?: { label: string; tone: "run" | "low" } | null;
+  extraId?: number;
 };
 type ShoppingMap = Record<string, RawLine[]>;
 
-type Product = { id: number; effectiveCents: number | null };
+type Product = { id: number; name: string; effectiveCents: number | null };
 type Ingredient = { id: number; canonicalUnit: string };
 type Shop = { id: number; name: string; website: string | null; iconUrl: string | null };
 
 export default function ShopPage() {
   const [data, setData] = useState<ShoppingMap | null>(null);
   const [prices, setPrices] = useState<PriceMap>({});
+  const [products, setProducts] = useState<Product[]>([]);
   const [units, setUnits] = useState<Record<number, string>>({});
   const [shopMeta, setShopMeta] = useState<Record<string, Shop>>({});
   const [pendingCount, setPendingCount] = useState(0);
@@ -28,13 +31,15 @@ export default function ShopPage() {
   const [tab, setTab] = useState<"run" | "bill">("run");
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadShopping = useCallback(() => {
     setData(null);
     fetch(`/api/shopping?horizon=${horizon}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((j) => setData(j as ShoppingMap))
       .catch(() => setError("Couldn't load the shopping list yet."));
   }, [horizon]);
+
+  useEffect(() => { loadShopping(); }, [loadShopping]);
 
   useEffect(() => {
     fetch("/api/purchases")
@@ -44,9 +49,10 @@ export default function ShopPage() {
 
     fetch("/api/products")
       .then((r) => (r.ok ? r.json() : []))
-      .then((products: Product[]) =>
-        setPrices(Object.fromEntries(products.map((p) => [p.id, p.effectiveCents]))),
-      )
+      .then((ps: Product[]) => {
+        setProducts(ps);
+        setPrices(Object.fromEntries(ps.map((p) => [p.id, p.effectiveCents])));
+      })
       .catch(() => {});
 
     fetch("/api/ingredients")
@@ -123,6 +129,12 @@ export default function ShopPage() {
             {data && shops.length === 0 && (
               <p className="empty">Nothing to buy — plan some meals first.</p>
             )}
+
+            <AddExtra
+              products={products}
+              shops={Object.values(shopMeta)}
+              onAdded={loadShopping}
+            />
 
             {shops.map(([shopName, lines]) => {
               const meta = shopMeta[shopName];
