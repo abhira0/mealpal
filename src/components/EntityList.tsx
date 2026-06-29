@@ -142,18 +142,18 @@ export function EntityList({ slug }: { slug: EntitySlug }) {
             </span>
           ));
 
-          // bigImage: name on its own row, then [image 40%][details 60%].
+          // bigImage: [image][title + details] on one row.
           const main =
             config.bigImage && icon ? (
-              <span className="row-main">
-                <span className="title" style={{ display: "block", fontSize: 15, marginBottom: 8 }}>
-                  {cellValue(row, config.columns[0])}
+              <span className="row-main" style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                <span style={{ flex: "0 0 auto" }}>
+                  <Favicon name={icon.name} website={icon.website} iconUrl={icon.iconUrl} size={64} />
                 </span>
-                <span style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                  <span style={{ flex: "0 0 20%" }}>
-                    <Favicon name={icon.name} website={icon.website} iconUrl={icon.iconUrl} size={64} />
+                <span style={{ flex: "1 1 auto", minWidth: 0 }}>
+                  <span className="title" style={{ display: "block", fontSize: 15 }}>
+                    {cellValue(row, config.columns[0])}
                   </span>
-                  <span style={{ flex: "1 1 auto", minWidth: 0 }}>{details}</span>
+                  {details}
                 </span>
               </span>
             ) : (
