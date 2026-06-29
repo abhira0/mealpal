@@ -174,6 +174,7 @@ export function IngredientDetail({ id }: { id: string }) {
       <div className="content stack-sm">
         {error && <p className="notice">{error}</p>}
 
+        <span className="section-label">Details</span>
         <section className="card stack-sm">
           <div className="ing-row" style={{ borderBottom: "none", paddingTop: 0 }}>
             <span style={{ flex: 1 }}>
@@ -190,7 +191,7 @@ export function IngredientDetail({ id }: { id: string }) {
           onEdit={() => setEditing(true)}
         />
 
-        <span className="section-label">{products.length} {products.length === 1 ? "product" : "products"}</span>
+        <span className="section-label">Products · {products.length}</span>
 
         <div style={{ display: "flex", gap: 8 }} role="tablist" aria-label="Sort products">
           <button type="button" role="tab" className="tab" aria-selected={view === "priority"} onClick={() => setView("priority")}>
@@ -222,15 +223,17 @@ export function IngredientDetail({ id }: { id: string }) {
         </button>
 
         {detail.recipes.length > 0 && (
-          <section className="card stack-sm">
+          <>
             <span className="section-label">Used in recipes</span>
+            <section className="card stack-sm">
             {detail.recipes.map((r) => (
               <Link key={r.id} href={`/recipes/${r.id}`} className="ing-row" style={{ textDecoration: "none" }}>
                 <span className="nm" style={{ flex: 1 }}>{r.name}</span>
                 <ChevronRight className="arrow" size={16} aria-hidden="true" />
               </Link>
             ))}
-          </section>
+            </section>
+          </>
         )}
       </div>
 

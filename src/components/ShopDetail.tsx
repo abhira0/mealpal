@@ -73,6 +73,7 @@ export function ShopDetail({ id }: { id: string }) {
       <div className="content stack-sm">
         {error && <p className="notice">{error}</p>}
 
+        <span className="section-label">Details</span>
         <section className="card stack-sm">
           <div className="ing-row" style={{ borderBottom: "none", paddingTop: 0 }}>
             <Favicon name={shop.name} website={shop.website} iconUrl={shop.iconUrl} size={48} />
@@ -91,7 +92,7 @@ export function ShopDetail({ id }: { id: string }) {
           onEdit={() => setEditing(true)}
         />
 
-        <span className="section-label">{products.length} {products.length === 1 ? "product" : "products"}</span>
+        <span className="section-label">Products · {products.length}</span>
 
         <section className="card">
           {products.length === 0 ? (

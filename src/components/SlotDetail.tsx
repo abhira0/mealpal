@@ -46,6 +46,7 @@ export function SlotDetail({ id }: { id: string }) {
       <div className="content stack-sm">
         {error && <p className="notice">{error}</p>}
 
+        <span className="section-label">Details</span>
         <section className="card stack-sm">
           <div className="ing-row" style={{ paddingTop: 0 }}>
             <span className="meta" style={{ flex: 1 }}>Time of day</span>
