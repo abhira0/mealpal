@@ -56,6 +56,7 @@ export async function POST(req: Request) {
     priceCents,
     url: b?.url?.trim() || null,
     imageUrl: b?.imageUrl?.trim() || null,
+    servingSize: b?.servingSize != null ? Number(b.servingSize) : null,
   });
   return NextResponse.json(row, { status: 201 });
 }

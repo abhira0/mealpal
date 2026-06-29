@@ -14,6 +14,7 @@ export interface ProductInput {
   priceCents?: number | null;
   url: string | null;
   imageUrl?: string | null;
+  servingSize?: number | null;
 }
 
 export function createProduct(db: Db, householdId: number, input: ProductInput) {
