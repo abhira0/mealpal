@@ -146,6 +146,8 @@ export const stockMovements = sqliteTable("stock_movements", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   householdId: integer("household_id").notNull().references(() => households.id),
   ingredientId: integer("ingredient_id").notNull().references(() => ingredients.id),
+  // which product these units are; null = unattributed (pre-migration / untagged backfill)
+  productId: integer("product_id").references(() => products.id),
   // signed canonical units: + purchase, - cooked, +/- manual
   delta: integer("delta").notNull(),
   reason: text("reason").notNull(), // 'purchase' | 'cooked' | 'manual'
