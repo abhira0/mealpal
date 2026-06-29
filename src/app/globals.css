@@ -143,6 +143,7 @@ button{font-family:inherit}
 .tk-name{font-family:var(--display);font-weight:800;font-size:15px}
 .tk-meta{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--sage);margin-top:2px}
 .tk-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.bill-fields{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px}
 .tk-total{font-family:var(--mono);font-weight:700;font-size:13px}
 
 /* ---------- recipe detail ---------- */

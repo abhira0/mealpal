@@ -43,30 +43,49 @@ export function ShopTicket({
   );
 
   return (
+    <Ticket shopName={shopName} website={website} iconUrl={iconUrl} total={total}>
+      {ordered.map((line) => (
+        <ShopLineRow
+          key={line.ingredientId}
+          line={line}
+          priceCents={line.product ? prices[line.product.id] ?? null : null}
+          struck={struck.has(line.ingredientId)}
+          onBought={() =>
+            setStruck((prev) => new Set(prev).add(line.ingredientId))
+          }
+        />
+      ))}
+    </Ticket>
+  );
+}
+
+/** Stop card chrome — header + body — shared by the run and the bill. */
+export function Ticket({
+  shopName,
+  website,
+  iconUrl,
+  total,
+  children,
+}: {
+  shopName: string;
+  website?: string | null;
+  iconUrl?: string | null;
+  total?: number;
+  children: React.ReactNode;
+}) {
+  return (
     <div className="ticket">
       <div className="ticket-head">
         <p className="eb">Stop</p>
         <h2>
           <Favicon name={shopName} website={website} iconUrl={iconUrl} size={22} />
           {shopName}
-          {total > 0 && (
+          {total != null && total > 0 && (
             <span className="tk-total">${centsToDollars(total).toFixed(2)}</span>
           )}
         </h2>
       </div>
-      <div className="ticket-body">
-        {ordered.map((line) => (
-          <ShopLineRow
-            key={line.ingredientId}
-            line={line}
-            priceCents={line.product ? prices[line.product.id] ?? null : null}
-            struck={struck.has(line.ingredientId)}
-            onBought={() =>
-              setStruck((prev) => new Set(prev).add(line.ingredientId))
-            }
-          />
-        ))}
-      </div>
+      <div className="ticket-body">{children}</div>
     </div>
   );
 }
