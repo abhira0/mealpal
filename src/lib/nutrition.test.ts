@@ -60,7 +60,7 @@ describe("dayNutrition", () => {
     const pid = flourProduct({ calories: 2 });
     recordPurchase(db, hid, { productId: pid, quantity: 1 }); // +1000g on pid
     const ev = event(bread().id, "cooked");
-    recordCooked(db, hid, ev.recipeId, ev.servings, ev.id); // -500g attributed to pid
+    recordCooked(db, hid, ev.recipeId!, ev.servings, ev.id); // -500g attributed to pid
     const day = dayNutrition(db, hid, "2026-07-01");
     expect(day.meals[0].estimate).toBe(false);
     expect(day.total.calories).toBe(1000);

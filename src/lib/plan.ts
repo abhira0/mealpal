@@ -1,19 +1,47 @@
 import { and, asc, eq, gte, lte } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
-import { getRecipe } from "@/lib/recipes";
-import { consumptionForRecipe, recordCooked } from "@/lib/consumption";
+import { consumptionLinesForEvent, recordCookedForEvent } from "@/lib/consumption";
 import { skipDay, endSeriesFrom, deleteRule } from "@/lib/rules";
 
 type Db = BetterSQLite3Database<typeof schema>;
 
 export type DeleteScope = "one" | "following" | "all";
 
-export interface EventInput { date: string; slotId: number; recipeId: number; servings: number; }
+// A meal event is one kind: recipe (recipeId), direct ingredient (ingredientId
+// + amount), or direct product (productId, optional variantId, + servings).
+export interface EventInput {
+  date: string; slotId: number; servings: number;
+  recipeId?: number | null;
+  ingredientId?: number | null;
+  productId?: number | null;
+  variantId?: number | null;
+  amount?: number | null;
+}
 
 export function addEvent(db: Db, householdId: number, input: EventInput) {
+  const servings = input.servings || 1;
+  let amount: number | null = null;
+  if (input.productId != null) {
+    // canonical units = servings × packet/serving size (variant overrides product)
+    const [p] = db.select({ s: schema.products.servingSize }).from(schema.products)
+      .where(and(eq(schema.products.id, input.productId), eq(schema.products.householdId, householdId))).all();
+    let perServing = p?.s && p.s > 0 ? p.s : 1;
+    if (input.variantId != null) {
+      const [v] = db.select({ s: schema.productVariants.servingSize }).from(schema.productVariants)
+        .where(and(eq(schema.productVariants.id, input.variantId), eq(schema.productVariants.householdId, householdId))).all();
+      if (v?.s && v.s > 0) perServing = v.s;
+    }
+    amount = servings * perServing;
+  } else if (input.ingredientId != null) {
+    amount = input.amount ?? 0;
+  }
   const [row] = db.insert(schema.mealEvents)
-    .values({ householdId, ...input, status: "planned" }).returning().all();
+    .values({
+      householdId, date: input.date, slotId: input.slotId, servings, status: "planned",
+      recipeId: input.recipeId ?? null, ingredientId: input.ingredientId ?? null,
+      productId: input.productId ?? null, variantId: input.variantId ?? null, amount,
+    }).returning().all();
   return row;
 }
 
@@ -41,9 +69,7 @@ export function plannedConsumption(
   const fromMs = Date.parse(from);
   const map = new Map<number, number>();
   for (const ev of events) {
-    const recipe = getRecipe(db, householdId, ev.recipeId);
-    if (!recipe) continue;
-    for (const line of consumptionForRecipe(recipe, ev.servings)) {
+    for (const line of consumptionLinesForEvent(db, householdId, ev)) {
       const life = shelfLife?.get(line.ingredientId);
       if (life !== undefined) {
         const daysOut = Math.round((Date.parse(ev.date) - fromMs) / 86_400_000);
@@ -67,9 +93,7 @@ export function runOutDates(
   const remaining = new Map(stock); // mutate a copy as we burn it down
   const out = new Map<number, string>();
   for (const ev of events) {
-    const recipe = getRecipe(db, householdId, ev.recipeId);
-    if (!recipe) continue;
-    for (const line of consumptionForRecipe(recipe, ev.servings)) {
+    for (const line of consumptionLinesForEvent(db, householdId, ev)) {
       if (out.has(line.ingredientId)) continue; // already dated
       const left = (remaining.get(line.ingredientId) ?? 0) - line.amount;
       remaining.set(line.ingredientId, left);
@@ -105,7 +129,7 @@ export function cookEvent(
   const [ev] = db.select().from(schema.mealEvents)
     .where(and(eq(schema.mealEvents.id, eventId), eq(schema.mealEvents.householdId, householdId))).all();
   if (!ev || ev.status === "cooked") return; // no-op if missing or already cooked
-  recordCooked(db, householdId, ev.recipeId, ev.servings, ev.id, allocations);
+  recordCookedForEvent(db, householdId, ev, allocations);
   db.update(schema.mealEvents).set({ status: "cooked" })
     .where(eq(schema.mealEvents.id, ev.id)).run();
 }
