@@ -253,10 +253,14 @@ export function EntityForm({
     try {
       if (editing && id) {
         await sendJSON(config.itemPath(id), "PATCH", config.toUpdatePayload(values));
+        done();
       } else {
-        await sendJSON(config.listPath, "POST", config.toCreatePayload(values));
+        const created = (await sendJSON(config.listPath, "POST", config.toCreatePayload(values))) as Row;
+        // Embedded sheets hand control back; otherwise drop into the new item.
+        if (onDone) onDone();
+        else if (created?.id != null) router.push(`/manage/${slug}/${created.id}`);
+        else done();
       }
-      done();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setBusy(false);
