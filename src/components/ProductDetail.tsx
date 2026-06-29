@@ -7,7 +7,7 @@ import { Favicon } from "@/components/Favicon";
 import { Sheet } from "@/components/Sheet";
 import { EntityForm } from "@/components/EntityForm";
 import { EditDeleteActions } from "@/components/EditDeleteActions";
-import { NutritionFacts, type FactValues } from "@/components/NutritionFacts";
+import { NutritionFacts, type FactValues, type FactKey, FACT_ROWS } from "@/components/NutritionFacts";
 
 type Purchase = { cents: number; purchasedAt: string };
 type Product = {
@@ -30,7 +30,16 @@ type Product = {
   carbsG: number | null;
   fiberG: number | null;
   sugarG: number | null;
+  addedSugarG: number | null;
   proteinG: number | null;
+  polyFatG: number | null;
+  monoFatG: number | null;
+  vitaminDMcg: number | null;
+  calciumMg: number | null;
+  ironMg: number | null;
+  potassiumMg: number | null;
+  vitaminAMcg: number | null;
+  vitaminCMg: number | null;
   history: Purchase[];
   effectiveCents: number | null;
 };
@@ -40,15 +49,13 @@ type Shop = { id: number; name: string; website: string | null; iconUrl: string 
 const money = (c: number | null) => (c == null ? "—" : `$${(c / 100).toFixed(2)}`);
 const day = (d: string) => new Date(d).toLocaleDateString();
 
-// per-unit product values × serving size → per-serving values for the label
-const PRODUCT_FACT_KEYS = [
-  "calories", "fatG", "satFatG", "transFatG", "cholesterolMg",
-  "sodiumMg", "carbsG", "fiberG", "sugarG", "proteinG",
-] as const;
+// per-unit product values × serving size → per-serving values for the label.
+// Keys derive from the label itself (FACT_ROWS) so the two can never drift.
+const PRODUCT_FACT_KEYS: FactKey[] = ["calories", ...FACT_ROWS.map((r) => r.key)];
 function scalePerServing(p: Product, s: number): FactValues {
   const out: FactValues = {};
   for (const k of PRODUCT_FACT_KEYS) {
-    const v = p[k];
+    const v = p[k as keyof Product] as number | null | undefined;
     if (v != null) out[k] = v * s;
   }
   return out;
