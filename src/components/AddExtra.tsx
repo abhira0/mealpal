@@ -59,12 +59,12 @@ export function AddExtra({
   return (
     <div className="ticket">
       <div className="ticket-body stack" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <div className="chrome-tabs">
-          <button type="button" onClick={() => setMode("product")} aria-pressed={mode === "product"}>
-            Product
-          </button>
+        <div className="unit-radio">
           <button type="button" onClick={() => setMode("custom")} aria-pressed={mode === "custom"}>
             One-off
+          </button>
+          <button type="button" onClick={() => setMode("product")} aria-pressed={mode === "product"}>
+            Product
           </button>
         </div>
 
