@@ -5,6 +5,21 @@ import type { ReactNode } from "react";
 import { Check, X } from "lucide-react";
 import { Favicon } from "@/components/Favicon";
 
+// Product nutrition columns the "filled?" check looks at (serving size +
+// every Nutrition Facts number). Mirrors NUTRIENT_KEYS in lib/nutrition.ts;
+// kept inline so this client config doesn't pull in server-side db code.
+const NUTRITION_NUMBER_KEYS = [
+  "servingSize", "calories", "fatG", "satFatG", "transFatG", "polyFatG",
+  "monoFatG", "cholesterolMg", "sodiumMg", "carbsG", "fiberG", "sugarG",
+  "addedSugarG", "proteinG", "vitaminDMcg", "calciumMg", "ironMg",
+  "potassiumMg", "vitaminAMcg", "vitaminCMg",
+];
+
+function hasNutritionData(row: Record<string, unknown>): boolean {
+  if (row.nutritionPhoto) return true;
+  return NUTRITION_NUMBER_KEYS.some((k) => Number(row[k] ?? 0) !== 0);
+}
+
 export type FieldDef = {
   name: string;
   label: string;
@@ -180,8 +195,10 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
       {
         key: "nutritionPhoto",
         label: "Nutrition label",
+        // ✓ once nutrition is provided: a label photo OR any non-zero number
+        // (serving size / calories / any nutrient), even without a photo.
         renderCell: (row) =>
-          row.nutritionPhoto ? (
+          hasNutritionData(row) ? (
             <Check size={14} style={{ color: "var(--ok, green)", verticalAlign: "middle" }} />
           ) : (
             <X size={14} style={{ color: "var(--muted, #999)", verticalAlign: "middle" }} />
