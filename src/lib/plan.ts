@@ -63,3 +63,17 @@ export function cookEvent(db: Db, householdId: number, eventId: number) {
   db.update(schema.mealEvents).set({ status: "cooked" })
     .where(eq(schema.mealEvents.id, ev.id)).run();
 }
+
+/** Reverse cookEvent: drop the stock movements it logged and flip status back. */
+export function uncookEvent(db: Db, householdId: number, eventId: number) {
+  const [ev] = db.select().from(schema.mealEvents)
+    .where(and(eq(schema.mealEvents.id, eventId), eq(schema.mealEvents.householdId, householdId))).all();
+  if (!ev || ev.status !== "cooked") return; // no-op if missing or not cooked
+  db.delete(schema.stockMovements)
+    .where(and(
+      eq(schema.stockMovements.householdId, householdId),
+      eq(schema.stockMovements.mealEventId, ev.id),
+    )).run();
+  db.update(schema.mealEvents).set({ status: "planned" })
+    .where(eq(schema.mealEvents.id, ev.id)).run();
+}

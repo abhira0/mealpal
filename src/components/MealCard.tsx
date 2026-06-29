@@ -49,6 +49,17 @@ export function MealCard({
     }
   }
 
+  async function uncook() {
+    if (cooking) return;
+    setCooking(true);
+    const res = await fetch(`/api/events/${eventId}/cook`, { method: "DELETE" });
+    setCooking(false);
+    if (res.ok) {
+      setLocal("planned");
+      router.refresh();
+    }
+  }
+
   async function remove() {
     const res = await fetch(`/api/events/${eventId}`, { method: "DELETE" });
     if (res.ok) {
@@ -67,7 +78,11 @@ export function MealCard({
       </div>
       <div className="card-row" style={{ marginTop: 12 }}>
         <span className="slot">{cooked ? "✓ Cooked" : "Planned"}</span>
-        {!cooked && (
+        {cooked ? (
+          <button type="button" className="btn-add" onClick={uncook} disabled={cooking}>
+            {cooking ? "Undoing…" : "Undo"}
+          </button>
+        ) : (
           <div style={{ display: "flex", gap: 8 }}>
             <button type="button" className="btn-add" onClick={remove} aria-label="Remove meal">
               Remove
