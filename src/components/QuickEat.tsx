@@ -17,17 +17,16 @@ export function QuickEat({ date, onLogged }: { date: string; onLogged: () => voi
     fetch("/api/products").then((r) => (r.ok ? r.json() : [])).then(setProducts).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (productId == null) {
-      setVariants([]);
-      setVariantId(null);
-      return;
-    }
-    fetch(`/api/products/${productId}/variants`)
+  function selectProduct(id: number | null) {
+    setProductId(id);
+    setVariants([]);
+    setVariantId(null);
+    if (id == null) return;
+    fetch(`/api/products/${id}/variants`)
       .then((r) => (r.ok ? r.json() : []))
-      .then((rows: Variant[]) => { setVariants(rows); setVariantId(null); })
+      .then((rows: Variant[]) => setVariants(rows))
       .catch(() => {});
-  }, [productId]);
+  }
 
   async function logIt() {
     if (productId == null) return;
@@ -44,7 +43,7 @@ export function QuickEat({ date, onLogged }: { date: string; onLogged: () => voi
     <section className="card stack-sm">
       <span className="eb">Ate a snack/packet</span>
       <Dropdown label="Product" value={productId} options={products.map((p) => ({ id: p.id, label: p.name }))}
-        onChange={(v) => setProductId(Number(v))} />
+        onChange={(v) => selectProduct(Number(v))} />
       {variants.length > 0 && (
         <Dropdown label="Which variant?" value={variantId} options={variants.map((v) => ({ id: v.id, label: v.name }))}
           onChange={(v) => setVariantId(Number(v))} />
