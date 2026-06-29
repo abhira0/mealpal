@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { QuantityChip } from "@/components/QuantityChip";
 import { Favicon } from "@/components/Favicon";
-import { dollarsToCents, centsToDollars } from "@/lib/money";
+import { centsToDollars } from "@/lib/money";
 import { formatQty } from "@/lib/units";
 
 export type ShopLine = {
@@ -85,31 +85,15 @@ function ShopLineRow({
   struck: boolean;
   onBought: () => void;
 }) {
-  const [pricing, setPricing] = useState(false);
-  const [dollars, setDollars] = useState(
-    priceCents != null ? centsToDollars(priceCents).toFixed(2) : "",
-  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function onCheck(checked: boolean) {
-    if (!checked) {
-      setPricing(false);
-      return;
-    }
+  // One tap = bought. Records a price-less purchase (restocks now); the price +
+  // expiry get filled in later on the bill screen. No product on file → just strike.
+  async function onCheck() {
+    if (struck || busy) return;
     if (!line.product) {
-      // No product on file — nothing to price; just strike it off.
       onBought();
-      return;
-    }
-    setPricing(true);
-  }
-
-  async function record() {
-    if (!line.product) return;
-    const amount = Number(dollars);
-    if (!Number.isFinite(amount) || amount < 0) {
-      setError("Enter a price.");
       return;
     }
     setBusy(true);
@@ -117,22 +101,12 @@ function ShopLineRow({
     const res = await fetch("/api/purchases", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        productId: line.product.id,
-        quantity: 1,
-        dollars: amount,
-        cents: dollarsToCents(amount),
-      }),
+      body: JSON.stringify({ productId: line.product.id, quantity: 1 }),
     });
     setBusy(false);
-    if (res.ok) {
-      onBought();
-    } else {
-      setError("Couldn't record.");
-    }
+    if (res.ok) onBought();
+    else setError("Couldn't record.");
   }
-
-  const checked = pricing || struck;
 
   return (
     <div className={struck ? "ticket-row done" : "ticket-row"}>
@@ -140,15 +114,16 @@ function ShopLineRow({
         type="button"
         className="checkbox"
         role="checkbox"
-        aria-checked={checked}
+        aria-checked={struck}
         aria-label={`Mark ${line.ingredientName} bought`}
-        onClick={() => onCheck(!checked)}
+        disabled={busy}
+        onClick={onCheck}
       />
       <div className="tk-main">
         <div className="tk-name">{line.ingredientName}</div>
         <div className="tk-meta">
           {line.product ? line.product.name : "No product on file"}
-          {priceCents != null && <> · ${centsToDollars(priceCents).toFixed(2)}</>}
+          {priceCents != null && <> · ~${centsToDollars(priceCents).toFixed(2)}</>}
         </div>
         <div className="tk-chips">
           <QuantityChip value={`need ${formatNeeded(line)}`} tone="default" />
@@ -156,35 +131,7 @@ function ShopLineRow({
             <QuantityChip value={line.urgency.label} tone={line.urgency.tone} />
           )}
         </div>
-
-        {pricing && line.product && !struck && (
-          <div className="servings-row" style={{ marginTop: 10, justifyContent: "flex-start", gap: 8, flexWrap: "wrap" }}>
-            <span className="input mono" style={{ display: "inline-flex", alignItems: "center", width: "auto", padding: "0 10px", minHeight: 40 }}>
-              <span style={{ color: "var(--sage)", marginRight: 2 }}>$</span>
-              <input
-                inputMode="decimal"
-                value={dollars}
-                onChange={(e) => setDollars(e.target.value.replace(/[^0-9.]/g, ""))}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    record();
-                  }
-                }}
-                aria-label="Price paid in dollars"
-                autoFocus
-                style={{ width: 70, border: "none", outline: "none", background: "transparent", font: "inherit", color: "inherit" }}
-              />
-            </span>
-            <button type="button" className="tab" onClick={record} disabled={busy}>
-              {busy ? "…" : "Record"}
-            </button>
-            <button type="button" className="btn-link" onClick={() => setPricing(false)}>
-              cancel
-            </button>
-            {error && <span className="eb" style={{ color: "var(--paprika)" }}>{error}</span>}
-          </div>
-        )}
+        {error && <div className="eb" style={{ color: "var(--paprika)", marginTop: 6 }}>{error}</div>}
       </div>
     </div>
   );

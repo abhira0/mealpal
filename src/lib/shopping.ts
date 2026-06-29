@@ -1,10 +1,11 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
 
 type Db = BetterSQLite3Database<typeof schema>;
 
-export interface PurchaseInput { productId: number; quantity: number; cents: number; expiresAt?: string | null; }
+// cents null = bought but not yet priced; fill it in later on the bill screen.
+export interface PurchaseInput { productId: number; quantity: number; cents?: number | null; expiresAt?: string | null; }
 
 /** Record a purchase: insert purchase row and restock inventory. The purchase IS the price history. */
 export function recordPurchase(db: Db, householdId: number, input: PurchaseInput) {
@@ -13,13 +14,66 @@ export function recordPurchase(db: Db, householdId: number, input: PurchaseInput
       .where(and(eq(schema.products.id, input.productId), eq(schema.products.householdId, householdId))).all();
     if (!product) throw new Error("product not found in household");
     const [purchase] = tx.insert(schema.purchases)
-      .values({ householdId, productId: input.productId, quantity: input.quantity, cents: input.cents, expiresAt: input.expiresAt ?? null })
+      .values({ householdId, productId: input.productId, quantity: input.quantity, cents: input.cents ?? null, expiresAt: input.expiresAt ?? null })
       .returning().all();
     tx.insert(schema.stockMovements).values({
       householdId, ingredientId: product.ingredientId,
       delta: product.packSize * input.quantity, reason: "purchase", purchaseId: purchase.id,
     }).run();
     return purchase;
+  });
+}
+
+/** Pending purchases (no price yet), newest first, with product name + a price hint. */
+export function listPendingPurchases(db: Db, householdId: number) {
+  return db.select({
+    id: schema.purchases.id,
+    productId: schema.purchases.productId,
+    productName: schema.products.name,
+    quantity: schema.purchases.quantity,
+    expiresAt: schema.purchases.expiresAt,
+    hintCents: schema.products.priceCents, // manual override as a suggestion; may be null
+    purchasedAt: schema.purchases.purchasedAt,
+  })
+    .from(schema.purchases)
+    .innerJoin(schema.products, eq(schema.products.id, schema.purchases.productId))
+    .where(and(eq(schema.purchases.householdId, householdId), isNull(schema.purchases.cents)))
+    .orderBy(desc(schema.purchases.purchasedAt))
+    .all();
+}
+
+/**
+ * Fill in / correct a purchase. Changing quantity re-syncs the linked restock
+ * movement's delta so inventory stays consistent. Household-scoped.
+ */
+export function updatePurchase(
+  db: Db, householdId: number, id: number,
+  patch: { cents?: number | null; expiresAt?: string | null; quantity?: number },
+) {
+  return db.transaction((tx) => {
+    const [purchase] = tx.select().from(schema.purchases)
+      .where(and(eq(schema.purchases.id, id), eq(schema.purchases.householdId, householdId))).all();
+    if (!purchase) return undefined;
+
+    if (patch.quantity !== undefined && patch.quantity !== purchase.quantity) {
+      const [product] = tx.select().from(schema.products)
+        .where(eq(schema.products.id, purchase.productId)).all();
+      if (product) {
+        tx.update(schema.stockMovements)
+          .set({ delta: product.packSize * patch.quantity })
+          .where(eq(schema.stockMovements.purchaseId, id)).run();
+      }
+    }
+
+    const [row] = tx.update(schema.purchases)
+      .set({
+        ...(patch.cents !== undefined ? { cents: patch.cents } : {}),
+        ...(patch.expiresAt !== undefined ? { expiresAt: patch.expiresAt } : {}),
+        ...(patch.quantity !== undefined ? { quantity: patch.quantity } : {}),
+      })
+      .where(and(eq(schema.purchases.id, id), eq(schema.purchases.householdId, householdId)))
+      .returning().all();
+    return row;
   });
 }
 
