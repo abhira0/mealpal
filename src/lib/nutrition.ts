@@ -145,17 +145,19 @@ export function dayNutrition(db: Db, householdId: number, date: string): DayNutr
   );
   for (const c of listEaten(db, householdId, date)) {
     const p = productById.get(c.productId);
-    const n = c.variantId != null ? (variantById.get(c.variantId) && variantNutrients(variantById.get(c.variantId)!))
-                                   : (p ? productNutrients(p) : null);
+    const variant = c.variantId != null ? variantById.get(c.variantId) : undefined;
+    const n = variant ? variantNutrients(variant) : (p ? productNutrients(p) : null);
     const nutrients = zeroNutrients();
     const miss = new Set<number>();
-    if (n) addScaled(nutrients, n, c.count);
+    if (n) addScaled(nutrients, n, c.count); // c.count is canonical units
     else if (p) miss.add(p.ingredientId);
+    // show packets eaten, not raw canonical units (e.g. 1 packet, not 43 g)
+    const perServing = variant?.servingSize && variant.servingSize > 0 ? variant.servingSize : 1;
     meals.push({
       eventId: -c.id, // negative id namespace so it can't collide with mealEvents
-      recipeName: c.variantId != null ? (variantById.get(c.variantId)?.name ?? p?.name ?? "Snack") : (p?.name ?? "Snack"),
+      recipeName: variant?.name ?? p?.name ?? "Snack",
       slotName: "Snack",
-      servings: c.count,
+      servings: c.count / perServing,
       estimate: false,
       nutrients,
       missing: [...miss].map((id) => ingredientName.get(id) ?? "?"),

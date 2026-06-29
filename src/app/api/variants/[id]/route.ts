@@ -11,6 +11,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const patch: VariantPatch = {};
   if (b?.name !== undefined) patch.name = String(b.name).trim();
   if (b?.nutritionPhoto !== undefined) patch.nutritionPhoto = b.nutritionPhoto === null ? null : String(b.nutritionPhoto);
+  if (b?.servingSize !== undefined) patch.servingSize = b.servingSize === null || b.servingSize === "" ? null : Number(b.servingSize);
   for (const k of NUTRIENT_PATCH_KEYS) if (b?.[k] !== undefined) patch[k] = b[k] === null ? null : Number(b[k]);
   const row = updateVariant(db, session.user.householdId, Number((await params).id), patch);
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });

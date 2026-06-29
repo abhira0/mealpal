@@ -20,7 +20,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const nutrients: Record<string, number | null> = {};
   for (const k of NUTRIENT_PATCH_KEYS) if (b?.[k] !== undefined) nutrients[k] = b[k] === null ? null : Number(b[k]);
   const row = createVariant(db, session.user.householdId, productId, {
-    name, nutritionPhoto: b?.nutritionPhoto ?? null, ...nutrients,
+    name, nutritionPhoto: b?.nutritionPhoto ?? null,
+    servingSize: b?.servingSize != null && b.servingSize !== "" ? Number(b.servingSize) : null,
+    ...nutrients,
   });
   if (!row) return NextResponse.json({ error: "Product not found" }, { status: 404 });
   return NextResponse.json(row, { status: 201 });
