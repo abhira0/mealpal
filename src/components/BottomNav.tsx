@@ -29,16 +29,6 @@ const TABS: Tab[] = [
     ),
   },
   {
-    href: "/plan",
-    label: "Plan",
-    icon: (
-      <svg {...ICON_PROPS}>
-        <rect x="3" y="4" width="18" height="17" rx="2" />
-        <path d="M3 9h18M8 2v4M16 2v4" />
-      </svg>
-    ),
-  },
-  {
     href: "/pantry",
     label: "Pantry",
     icon: (

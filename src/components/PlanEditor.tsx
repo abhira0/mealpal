@@ -38,8 +38,25 @@ function weekDays(): Date[] {
 
 const DOW = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
-export function PlanEditor() {
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+function initials(name: string | null | undefined): string {
+  const s = (name ?? "").trim();
+  if (!s) return "ME";
+  const parts = s.split(/\s+/);
+  const a = parts[0]?.[0] ?? "";
+  const b = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return (a + b || a).toUpperCase();
+}
+
+export function PlanEditor({ userName }: { userName?: string | null }) {
   const days = useMemo(weekDays, []);
+  const todayIso = isoOf(days[1]); // days[1] is today (window starts 1 day back)
   const from = isoOf(days[0]);
   const to = isoOf(days[days.length - 1]);
 
@@ -101,9 +118,32 @@ export function PlanEditor() {
     [recipes],
   );
 
-  const month = new Date(selected + "T00:00:00")
-    .toLocaleDateString(undefined, { month: "long" })
+  const isToday = selected === todayIso;
+  const selectedDate = new Date(selected + "T00:00:00");
+  const dateLabel = selectedDate
+    .toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
     .toUpperCase();
+  const heading = isToday
+    ? greeting()
+    : selectedDate.toLocaleDateString(undefined, { weekday: "long" });
+
+  function cardsFor(slot: Slot) {
+    return events
+      .filter((e) => e.date === selected && e.slotId === slot.id)
+      .map((ev) => (
+        <MealCard
+          key={ev.id}
+          eventId={ev.id}
+          title={recipeName.get(ev.recipeId) ?? "Recipe"}
+          servings={ev.servings}
+          recipeId={ev.recipeId}
+          status={ev.status}
+          recurring={ev.ruleId != null}
+          onCooked={loadEvents}
+          onDeleted={loadEvents}
+        />
+      ));
+  }
 
   function openAdd(slot: Slot) {
     setAddSlot(slot);
@@ -154,8 +194,15 @@ export function PlanEditor() {
   return (
     <>
       <header className="chrome">
-        <p className="eb">Plan · {month}</p>
-        <h1>This week</h1>
+        <div className="chrome-row">
+          <div>
+            <p className="eb">{isToday ? `Today · ${dateLabel}` : dateLabel}</p>
+            <h1>{heading}</h1>
+          </div>
+          <Link href="/manage" aria-label="Manage account" className="avatar">
+            {initials(userName)}
+          </Link>
+        </div>
       </header>
 
       <div className="content">
@@ -181,7 +228,7 @@ export function PlanEditor() {
           })}
         </div>
 
-        <div className="stack" style={{ marginTop: 22, gap: 22 }}>
+        <div style={{ marginTop: 22 }}>
           {loading ? (
             <p className="loading">Loading…</p>
           ) : slots.length === 0 ? (
@@ -191,27 +238,40 @@ export function PlanEditor() {
               No recipes yet. <Link href="/recipes">Add a recipe</Link> to start
               planning meals.
             </p>
+          ) : isToday ? (
+            <div className="timeline">
+              {slots.map((slot) => {
+                const cards = cardsFor(slot);
+                return (
+                  <div key={slot.id} className="seg">
+                    <span
+                      className={cards.length ? "node" : "node node--empty"}
+                      aria-hidden="true"
+                    />
+                    <p className="slot" style={{ marginBottom: 8 }}>
+                      {slot.name}
+                    </p>
+                    {cards.length ? (
+                      <div className="stack-sm">{cards}</div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn-add"
+                        onClick={() => openAdd(slot)}
+                      >
+                        + Add a meal
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           ) : (
-            slots.map((slot) => {
-              const slotEvents = events.filter(
-                (e) => e.date === selected && e.slotId === slot.id,
-              );
-              return (
+            <div className="stack" style={{ gap: 22 }}>
+              {slots.map((slot) => (
                 <div key={slot.id} className="stack-sm">
                   <p className="slot">{slot.name}</p>
-                  {slotEvents.map((ev) => (
-                    <MealCard
-                      key={ev.id}
-                      eventId={ev.id}
-                      title={recipeName.get(ev.recipeId) ?? "Recipe"}
-                      servings={ev.servings}
-                      recipeId={ev.recipeId}
-                      status={ev.status}
-                      recurring={ev.ruleId != null}
-                      onCooked={loadEvents}
-                      onDeleted={loadEvents}
-                    />
-                  ))}
+                  {cardsFor(slot)}
                   <button
                     type="button"
                     className="btn-add"
@@ -220,8 +280,8 @@ export function PlanEditor() {
                     + Add a meal
                   </button>
                 </div>
-              );
-            })
+              ))}
+            </div>
           )}
         </div>
       </div>
