@@ -17,7 +17,7 @@ export function recordPurchase(db: Db, householdId: number, input: PurchaseInput
       .values({ householdId, productId: input.productId, quantity: input.quantity, cents: input.cents ?? null, expiresAt: input.expiresAt ?? null })
       .returning().all();
     tx.insert(schema.stockMovements).values({
-      householdId, ingredientId: product.ingredientId,
+      householdId, ingredientId: product.ingredientId, productId: product.id,
       delta: product.packSize * input.quantity, reason: "purchase", purchaseId: purchase.id,
     }).run();
     return purchase;
