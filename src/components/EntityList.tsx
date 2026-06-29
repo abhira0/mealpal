@@ -107,19 +107,28 @@ export function EntityList({ slug }: { slug: EntitySlug }) {
       <div className="content stack-sm">
         {error && <p className="notice">{error}</p>}
 
-        {rows.length > 0 && (
-          <div className="search">
-            <span className="search-icon" aria-hidden="true">⌕</span>
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={`Search ${config.label.toLowerCase()}`}
-              aria-label={`Search ${config.label.toLowerCase()}`}
-              className="input"
-            />
-          </div>
-        )}
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {rows.length > 0 && (
+            <div className="search" style={{ flex: 1 }}>
+              <span className="search-icon" aria-hidden="true">⌕</span>
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={`Search ${config.label.toLowerCase()}`}
+                aria-label={`Search ${config.label.toLowerCase()}`}
+                className="input"
+              />
+            </div>
+          )}
+          <Link
+            href={`/manage/${slug}/new`}
+            className="btn"
+            style={{ flex: rows.length > 0 ? "0 0 auto" : 1, textDecoration: "none" }}
+          >
+            + Add {config.singular.toLowerCase()}
+          </Link>
+        </div>
 
         {loaded && rows.length === 0 && !error && (
           <p className="empty">No {config.label.toLowerCase()} yet.</p>
@@ -190,10 +199,6 @@ export function EntityList({ slug }: { slug: EntitySlug }) {
             </div>
           );
         })}
-
-        <Link href={`/manage/${slug}/new`} className="btn block" style={{ textDecoration: "none" }}>
-          + Add {config.singular.toLowerCase()}
-        </Link>
       </div>
     </>
   );

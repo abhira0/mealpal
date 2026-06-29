@@ -50,16 +50,21 @@ export default function RecipesPage() {
       </header>
 
       <div className="content stack-sm">
-        <div className="search">
-          <span className="search-icon" aria-hidden="true">⌕</span>
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search recipes"
-            aria-label="Search recipes"
-            className="input"
-          />
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div className="search" style={{ flex: 1 }}>
+            <span className="search-icon" aria-hidden="true">⌕</span>
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search recipes"
+              aria-label="Search recipes"
+              className="input"
+            />
+          </div>
+          <button type="button" className="btn" style={{ flex: "0 0 auto" }} onClick={() => setCreateOpen(true)}>
+            + New recipe
+          </button>
         </div>
 
         {recipes === null ? (
@@ -83,12 +88,7 @@ export default function RecipesPage() {
               <span className="arrow" aria-hidden="true">›</span>
             </Link>
           ))
-        )}
-
-        <button type="button" className="btn block" onClick={() => setCreateOpen(true)}>
-          + New recipe
-        </button>
-      </div>
+        )}      </div>
 
       <NewRecipeSheet
         open={createOpen}
