@@ -23,18 +23,22 @@ export default function ShopPage() {
   const [units, setUnits] = useState<Record<number, string>>({});
   const [shopMeta, setShopMeta] = useState<Record<string, Shop>>({});
   const [pendingCount, setPendingCount] = useState(0);
+  const [horizon, setHorizon] = useState(14);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setData(null);
+    fetch(`/api/shopping?horizon=${horizon}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((j) => setData(j as ShoppingMap))
+      .catch(() => setError("Couldn't load the shopping list yet."));
+  }, [horizon]);
 
   useEffect(() => {
     fetch("/api/purchases")
       .then((r) => (r.ok ? r.json() : []))
       .then((p: unknown[]) => setPendingCount(Array.isArray(p) ? p.length : 0))
       .catch(() => {});
-
-    fetch("/api/shopping")
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((j) => setData(j as ShoppingMap))
-      .catch(() => setError("Couldn't load the shopping list yet."));
 
     fetch("/api/products")
       .then((r) => (r.ok ? r.json() : []))
@@ -85,6 +89,19 @@ export default function ShopPage() {
           {tripTotal > 0 && <> · ${centsToDollars(tripTotal).toFixed(2)}</>}
         </p>
         <h1>The run</h1>
+        <p className="eb" style={{ display: "flex", gap: ".5rem", alignItems: "center" }}>
+          Buy ahead
+          {[7, 14, 30].map((d) => (
+            <button
+              key={d}
+              onClick={() => setHorizon(d)}
+              aria-pressed={horizon === d}
+              style={{ fontWeight: horizon === d ? 700 : 400, textDecoration: horizon === d ? "underline" : "none" }}
+            >
+              {d}d
+            </button>
+          ))}
+        </p>
       </header>
 
       <main className="content stack">

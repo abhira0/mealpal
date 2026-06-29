@@ -77,6 +77,44 @@ export function updatePurchase(
   });
 }
 
+/**
+ * Per-ingredient shelf life in days, learned from purchase history:
+ * median(expiresAt − purchasedAt) over that ingredient's dated purchases.
+ * Only ingredients with ≥2 dated purchases are included; callers fall back to
+ * the horizon for the rest. Pooled across all products of the ingredient.
+ */
+export function learnedShelfLife(db: Db, householdId: number): Map<number, number> {
+  const rows = db.select({
+    ingredientId: schema.products.ingredientId,
+    expiresAt: schema.purchases.expiresAt,
+    purchasedAt: schema.purchases.purchasedAt,
+  })
+    .from(schema.purchases)
+    .innerJoin(schema.products, eq(schema.products.id, schema.purchases.productId))
+    .where(eq(schema.purchases.householdId, householdId))
+    .all();
+
+  const daysByIngredient = new Map<number, number[]>();
+  for (const r of rows) {
+    if (!r.expiresAt) continue;
+    const days = Math.round((Date.parse(r.expiresAt) - r.purchasedAt.getTime()) / 86_400_000);
+    if (days <= 0) continue; // ignore already-expired / same-day junk
+    const list = daysByIngredient.get(r.ingredientId) ?? [];
+    list.push(days);
+    daysByIngredient.set(r.ingredientId, list);
+  }
+
+  const result = new Map<number, number>();
+  for (const [ingredientId, days] of daysByIngredient) {
+    if (days.length < 2) continue; // not enough data to trust
+    days.sort((a, b) => a - b);
+    const mid = Math.floor(days.length / 2);
+    const median = days.length % 2 ? days[mid] : (days[mid - 1] + days[mid]) / 2;
+    result.set(ingredientId, median);
+  }
+  return result;
+}
+
 export interface ShoppingLine {
   ingredientId: number; ingredientName: string;
   needed: number;        // canonical units short

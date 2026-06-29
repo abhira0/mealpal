@@ -4,7 +4,7 @@ import { makeTestDb, type TestDb } from "@/test/db";
 import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
 import { createProduct } from "@/lib/products";
-import { recordPurchase, listPendingPurchases, updatePurchase } from "@/lib/shopping";
+import { recordPurchase, listPendingPurchases, updatePurchase, learnedShelfLife } from "@/lib/shopping";
 import { currentStock } from "@/lib/stock";
 
 let db: TestDb;
@@ -38,6 +38,29 @@ describe("recordPurchase", () => {
   it("buying 2 adds 2x the pack size", () => {
     recordPurchase(db, hid, { productId, quantity: 2, cents: 1299 });
     expect(currentStock(db, hid, flourId)).toBe(22680);
+  });
+});
+
+describe("learnedShelfLife", () => {
+  // insert a purchase with a controlled purchasedAt + expiresAt
+  function buy(purchasedAt: string, expiresAt: string | null) {
+    db.insert(schema.purchases).values({
+      householdId: hid, productId, quantity: 1, cents: 100,
+      purchasedAt: new Date(purchasedAt), expiresAt,
+    }).run();
+  }
+
+  it("takes the median day-gap over dated purchases, per ingredient", () => {
+    buy("2026-06-01T00:00:00Z", "2026-06-06"); // 5
+    buy("2026-06-10T00:00:00Z", "2026-06-17"); // 7
+    buy("2026-06-20T00:00:00Z", "2026-06-29"); // 9
+    expect(learnedShelfLife(db, hid).get(flourId)).toBe(7); // median of [5,7,9]
+  });
+
+  it("ignores undated purchases and needs at least 2 dated ones", () => {
+    buy("2026-06-01T00:00:00Z", "2026-06-06");
+    buy("2026-06-10T00:00:00Z", null); // no expiry → ignored
+    expect(learnedShelfLife(db, hid).has(flourId)).toBe(false); // only 1 dated → untrusted
   });
 });
 

@@ -40,6 +40,14 @@ describe("meal plan", () => {
     expect(map.get(flourId)).toBe(1500);
   });
 
+  it("shelf life caps an ingredient to its window inside the horizon", () => {
+    addEvent(db, hid, { date: "2026-07-01", slotId, recipeId, servings: 2 });  // day 0, 500g
+    addEvent(db, hid, { date: "2026-07-10", slotId, recipeId, servings: 2 });  // day 9, 500g
+    // horizon is 30d, but flour only keeps 3d → only the day-0 meal counts
+    const map = plannedConsumption(db, hid, "2026-07-01", "2026-07-31", new Map([[flourId, 3]]));
+    expect(map.get(flourId)).toBe(500);
+  });
+
   it("cooking an event flips status and depletes stock once", () => {
     db.insert(schema.stockMovements)
       .values({ householdId: hid, ingredientId: flourId, delta: 2000, reason: "manual" }).run();
