@@ -11,7 +11,7 @@ import { NutritionFacts, type FactValues, FACT_ROWS } from "@/components/Nutriti
 
 type Media = { kind: string; url: string };
 type RecipeIngredient = { ingredientId: number; amount: number };
-type Step = { position: number; text: string };
+type Step = { position: number; text: string; startSeconds: number | null; endSeconds: number | null };
 
 type Recipe = {
   id: number;
@@ -271,7 +271,14 @@ export function RecipeView({ id }: { id: string }) {
         }}
       />
 
-      {cooking && <CookMode steps={recipe.steps} title={recipe.name} onClose={() => setCooking(false)} />}
+      {cooking && (
+        <CookMode
+          steps={recipe.steps}
+          title={recipe.name}
+          videoId={youTubeId(recipe.media.find((m) => m.kind === "youtube")?.url ?? "")}
+          onClose={() => setCooking(false)}
+        />
+      )}
     </>
   );
 }

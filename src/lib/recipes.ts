@@ -12,8 +12,18 @@ export interface RecipeInput {
   notes: string | null;
   totalMinutes?: number | null;
   ingredients: { ingredientId: number; amount: number }[];
-  steps: string[];
+  steps: StepInput[];
   media: { kind: string; url: string }[];
+}
+
+export type StepInput = { text: string; startSeconds?: number | null; endSeconds?: number | null };
+
+/** Coerce a request body step (string legacy, or object) into a StepInput. */
+export function normalizeStep(s: unknown): StepInput {
+  if (typeof s === "string") return { text: s, startSeconds: null, endSeconds: null };
+  const o = (s ?? {}) as { text?: unknown; startSeconds?: unknown; endSeconds?: unknown };
+  const num = (v: unknown) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Math.round(Number(v)) : null);
+  return { text: String(o.text ?? ""), startSeconds: num(o.startSeconds), endSeconds: num(o.endSeconds) };
 }
 
 export function createRecipe(db: Db, householdId: number, input: RecipeInput) {
@@ -25,8 +35,9 @@ export function createRecipe(db: Db, householdId: number, input: RecipeInput) {
       tx.insert(schema.recipeIngredients)
         .values({ recipeId: recipe.id, ingredientId: ing.ingredientId, amount: ing.amount }).run();
     }
-    input.steps.forEach((text, i) => {
-      tx.insert(schema.recipeSteps).values({ recipeId: recipe.id, position: i, text }).run();
+    input.steps.forEach((s, i) => {
+      tx.insert(schema.recipeSteps)
+        .values({ recipeId: recipe.id, position: i, text: s.text, startSeconds: s.startSeconds ?? null, endSeconds: s.endSeconds ?? null }).run();
     });
     for (const m of input.media) {
       tx.insert(schema.recipeMedia).values({ recipeId: recipe.id, kind: m.kind, url: m.url }).run();
@@ -50,8 +61,9 @@ export function updateRecipe(db: Db, householdId: number, id: number, input: Rec
       tx.insert(schema.recipeIngredients)
         .values({ recipeId: id, ingredientId: ing.ingredientId, amount: ing.amount }).run();
     }
-    input.steps.forEach((text, i) => {
-      tx.insert(schema.recipeSteps).values({ recipeId: id, position: i, text }).run();
+    input.steps.forEach((s, i) => {
+      tx.insert(schema.recipeSteps)
+        .values({ recipeId: id, position: i, text: s.text, startSeconds: s.startSeconds ?? null, endSeconds: s.endSeconds ?? null }).run();
     });
     for (const m of input.media) {
       tx.insert(schema.recipeMedia).values({ recipeId: id, kind: m.kind, url: m.url }).run();

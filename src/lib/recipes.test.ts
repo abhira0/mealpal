@@ -21,7 +21,7 @@ describe("recipes", () => {
     const r = createRecipe(db, hid, {
       name: "Bread", baseServings: 2, notes: null,
       ingredients: [{ ingredientId: flourId, amount: 500 }],
-      steps: ["Mix", "Bake"],
+      steps: [{ text: "Mix" }, { text: "Bake" }],
       media: [{ kind: "youtube", url: "https://youtu.be/x" }],
     });
     const full = getRecipe(db, hid, r.id);
@@ -45,16 +45,29 @@ describe("recipes", () => {
     expect(getRecipe(db, hid, r.id)?.totalMinutes).toBeNull();
   });
 
+  it("persists per-step clip times", () => {
+    const r = createRecipe(db, hid, {
+      name: "Bread", baseServings: 1, notes: null,
+      ingredients: [],
+      steps: [{ text: "Mix", startSeconds: 30, endSeconds: 48 }, { text: "Bake" }],
+      media: [],
+    });
+    const steps = getRecipe(db, hid, r.id)!.steps;
+    expect(steps[0].startSeconds).toBe(30);
+    expect(steps[0].endSeconds).toBe(48);
+    expect(steps[1].startSeconds).toBeNull();
+  });
+
   it("updates a recipe and replaces its children", () => {
     const r = createRecipe(db, hid, {
       name: "Bread", baseServings: 2, notes: "old",
       ingredients: [{ ingredientId: flourId, amount: 500 }],
-      steps: ["Mix", "Bake"], media: [],
+      steps: [{ text: "Mix" }, { text: "Bake" }], media: [],
     });
     const ok = updateRecipe(db, hid, r.id, {
       name: "Sourdough", baseServings: 4, notes: null,
       ingredients: [{ ingredientId: flourId, amount: 600 }],
-      steps: ["Knead"], media: [],
+      steps: [{ text: "Knead" }], media: [],
     });
     expect(ok).toBeTruthy();
     const full = getRecipe(db, hid, r.id);
@@ -82,7 +95,7 @@ describe("recipes", () => {
     const r = createRecipe(db, hid, {
       name: "Bread", baseServings: 2, notes: null,
       ingredients: [{ ingredientId: flourId, amount: 500 }],
-      steps: ["Mix"], media: [{ kind: "youtube", url: "https://youtu.be/x" }],
+      steps: [{ text: "Mix" }], media: [{ kind: "youtube", url: "https://youtu.be/x" }],
     });
     expect(deleteRecipe(db, hid, r.id)).toEqual({ ok: true, deleted: true });
     expect(getRecipe(db, hid, r.id)).toBeUndefined();

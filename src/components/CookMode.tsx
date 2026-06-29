@@ -2,16 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 
-type Step = { position: number; text: string };
+type Step = { position: number; text: string; startSeconds: number | null; endSeconds: number | null };
 
 // Fullscreen step-by-step view that keeps the screen awake while cooking.
 export function CookMode({
   steps,
   title,
+  videoId,
   onClose,
 }: {
   steps: Step[];
   title: string;
+  videoId?: string | null;
   onClose: () => void;
 }) {
   const [i, setI] = useState(0);
@@ -51,6 +53,15 @@ export function CookMode({
 
   if (steps.length === 0) return null;
 
+  const step = steps[i];
+  // Show the step's video clip when it has a start time and the recipe has a YouTube video.
+  const clip =
+    videoId && step.startSeconds != null
+      ? `https://www.youtube.com/embed/${videoId}?start=${step.startSeconds}` +
+        (step.endSeconds != null ? `&end=${step.endSeconds}` : "") +
+        "&autoplay=1&mute=1&rel=0"
+      : null;
+
   return (
     <div className="cook-overlay" role="dialog" aria-label={`Cooking: ${title}`}>
       <div className="cook-top">
@@ -62,7 +73,18 @@ export function CookMode({
 
       <div className="cook-step">
         <span className="cook-num">Step {i + 1} of {steps.length}</span>
-        <p className="cook-text">{steps[i].text}</p>
+        {clip ? (
+          <div className="cook-clip">
+            <iframe
+              key={i}
+              src={clip}
+              title={`Step ${i + 1} clip`}
+              allow="autoplay; encrypted-media; fullscreen"
+              allowFullScreen
+            />
+          </div>
+        ) : null}
+        <p className="cook-text">{step.text}</p>
       </div>
 
       <div className="cook-dots" aria-hidden="true">
