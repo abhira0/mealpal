@@ -16,6 +16,14 @@ type Product = { id: number; name: string; ingredientId: number };
 type NumMap = Record<string, number>;
 type ExpiryMap = Record<string, string>;
 
+const EXPIRY_WARN_DAYS = 7; // flag food spoiling within a week
+
+// Whole days from today (local) until a YYYY-MM-DD date; negative = already past.
+function daysUntil(ymd: string): number {
+  const today = new Date().toISOString().slice(0, 10);
+  return Math.round((Date.parse(ymd) - Date.parse(today)) / 86_400_000);
+}
+
 export default function PantryPage() {
   const [ingredients, setIngredients] = useState<Ingredient[] | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -81,6 +89,13 @@ export default function PantryPage() {
           if (!ingredients) return null;
           const present = ingredients.filter((i) => (stock[String(i.id)] ?? 0) > 0);
           const out = ingredients.filter((i) => (stock[String(i.id)] ?? 0) <= 0);
+          // In-stock items whose soonest expiry is within the warning window.
+          const expiring = present
+            .map((i) => ({ ing: i, exp: expiry[String(i.id)], days: 0 }))
+            .filter((e) => e.exp != null)
+            .map((e) => ({ ...e, days: daysUntil(e.exp!) }))
+            .filter((e) => e.days <= EXPIRY_WARN_DAYS)
+            .sort((a, b) => a.days - b.days);
           const row = (ing: Ingredient) => {
             const qty = stock[String(ing.id)] ?? 0;
             const exp = expiry[String(ing.id)];
@@ -102,7 +117,29 @@ export default function PantryPage() {
           };
           return (
             <>
-              {present.length > 0 && <p className="eb">In stock</p>}
+              {expiring.length > 0 && (
+                <>
+                  <p className="eb" style={{ color: "var(--paprika)" }}>Use soon</p>
+                  {expiring.map(({ ing, exp, days }) => (
+                    <button
+                      key={`exp-${ing.id}`}
+                      type="button"
+                      className="card"
+                      style={{ textAlign: "left", width: "100%", cursor: "pointer" }}
+                      onClick={() => setEditing(ing)}
+                    >
+                      <div className="card-row">
+                        <span style={{ fontWeight: 600, fontSize: 16 }}>{ing.name}</span>
+                        <span className={`chip ${days <= 3 ? "run" : "low"}`}>
+                          {days <= 0 ? "expired" : `${days}d left`}
+                        </span>
+                      </div>
+                      <p className="meta">expires · {exp}</p>
+                    </button>
+                  ))}
+                </>
+              )}
+              {present.length > 0 && <p className="eb" style={{ marginTop: expiring.length > 0 ? 16 : 0 }}>In stock</p>}
               {present.map(row)}
               {out.length > 0 && <p className="eb" style={{ marginTop: 16 }}>Out of stock</p>}
               {out.map(row)}
