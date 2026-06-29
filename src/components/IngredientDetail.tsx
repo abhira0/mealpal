@@ -190,6 +190,8 @@ export function IngredientDetail({ id }: { id: string }) {
           onEdit={() => setEditing(true)}
         />
 
+        <span className="section-label">{products.length} {products.length === 1 ? "product" : "products"}</span>
+
         <div style={{ display: "flex", gap: 8 }} role="tablist" aria-label="Sort products">
           <button type="button" role="tab" className="tab" aria-selected={view === "priority"} onClick={() => setView("priority")}>
             Priority

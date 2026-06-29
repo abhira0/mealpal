@@ -91,7 +91,7 @@ export function ShopDetail({ id }: { id: string }) {
           onEdit={() => setEditing(true)}
         />
 
-        <span className="chip">{products.length} {products.length === 1 ? "product" : "products"}</span>
+        <span className="section-label">{products.length} {products.length === 1 ? "product" : "products"}</span>
 
         <section className="card">
           {products.length === 0 ? (
