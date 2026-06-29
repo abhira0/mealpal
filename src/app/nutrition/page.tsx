@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { DayNutrition, Nutrients } from "@/lib/nutrition";
+import type { DayNutrition, IngredientNutritionRow, Nutrients } from "@/lib/nutrition";
+import { FACT_ROWS } from "@/components/NutritionFacts";
 
 function todayISO(): string {
   const t = new Date();
@@ -42,6 +43,7 @@ const TOTAL_ROWS: { label: string; key: keyof Nutrients; fmt: (n: number) => str
 ];
 
 export default function NutritionPage() {
+  const [tab, setTab] = useState<"day" | "ingredients">("day");
   const [date, setDate] = useState(todayISO);
   const [data, setData] = useState<DayNutrition | null>(null);
 
@@ -66,6 +68,15 @@ export default function NutritionPage() {
       </header>
 
       <div className="content stack">
+        <div className="filter">
+          <button type="button" aria-pressed={tab === "day"} onClick={() => setTab("day")}>Day</button>
+          <button type="button" aria-pressed={tab === "ingredients"} onClick={() => setTab("ingredients")}>Ingredients</button>
+        </div>
+
+        {tab === "ingredients" ? (
+          <IngredientsTable />
+        ) : (
+        <>
         <label className="field" htmlFor="nutrition-date">
           <span className="field-label">Date</span>
           <input
@@ -121,6 +132,59 @@ export default function NutritionPage() {
             </div>
           ))
         )}
+        </>
+        )}
+      </div>
+    </>
+  );
+}
+
+// Columns: Calories + the standard label rows (reused so labels/units match).
+const COLS = [{ key: "calories" as const, label: "Cal", unit: "" }, ...FACT_ROWS];
+
+function IngredientsTable() {
+  const [rows, setRows] = useState<IngredientNutritionRow[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/nutrition/ingredients", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => { if (!cancelled) setRows(d); })
+      .catch(() => { if (!cancelled) setRows([]); });
+    return () => { cancelled = true; };
+  }, []);
+
+  if (!rows) return <p style={{ opacity: 0.6 }}>Loading…</p>;
+  if (rows.length === 0) return <p style={{ opacity: 0.6 }}>No ingredients have nutrition filled in yet.</p>;
+
+  return (
+    <>
+      <p className="section-label">Per 100 units of each ingredient&apos;s preferred product.</p>
+      <div style={{ overflowX: "auto" }}>
+        <table className="mono" style={{ borderCollapse: "collapse", fontSize: 12, whiteSpace: "nowrap" }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: "left", padding: "6px 10px 6px 0", position: "sticky", left: 0, background: "var(--paper)" }}>Ingredient</th>
+              {COLS.map((c) => (
+                <th key={c.key} style={{ textAlign: "right", padding: "6px 8px" }}>{c.label}{c.unit ? ` (${c.unit})` : ""}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.ingredientId} style={{ borderTop: "1px solid var(--line, #0001)" }}>
+                <th scope="row" style={{ textAlign: "left", fontWeight: 600, padding: "6px 10px 6px 0", position: "sticky", left: 0, background: "var(--paper)" }}>
+                  {r.name} <span style={{ opacity: 0.5, fontWeight: 400 }}>/100{r.unit}</span>
+                </th>
+                {COLS.map((c) => (
+                  <td key={c.key} style={{ textAlign: "right", padding: "6px 8px" }}>
+                    {r.values[c.key] != null ? Math.round(r.values[c.key]!) : "—"}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </>
   );
