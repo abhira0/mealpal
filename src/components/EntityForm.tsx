@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Dropdown } from "@/components/Dropdown";
 import { Favicon, domainFrom } from "@/components/Favicon";
 import { NutritionPhoto } from "@/components/NutritionPhoto";
+import { NutritionFactsEditor } from "@/components/NutritionFactsEditor";
 import { convertCanonical } from "@/lib/units";
 import { ENTITIES, type EntitySlug, type FieldDef } from "@/app/manage/entities";
 
@@ -461,10 +462,31 @@ export function EntityForm({
 
         {!embedded && editing && slug === "products" && row && <ProductHistory row={row} />}
 
-        {!embedded && editing && slug === "products" && row && (
+        {editing && slug === "products" && row && (
           <section className="card stack" style={{ marginTop: 16 }}>
             <h2 style={{ margin: 0, fontSize: 16 }}>Nutrition facts</h2>
             <NutritionPhoto productId={Number(row.id)} photo={(row.nutritionPhoto as string | null) ?? null} />
+            <NutritionFactsEditor
+              productId={Number(row.id)}
+              unit={String(
+                (optionRows.ingredientId ?? []).find((r) => String(r.id) === values.ingredientId)
+                  ?.canonicalUnit ?? "",
+              )}
+              initial={{
+                servingSize: row.servingSize as number | null,
+                calories: row.calories as number | null,
+                fatG: row.fatG as number | null,
+                satFatG: row.satFatG as number | null,
+                transFatG: row.transFatG as number | null,
+                cholesterolMg: row.cholesterolMg as number | null,
+                sodiumMg: row.sodiumMg as number | null,
+                carbsG: row.carbsG as number | null,
+                fiberG: row.fiberG as number | null,
+                sugarG: row.sugarG as number | null,
+                proteinG: row.proteinG as number | null,
+              }}
+              onSaved={onDone}
+            />
           </section>
         )}
       </div>

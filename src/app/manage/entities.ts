@@ -175,7 +175,6 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
       { name: "shopId", label: "Shop", type: "select", optionsFrom: "shops", optionLabel: "name", required: true },
       { name: "name", label: "Name", type: "text", required: true },
       { name: "packSize", label: "Pack size", type: "number", required: true, unitFrom: { field: "ingredientId", attr: "canonicalUnit" } },
-      { name: "servingSize", label: "Serving size", type: "number", optional: true, unitFrom: { field: "ingredientId", attr: "canonicalUnit" }, prefill: (r) => (r.servingSize != null ? String(r.servingSize) : "") },
       { name: "dollars", label: "Price ($) — manual override; blank = use latest purchase", type: "number", optional: true, prefill: (r) => (r.priceCents != null ? String(Number(r.priceCents) / 100) : "") },
       // priority is set by drag-reorder on the ingredient detail page, not here
       { name: "url", label: "URL", type: "text", optional: true },
@@ -189,7 +188,6 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
       shopId: num(v.shopId),
       name: v.name,
       packSize: num(v.packSize) || 1,
-      servingSize: optNum(v.servingSize),
       dollars: optNum(v.dollars),
       url: optStr(v.url),
       imageUrl: optStr(v.imageUrl),
@@ -199,8 +197,6 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
       shopId: num(v.shopId),
       name: v.name,
       packSize: num(v.packSize) || 1,
-      // "" → null clears it; absent stays absent (PATCH ignores undefined)
-      servingSize: v.servingSize === "" ? null : v.servingSize ?? undefined,
       // "" → null clears the override; absent stays absent (PATCH ignores undefined)
       dollars: v.dollars ?? undefined,
       url: optStr(v.url),

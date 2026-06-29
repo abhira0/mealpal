@@ -135,10 +135,10 @@ export function ProductDetail({ id }: { id: string }) {
         {product.calories != null && (
           <>
             <span className="section-label">Nutrition facts</span>
-            {product.servingSize == null && (
-              <p className="empty">Set a serving size to see per-serving values.</p>
-            )}
             <NutritionFacts facts={product} unit={unit} />
+            {product.servingSize == null && (
+              <p className="empty">Showing per {unit || "unit"}. Set a serving size to see per-serving values.</p>
+            )}
           </>
         )}
 
