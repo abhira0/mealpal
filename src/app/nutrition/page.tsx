@@ -116,19 +116,19 @@ export default function NutritionPage() {
 const COLS = [{ key: "calories" as const, label: "Cal", unit: "" }, ...FACT_ROWS];
 
 function IngredientsTable({ date }: { date: string }) {
-  const [rows, setRows] = useState<IngredientNutritionRow[] | null>(null);
+  const [loaded, setLoaded] = useState<{ date: string; rows: IngredientNutritionRow[] } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    setRows(null);
     fetch(`/api/nutrition/ingredients?date=${date}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : []))
-      .then((d) => { if (!cancelled) setRows(d); })
-      .catch(() => { if (!cancelled) setRows([]); });
+      .then((d) => { if (!cancelled) setLoaded({ date, rows: d }); })
+      .catch(() => { if (!cancelled) setLoaded({ date, rows: [] }); });
     return () => { cancelled = true; };
   }, [date]);
 
-  if (!rows) return <p style={{ opacity: 0.6 }}>Loading…</p>;
+  if (loaded?.date !== date) return <p style={{ opacity: 0.6 }}>Loading…</p>;
+  const rows = loaded.rows;
   if (rows.length === 0) return <p style={{ opacity: 0.6 }}>No ingredients used on this day.</p>;
 
   return (
@@ -190,6 +190,7 @@ interface AnalysisData {
   monday?: string;
   daysWithMeals?: number;
   perDay?: { date: string; total: Nutrients; hasMeals: boolean }[];
+  _key?: string; // request this data was fetched for, to derive loading
 }
 
 const MACRO_COLOR = { protein: "#115E59", carbs: "#E0A526", fat: "#D1492C" };
@@ -210,16 +211,18 @@ function AnalysisTab({ date, setDate }: { date: string; setDate: (d: string) => 
   const [openCard, setOpenCard] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const reqKey = `${mode}:${date}:${reloadKey}`;
 
   useEffect(() => {
     let cancelled = false;
-    setData(null);
     fetch(`/api/nutrition/analysis?mode=${mode}&date=${date}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (!cancelled) setData(d); })
+      .then((d) => { if (!cancelled) setData(d ? { ...d, _key: reqKey } : null); })
       .catch(() => { if (!cancelled) setData(null); });
     return () => { cancelled = true; };
-  }, [mode, date, reloadKey]);
+  }, [mode, date, reqKey]);
+
+  const loading = data?._key !== reqKey;
 
   return (
     <div className="stack">
@@ -244,7 +247,7 @@ function AnalysisTab({ date, setDate }: { date: string; setDate: (d: string) => 
         </div>
       )}
 
-      {!data ? (
+      {loading || !data ? (
         <p style={{ opacity: 0.6 }}>Loading…</p>
       ) : mode === "week" && data.daysWithMeals === 0 ? (
         <p style={{ opacity: 0.6 }}>No meals planned this week.</p>
@@ -377,15 +380,14 @@ function GoalsEditor({ goals, editing, setEditing, reload }: {
   reload: () => void;
 }) {
   const [form, setForm] = useState<Goals | null>(null);
-  useEffect(() => { if (editing && goals) setForm(goals); }, [editing, goals]);
 
-  if (!editing) {
+  if (!editing || !form) {
     return (
       <button type="button" className="btn-link" style={{ alignSelf: "flex-start" }}
-        onClick={() => setEditing(true)}>Edit goals</button>
+        disabled={!goals}
+        onClick={() => { if (goals) { setForm(goals); setEditing(true); } }}>Edit goals</button>
     );
   }
-  if (!form) return null;
 
   const field = (key: keyof Goals, label: string) => (
     <label className="field">
