@@ -135,6 +135,7 @@ export default function ShopPage() {
                   total={shopTotal(lines)}
                   lines={toLines(lines)}
                   prices={prices}
+                  onCountChange={(d) => setPendingCount((c) => Math.max(0, c + d))}
                 />
               );
             })}
