@@ -7,6 +7,7 @@ import { Dropdown } from "@/components/Dropdown";
 
 type Ingredient = { id: number; name: string; canonicalUnit: string };
 type DraftIngredient = { ingredientId: number | null; amount: string };
+type Media = { kind: string; url: string };
 
 // Full recipe shape when editing; undefined when creating.
 export type EditableRecipe = {
@@ -16,7 +17,33 @@ export type EditableRecipe = {
   notes: string | null;
   ingredients: { ingredientId: number; amount: number }[];
   steps: { position: number; text: string }[];
+  media?: Media[];
 };
+
+/** Downscale an image file to a JPEG data URL (longest side <= max px). */
+async function fileToPhotoDataUrl(file: File, max = 1024): Promise<string> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error("bad image"));
+      i.src = url;
+    });
+    const scale = Math.min(1, max / Math.max(img.width, img.height));
+    const w = Math.round(img.width * scale);
+    const h = Math.round(img.height * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("no canvas");
+    ctx.drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL("image/jpeg", 0.82);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
 
 export function RecipeSheet({
   open,
@@ -36,6 +63,10 @@ export function RecipeSheet({
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<DraftIngredient[]>([{ ingredientId: null, amount: "" }]);
   const [steps, setSteps] = useState<string[]>([""]);
+  // The recipe photo (data URL or existing url); null = none.
+  const [photo, setPhoto] = useState<string | null>(null);
+  // Non-photo media (video/youtube) preserved across edits.
+  const [otherMedia, setOtherMedia] = useState<Media[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,12 +92,17 @@ export function RecipeSheet({
           : [{ ingredientId: null, amount: "" }],
       );
       setSteps(recipe.steps.length ? recipe.steps.map((s) => s.text) : [""]);
+      const media = recipe.media ?? [];
+      setPhoto(media.find((m) => m.kind === "photo")?.url ?? null);
+      setOtherMedia(media.filter((m) => m.kind !== "photo"));
     } else {
       setName("");
       setBaseServings(2);
       setNotes("");
       setLines([{ ingredientId: null, amount: "" }]);
       setSteps([""]);
+      setPhoto(null);
+      setOtherMedia([]);
     }
   }, [open, recipe]);
 
@@ -91,7 +127,7 @@ export function RecipeSheet({
         .filter((l) => l.ingredientId != null && l.amount.trim() !== "")
         .map((l) => ({ ingredientId: l.ingredientId as number, amount: Number(l.amount) || 0 })),
       steps: steps.map((s) => s.trim()).filter(Boolean),
-      media: [],
+      media: [...otherMedia, ...(photo ? [{ kind: "photo", url: photo }] : [])],
     };
     const res = await fetch(editing ? `/api/recipes/${recipe.id}` : "/api/recipes", {
       method: editing ? "PUT" : "POST",
@@ -182,6 +218,41 @@ export function RecipeSheet({
             >
               + Add step
             </button>
+          </div>
+        </div>
+
+        <div className="field">
+          <span className="field-label">Photo</span>
+          {photo ? (
+            <div className="media" style={{ marginBottom: 8 }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={photo} alt="Recipe" />
+            </div>
+          ) : null}
+          <div className="stack-sm" style={{ flexDirection: "row", gap: 8 }}>
+            <label className="trigger add" style={{ cursor: "pointer" }}>
+              {photo ? "Replace photo" : "Add photo"}
+              <input
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (!file) return;
+                  try {
+                    setPhoto(await fileToPhotoDataUrl(file));
+                  } catch {
+                    setError("Couldn't read that image.");
+                  }
+                }}
+              />
+            </label>
+            {photo ? (
+              <button type="button" className="trigger add" onClick={() => setPhoto(null)}>
+                Remove
+              </button>
+            ) : null}
           </div>
         </div>
 
