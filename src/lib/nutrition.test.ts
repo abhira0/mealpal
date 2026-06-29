@@ -181,7 +181,7 @@ describe("dayNutrition includes the eat-log", () => {
   });
 
   it("adds an eaten variant's nutrition to the day total", () => {
-    const v = createVariant(eatDb, eatHid, eatProductId, { name: "Mega Omega", calories: 180, proteinG: 6 });
+    const v = createVariant(eatDb, eatHid, eatProductId, { name: "Mega Omega", calories: 180, proteinG: 6 })!;
     logEaten(eatDb, eatHid, { date: "2026-06-29", productId: eatProductId, variantId: v.id, count: 2 });
     const day = dayNutrition(eatDb, eatHid, "2026-06-29");
     expect(day.total.calories).toBe(360); // 180 × 2

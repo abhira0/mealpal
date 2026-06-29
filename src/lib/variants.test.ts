@@ -16,8 +16,8 @@ beforeEach(() => {
 
 describe("variants CRUD", () => {
   it("creates, lists, updates and deletes variants scoped to a product", () => {
-    const a = createVariant(db, hid, productId, { name: "Mega Omega", calories: 180, proteinG: 6 });
-    const b = createVariant(db, hid, productId, { name: "High Energy", calories: 200 });
+    const a = createVariant(db, hid, productId, { name: "Mega Omega", calories: 180, proteinG: 6 })!;
+    const b = createVariant(db, hid, productId, { name: "High Energy", calories: 200 })!;
     expect(listVariants(db, hid, productId).map((v) => v.name)).toEqual(["Mega Omega", "High Energy"]);
 
     updateVariant(db, hid, a.id, { calories: 190 });
@@ -27,9 +27,15 @@ describe("variants CRUD", () => {
     expect(listVariants(db, hid, productId)).toHaveLength(1);
   });
 
+  it("won't create a variant on a product from another household", () => {
+    const other = seedHousehold(db, "Other");
+    expect(createVariant(db, other, productId, { name: "Sneaky" })).toBeUndefined();
+    expect(listVariants(db, hid, productId)).toHaveLength(0);
+  });
+
   it("scopes by household — can't touch another home's variant", () => {
     const other = seedHousehold(db, "Other");
-    const v = createVariant(db, hid, productId, { name: "Mega Omega" });
+    const v = createVariant(db, hid, productId, { name: "Mega Omega" })!;
     expect(updateVariant(db, other, v.id, { calories: 5 })).toBeUndefined();
     expect(deleteVariant(db, other, v.id)).toBe(false);
   });
