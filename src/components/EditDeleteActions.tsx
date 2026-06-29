@@ -37,7 +37,7 @@ export function EditDeleteActions({
         Edit
       </button>
       {error && <p className="notice" style={{ marginTop: 0 }}>{error}</p>}
-      <button type="button" className="btn-link danger" style={{ width: "auto" }} onClick={remove}>
+      <button type="button" className="btn block danger" onClick={remove}>
         Delete {singular}
       </button>
     </>
