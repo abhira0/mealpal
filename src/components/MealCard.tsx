@@ -49,11 +49,13 @@ export function MealCard({
   const [askScope, setAskScope] = useState(false);
   const [choices, setChoices] = useState<CookChoice[] | null>(null);
   const [picked, setPicked] = useState<Record<number, number>>({});
+  const [cookErr, setCookErr] = useState<string | null>(null);
   const cooked = local === "cooked";
 
   async function doCook(allocations?: Record<number, number>) {
     if (cooking) return;
     setCooking(true);
+    setCookErr(null);
     const res = await fetch(`/api/events/${eventId}/cook`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -65,6 +67,11 @@ export function MealCard({
       setLocal("cooked");
       if (onCooked) onCooked();
       else router.refresh();
+    } else {
+      // e.g. 409 when an ingredient has no stock — can't cook a meal you can't make.
+      const j = await res.json().catch(() => ({}));
+      setChoices(null);
+      setCookErr(j.error ?? "Couldn't cook this meal.");
     }
   }
 
@@ -128,6 +135,10 @@ export function MealCard({
           </div>
         )}
       </div>
+
+      {cookErr && (
+        <p className="notice" style={{ marginTop: 8 }}>{cookErr}</p>
+      )}
 
       <Sheet open={choices !== null} title="Which did you use?" onClose={() => setChoices(null)}>
         <div className="sh-body">
