@@ -4,6 +4,7 @@ import { EntityForm } from "@/components/EntityForm";
 import { IngredientDetail } from "@/components/IngredientDetail";
 import { ShopDetail } from "@/components/ShopDetail";
 import { ProductDetail } from "@/components/ProductDetail";
+import { SlotDetail } from "@/components/SlotDetail";
 import { ENTITIES, isEntitySlug } from "../../entities";
 
 export default async function EditEntityPage({
@@ -20,10 +21,12 @@ export default async function EditEntityPage({
   // Entities without edit (prices) have no edit page.
   if (!ENTITIES[entity].canEdit) notFound();
 
-  // Ingredients and shops get a rich detail/hub view; everything else is the plain form.
+  // Every entity gets a read-only detail view; Edit opens the form in a sheet.
   if (entity === "ingredients") return <IngredientDetail id={id} />;
   if (entity === "shops") return <ShopDetail id={id} />;
   if (entity === "products") return <ProductDetail id={id} />;
+  if (entity === "slots") return <SlotDetail id={id} />;
 
+  // Fallback for any future entity without a bespoke detail view.
   return <EntityForm slug={entity} id={id} />;
 }

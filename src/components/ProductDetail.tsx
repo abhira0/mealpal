@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { ExternalLink, Pencil, Trash2 } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { Favicon } from "@/components/Favicon";
 import { Sheet } from "@/components/Sheet";
 import { EntityForm } from "@/components/EntityForm";
+import { EditDeleteActions } from "@/components/EditDeleteActions";
 
 type Purchase = { cents: number; purchasedAt: string };
 type Product = {
@@ -38,7 +38,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export function ProductDetail({ id }: { id: string }) {
-  const router = useRouter();
   const [product, setProduct] = useState<Product | null>(null);
   const [ingredient, setIngredient] = useState<Ingredient | null>(null);
   const [shop, setShop] = useState<Shop | null>(null);
@@ -72,17 +71,6 @@ export function ProductDetail({ id }: { id: string }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch on mount; state set after await, not synchronously
     load();
   }, [load]);
-
-  async function onDelete() {
-    setError(null);
-    const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
-    if (res.ok) {
-      router.push("/manage/products");
-      return;
-    }
-    const j = await res.json().catch(() => ({}));
-    setError(j.error ?? "Couldn't delete this product.");
-  }
 
   if (!product) {
     return (
@@ -131,14 +119,12 @@ export function ProductDetail({ id }: { id: string }) {
           )}
         </section>
 
-        <div style={{ display: "flex", gap: 8 }}>
-          <button type="button" className="btn block" onClick={() => setEditing(true)}>
-            <Pencil size={16} style={{ marginRight: 6, verticalAlign: "-2px" }} />Edit
-          </button>
-          <button type="button" className="icon-btn danger" aria-label="Delete product" onClick={onDelete}>
-            <Trash2 size={20} />
-          </button>
-        </div>
+        <EditDeleteActions
+          singular="product"
+          deletePath={`/api/products/${id}`}
+          backHref="/manage/products"
+          onEdit={() => setEditing(true)}
+        />
 
         <section className="card stack-sm">
           <span className="section-label">Price history</span>
