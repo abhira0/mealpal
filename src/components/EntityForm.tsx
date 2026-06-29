@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Dropdown } from "@/components/Dropdown";
 import { Favicon, domainFrom } from "@/components/Favicon";
+import { NutritionPhoto } from "@/components/NutritionPhoto";
 import { convertCanonical } from "@/lib/units";
 import { ENTITIES, type EntitySlug, type FieldDef } from "@/app/manage/entities";
 
@@ -459,6 +460,13 @@ export function EntityForm({
         </form>
 
         {!embedded && editing && slug === "products" && row && <ProductHistory row={row} />}
+
+        {!embedded && editing && slug === "products" && row && (
+          <section className="card stack" style={{ marginTop: 16 }}>
+            <h2 style={{ margin: 0, fontSize: 16 }}>Nutrition facts</h2>
+            <NutritionPhoto productId={Number(row.id)} photo={(row.nutritionPhoto as string | null) ?? null} />
+          </section>
+        )}
       </div>
     </>
   );

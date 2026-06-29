@@ -1,8 +1,19 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { deleteProduct, updateProduct } from "@/lib/products";
+import { deleteProduct, updateProduct, NUTRIENT_PATCH_KEYS, type ProductPatch } from "@/lib/products";
 import { dollarsToCents } from "@/lib/money";
+
+// Pull any nutrient fields present in the body into a patch (per canonical unit).
+// Accepts numbers and null (clears). Ignores absent keys.
+function nutrientPatch(b: Record<string, unknown>): ProductPatch {
+  const patch: ProductPatch = {};
+  for (const k of NUTRIENT_PATCH_KEYS) {
+    if (b?.[k] === undefined) continue;
+    patch[k] = b[k] === null ? null : Number(b[k]);
+  }
+  return patch;
+}
 
 // Resolve a manual price patch from {dollars} (form) or {priceCents}.
 // Empty/null clears the override (price then derives from purchases).
@@ -31,6 +42,7 @@ export async function PATCH(
     ...(pricePatch(b) ?? {}),
     ...(b?.available !== undefined ? { available: Boolean(b.available) } : {}),
     ...(b?.url !== undefined ? { url: b.url === null ? null : String(b.url).trim() || null } : {}),
+    ...nutrientPatch(b),
   });
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(row);
