@@ -6,7 +6,7 @@ import { Stepper } from "@/components/Stepper";
 import { Sheet } from "@/components/Sheet";
 import { MealCard } from "@/components/MealCard";
 
-type Slot = { id: number; name: string; position: number };
+type Slot = { id: number; name: string; timeOfDay: string };
 type Recipe = { id: number; name: string; baseServings: number };
 type MealEvent = {
   id: number;

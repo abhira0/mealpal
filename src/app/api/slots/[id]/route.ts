@@ -15,7 +15,7 @@ export async function PATCH(
   if (!name) return NextResponse.json({ error: "name is required." }, { status: 400 });
   const row = updateSlot(db, session.user.householdId, Number(id), {
     name,
-    ...(body?.position !== undefined ? { position: Number(body.position) || 0 } : {}),
+    ...(body?.timeOfDay !== undefined ? { timeOfDay: String(body.timeOfDay) || "12:00" } : {}),
   });
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(row);
