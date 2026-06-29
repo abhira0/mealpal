@@ -99,7 +99,8 @@ export const mealSlots = sqliteTable("meal_slots", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   householdId: integer("household_id").notNull().references(() => households.id),
   name: text("name").notNull(),
-  position: integer("position").notNull().default(0),
+  // "HH:MM" 24h. Slots auto-order by this; text sort matches chronological order.
+  timeOfDay: text("time_of_day").notNull().default("12:00"),
 });
 
 export const mealEvents = sqliteTable("meal_events", {

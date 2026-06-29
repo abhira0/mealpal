@@ -4,7 +4,7 @@
 export type FieldDef = {
   name: string;
   label: string;
-  type: "text" | "number" | "select" | "file";
+  type: "text" | "number" | "select" | "file" | "time";
   // For type:"select" — pull options from another entity's list endpoint,
   // using `optionLabel` for the visible text and `id` for the value.
   optionsFrom?: EntitySlug;
@@ -200,16 +200,16 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
     itemPath: (id) => `/api/slots/${id}`,
     columns: [
       { key: "name", label: "Name" },
-      { key: "position", label: "Order" },
+      { key: "timeOfDay", label: "Time" },
     ],
     fields: [
       { name: "name", label: "Name", type: "text", required: true },
-      { name: "position", label: "Order", type: "number", optional: true },
+      { name: "timeOfDay", label: "Time of day", type: "time", required: true },
     ],
     canEdit: true,
     canDelete: true,
-    toCreatePayload: (v) => ({ name: v.name, position: num(v.position) || 0 }),
-    toUpdatePayload: (v) => ({ name: v.name, position: num(v.position) || 0 }),
+    toCreatePayload: (v) => ({ name: v.name, timeOfDay: v.timeOfDay || "12:00" }),
+    toUpdatePayload: (v) => ({ name: v.name, timeOfDay: v.timeOfDay || "12:00" }),
   },
 };
 

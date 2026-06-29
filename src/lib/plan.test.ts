@@ -18,7 +18,7 @@ beforeEach(() => {
   flourId = db.insert(schema.ingredients)
     .values({ householdId: hid, name: "Flour", canonicalUnit: "g", servingSize: 50 })
     .returning().all()[0].id;
-  slotId = createSlot(db, hid, "Dinner", 0).id;
+  slotId = createSlot(db, hid, "Dinner", "18:00").id;
   recipeId = createRecipe(db, hid, {
     name: "Bread", baseServings: 2, notes: null,
     ingredients: [{ ingredientId: flourId, amount: 500 }], steps: [], media: [],
