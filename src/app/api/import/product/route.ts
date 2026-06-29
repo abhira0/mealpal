@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { connectAndExtract } from "@/lib/scrape-instacart";
+import { connectAndExtract } from "@/lib/scrape-products";
 
-// Scrapes the Instacart product tab open in your debug Chrome and returns the
-// fields to prefill the New Product form. Writes nothing — the form saves.
+// Scrapes the product tab open in your debug Chrome (Instacart or Weee, picked
+// by URL) and returns the fields to prefill the New Product form. Writes
+// nothing — the form saves.
 export async function POST() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

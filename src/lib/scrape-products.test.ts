@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseScraped } from "./scrape-instacart";
+import { parseScraped } from "./scrape-products";
 
 describe("parseScraped", () => {
   it("pulls name, price, image, url straight through", () => {
@@ -39,6 +39,13 @@ describe("parseScraped", () => {
 
   it("takes the first weight when several appear", () => {
     expect(parseScraped({ weightText: "1.36 kg (48 oz)" })).toMatchObject({ packSize: 1360, unit: "g" });
+  });
+
+  it("handles a Weee title carrying name + pack size (first weight wins)", () => {
+    // SayWeee feeds og:title as both title and weightText.
+    const t = "Franco Uncooked Phulka 18ct 1.31 lb";
+    expect(parseScraped({ title: t, weightText: t, shopText: "Weee" }))
+      .toMatchObject({ name: t, packSize: 18, unit: "count", shop: "Weee" });
   });
 
   it("extracts a servings count", () => {

@@ -177,7 +177,7 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
     ],
     canEdit: true,
     canDelete: true,
-    importPath: "/api/import/instacart",
+    importPath: "/api/import/product",
     toCreatePayload: (v) => ({
       ingredientId: num(v.ingredientId),
       shopId: num(v.shopId),
