@@ -45,16 +45,23 @@ const inputStyle: React.CSSProperties = {
 
 export function NutritionFactsEditor({
   productId,
+  savePath,
   initial,
   unit,
+  // When false, values are entered/stored per canonical unit directly (1 unit =
+  // 1 serving) — used for pack variants, which have no serving size.
+  showServing = true,
   onSaved,
 }: {
-  productId: number;
+  productId?: number;
+  savePath?: string;
   initial: PerUnit;
   unit: string;
+  showServing?: boolean;
   onSaved?: () => void;
 }) {
-  const s0 = initial.servingSize ?? 1; // derive per-serving from stored per-unit
+  const patchPath = savePath ?? `/api/products/${productId}`;
+  const s0 = showServing ? (initial.servingSize ?? 1) : 1; // derive per-serving from stored per-unit
   const [serving, setServing] = useState(str(initial.servingSize));
   const [vals, setVals] = useState<Record<Key, string>>(() =>
     Object.fromEntries(
@@ -78,21 +85,21 @@ export function NutritionFactsEditor({
   };
 
   async function save() {
-    const empty = serving.trim() === "" && EDITOR_KEYS.every((k) => vals[k].trim() === "");
-    const s = Number(serving);
+    const empty = (!showServing || serving.trim() === "") && EDITOR_KEYS.every((k) => vals[k].trim() === "");
+    const s = showServing ? Number(serving) : 1;
     // Allow saving an all-blank label (clears everything); otherwise require a serving.
-    if (!empty && (!serving || !Number.isFinite(s) || s <= 0)) {
+    if (showServing && !empty && (!serving || !Number.isFinite(s) || s <= 0)) {
       setMsg("Enter a serving size greater than 0.");
       return;
     }
     setBusy(true);
     setMsg(null);
-    const patch: Record<string, number | null> = { servingSize: empty ? null : s };
+    const patch: Record<string, number | null> = showServing ? { servingSize: empty ? null : s } : {};
     for (const k of EDITOR_KEYS) {
       const raw = vals[k].trim();
       patch[k] = raw === "" ? null : Number(raw) / s; // per-serving → per-unit
     }
-    const res = await fetch(`/api/products/${productId}`, {
+    const res = await fetch(patchPath, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(patch),
@@ -110,12 +117,18 @@ export function NutritionFactsEditor({
   return (
     <div style={{ background: "#fff", color: "#000", border: "1px solid #000", borderRadius: 4, padding: 12, fontFamily: "Helvetica, Arial, sans-serif", maxWidth: 340 }}>
       <div style={{ fontSize: 28, fontWeight: 800, ...rule(1) }}>Nutrition Facts</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 0", ...rule(8) }}>
-        <span>Serving size</span>
-        <input style={{ ...inputStyle, width: 56 }} type="number" inputMode="decimal" step="any"
-          value={serving} onChange={(e) => setServing(e.target.value)} aria-label="serving size" />
-        <strong>{unit}</strong>
-      </div>
+      {showServing ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 0", ...rule(8) }}>
+          <span>Serving size</span>
+          <input style={{ ...inputStyle, width: 56 }} type="number" inputMode="decimal" step="any"
+            value={serving} onChange={(e) => setServing(e.target.value)} aria-label="serving size" />
+          <strong>{unit}</strong>
+        </div>
+      ) : (
+        <div style={{ padding: "4px 0", ...rule(8) }}>
+          <strong>Amount per {unit || "unit"}</strong>
+        </div>
+      )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 2, ...rule(4) }}>
         <strong style={{ fontSize: 18 }}>Calories</strong>
