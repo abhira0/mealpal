@@ -158,9 +158,13 @@ function preferredProduct(db: Db, householdId: number, ingredientId: number): Pr
   return products.find((p) => p.calories != null) ?? null;
 }
 
+type NutrientValues = Partial<Record<(typeof NUTRIENT_PATCH_KEYS)[number], number>>;
+
 export interface RecipeNutrition {
   /** per-serving value per nutrient (all keys; absent = unknown). */
-  perServing: Partial<Record<(typeof NUTRIENT_PATCH_KEYS)[number], number>>;
+  perServing: NutrientValues;
+  /** per-serving contribution of each ingredient (for the breakdown table). */
+  byIngredient: { ingredientId: number; name: string; values: NutrientValues }[];
   /** ingredient names whose preferred product has no nutrition, so totals undercount. */
   missing: string[];
 }
@@ -179,18 +183,51 @@ export function recipeNutrition(
     db.select().from(schema.ingredients).where(eq(schema.ingredients.householdId, householdId)).all()
       .map((i) => [i.id, i.name]),
   );
+  const denom = recipe.baseServings > 0 ? recipe.baseServings : 1;
   const totals: Record<string, number> = {};
+  const byIngredient: RecipeNutrition["byIngredient"] = [];
   const missing = new Set<string>();
   for (const line of recipe.ingredients) {
+    const name = ingredientName.get(line.ingredientId) ?? "?";
     const p = preferredProduct(db, householdId, line.ingredientId);
-    if (!p) { missing.add(ingredientName.get(line.ingredientId) ?? "?"); continue; }
+    if (!p) { missing.add(name); continue; }
+    const values: NutrientValues = {};
     for (const k of NUTRIENT_PATCH_KEYS) {
       const v = p[k];
-      if (v != null) totals[k] = (totals[k] ?? 0) + v * line.amount;
+      if (v == null) continue;
+      values[k] = (v * line.amount) / denom; // per-serving contribution
+      totals[k] = (totals[k] ?? 0) + v * line.amount;
     }
+    byIngredient.push({ ingredientId: line.ingredientId, name, values });
   }
-  const denom = recipe.baseServings > 0 ? recipe.baseServings : 1;
-  const perServing: RecipeNutrition["perServing"] = {};
+  const perServing: NutrientValues = {};
   for (const k of NUTRIENT_PATCH_KEYS) if (totals[k] != null) perServing[k] = totals[k] / denom;
-  return { perServing, missing: [...missing] };
+  return { perServing, byIngredient, missing: [...missing] };
+}
+
+export interface IngredientNutritionRow {
+  ingredientId: number;
+  name: string;
+  unit: string;
+  productName: string;
+  /** values per 100 canonical units, for cross-ingredient comparison. */
+  values: Partial<Record<(typeof NUTRIENT_PATCH_KEYS)[number], number>>;
+}
+
+/**
+ * Every ingredient whose preferred product has nutrition, as a comparison table
+ * normalized to per-100-canonical-units (the standard food-label basis).
+ */
+export function ingredientNutritionTable(db: Db, householdId: number): IngredientNutritionRow[] {
+  const ingredients = db.select().from(schema.ingredients)
+    .where(eq(schema.ingredients.householdId, householdId)).all();
+  const rows: IngredientNutritionRow[] = [];
+  for (const ing of ingredients) {
+    const p = preferredProduct(db, householdId, ing.id);
+    if (!p) continue;
+    const values: IngredientNutritionRow["values"] = {};
+    for (const k of NUTRIENT_PATCH_KEYS) if (p[k] != null) values[k] = p[k]! * 100;
+    rows.push({ ingredientId: ing.id, name: ing.name, unit: ing.canonicalUnit, productName: p.name, values });
+  }
+  return rows;
 }

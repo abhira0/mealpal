@@ -6,7 +6,7 @@ import { QuantityChip } from "@/components/QuantityChip";
 import { Stepper } from "@/components/Stepper";
 import { RecipeSheet } from "@/components/RecipeSheet";
 import { EditDeleteActions } from "@/components/EditDeleteActions";
-import { NutritionFacts, type FactValues } from "@/components/NutritionFacts";
+import { NutritionFacts, type FactValues, FACT_ROWS } from "@/components/NutritionFacts";
 
 type Media = { kind: string; url: string };
 type RecipeIngredient = { ingredientId: number; amount: number };
@@ -21,7 +21,11 @@ type Recipe = {
   steps: Step[];
   media: Media[];
   costCents: number | null;
-  nutrition?: { perServing: FactValues; missing: string[] };
+  nutrition?: {
+    perServing: FactValues;
+    byIngredient: { ingredientId: number; name: string; values: FactValues }[];
+    missing: string[];
+  };
 };
 
 type Ingredient = {
@@ -29,6 +33,9 @@ type Ingredient = {
   name: string;
   canonicalUnit: string;
 };
+
+// Nutrient rows for the breakdown table: Calories + the standard label rows.
+const NUTRIENT_ROWS = [{ key: "calories" as const, label: "Calories", unit: "" }, ...FACT_ROWS];
 
 function youTubeId(url: string): string | null {
   const m = url.match(/(?:youtu\.be\/|v=|embed\/)([\w-]{11})/);
@@ -163,6 +170,39 @@ export function RecipeView({ id }: { id: string }) {
           <section>
             <h2 className="title" style={{ marginBottom: 4 }}>Nutrition</h2>
             <NutritionFacts values={recipe.nutrition.perServing} servingLabel="1 serving" />
+
+            <p className="section-label" style={{ marginTop: 12 }}>Per-serving breakdown by ingredient</p>
+            <div style={{ overflowX: "auto" }}>
+              <table className="mono" style={{ borderCollapse: "collapse", fontSize: 12, whiteSpace: "nowrap" }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left", padding: "6px 10px 6px 0", position: "sticky", left: 0, background: "var(--paper)" }}>Nutrient</th>
+                    {recipe.nutrition.byIngredient.map((ing) => (
+                      <th key={ing.ingredientId} style={{ textAlign: "right", padding: "6px 8px" }}>{ing.name}</th>
+                    ))}
+                    <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 700 }}>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {NUTRIENT_ROWS.map((row) => (
+                    <tr key={row.key} style={{ borderTop: "1px solid var(--line, #0001)" }}>
+                      <th scope="row" style={{ textAlign: "left", fontWeight: 600, padding: "6px 10px 6px 0", position: "sticky", left: 0, background: "var(--paper)" }}>
+                        {row.label}{row.unit ? ` (${row.unit})` : ""}
+                      </th>
+                      {recipe.nutrition!.byIngredient.map((ing) => (
+                        <td key={ing.ingredientId} style={{ textAlign: "right", padding: "6px 8px" }}>
+                          {ing.values[row.key] != null ? Math.round(ing.values[row.key]!) : "—"}
+                        </td>
+                      ))}
+                      <td style={{ textAlign: "right", padding: "6px 8px", fontWeight: 700 }}>
+                        {recipe.nutrition!.perServing[row.key] != null ? Math.round(recipe.nutrition!.perServing[row.key]!) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
             {recipe.nutrition.missing.length > 0 && (
               <p className="body" style={{ color: "var(--sage)", marginTop: 6 }}>
                 Missing nutrition for: {recipe.nutrition.missing.join(", ")} — totals may be low.
