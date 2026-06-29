@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { QuantityChip } from "@/components/QuantityChip";
 import { Stepper } from "@/components/Stepper";
+import { RecipeSheet } from "@/components/RecipeSheet";
 
 type Media = { kind: string; url: string };
 type RecipeIngredient = { ingredientId: number; amount: number };
@@ -61,25 +62,25 @@ export function RecipeView({ id }: { id: string }) {
   const [notFound, setNotFound] = useState(false);
   const [servings, setServings] = useState(1);
   const [cook, setCook] = useState<CookState>("idle");
+  const [editOpen, setEditOpen] = useState(false);
+
+  async function loadRecipe() {
+    const rRes = await fetch(`/api/recipes/${id}`);
+    if (rRes.status === 404 || !rRes.ok) {
+      setNotFound(true);
+      return;
+    }
+    const r: Recipe = await rRes.json();
+    setRecipe(r);
+    setServings(r.baseServings || 1);
+  }
 
   useEffect(() => {
-    let active = true;
-    Promise.all([fetch(`/api/recipes/${id}`), fetch("/api/ingredients")]).then(
-      async ([rRes, iRes]) => {
-        if (!active) return;
-        if (rRes.status === 404 || !rRes.ok) {
-          setNotFound(true);
-          return;
-        }
-        const r: Recipe = await rRes.json();
-        setRecipe(r);
-        setServings(r.baseServings || 1);
-        if (iRes.ok) setIngredients(await iRes.json());
-      },
-    );
-    return () => {
-      active = false;
-    };
+    loadRecipe();
+    fetch("/api/ingredients").then((iRes) => {
+      if (iRes.ok) iRes.json().then(setIngredients);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const lookup = new Map(ingredients.map((i) => [i.id, i]));
@@ -141,6 +142,9 @@ export function RecipeView({ id }: { id: string }) {
     <>
       <Chrome>
         <h1>{recipe.name}</h1>
+        <button type="button" className="chrome-back" onClick={() => setEditOpen(true)}>
+          Edit
+        </button>
       </Chrome>
 
       <div className="content stack">
@@ -209,6 +213,16 @@ export function RecipeView({ id }: { id: string }) {
           </p>
         ) : null}
       </div>
+
+      <RecipeSheet
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        recipe={recipe}
+        onSaved={() => {
+          setEditOpen(false);
+          loadRecipe();
+        }}
+      />
     </>
   );
 }
