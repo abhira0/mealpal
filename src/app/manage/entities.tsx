@@ -5,18 +5,19 @@ import type { ReactNode } from "react";
 import { Check, X } from "lucide-react";
 import { Favicon } from "@/components/Favicon";
 
-// Product nutrition columns the "filled?" check looks at (serving size +
-// every Nutrition Facts number). Mirrors NUTRIENT_KEYS in lib/nutrition.ts;
-// kept inline so this client config doesn't pull in server-side db code.
+// Product nutrition columns the "filled?" check looks at. Must mirror
+// NUTRIENT_KEYS in lib/nutrition.ts exactly (no servingSize, no photo) so the
+// card checkmark means the same as "usable for diet totals" — otherwise a
+// product shows ✓ yet still counts as "missing nutrition" in the scorecard.
+// Kept inline so this client config doesn't pull in server-side db code.
 const NUTRITION_NUMBER_KEYS = [
-  "servingSize", "calories", "fatG", "satFatG", "transFatG", "polyFatG",
+  "calories", "fatG", "satFatG", "transFatG", "polyFatG",
   "monoFatG", "cholesterolMg", "sodiumMg", "carbsG", "fiberG", "sugarG",
   "addedSugarG", "proteinG", "vitaminDMcg", "calciumMg", "ironMg",
   "potassiumMg", "vitaminAMcg", "vitaminCMg",
 ];
 
 function hasNutritionData(row: Record<string, unknown>): boolean {
-  if (row.nutritionPhoto) return true;
   return NUTRITION_NUMBER_KEYS.some((k) => Number(row[k] ?? 0) !== 0);
 }
 
