@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 
 // The one standard Edit/Delete block for every entity detail view:
