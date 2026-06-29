@@ -23,7 +23,6 @@ type Ingredient = {
   id: number;
   name: string;
   canonicalUnit: string;
-  servingSize: number | null;
 };
 
 function youTubeId(url: string): string | null {

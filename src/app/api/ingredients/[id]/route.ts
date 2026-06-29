@@ -28,9 +28,6 @@ export async function PATCH(
     ...(body?.canonicalUnit !== undefined
       ? { canonicalUnit: String(body.canonicalUnit).trim() }
       : {}),
-    ...(body?.servingSize !== undefined
-      ? { servingSize: body.servingSize === null ? null : Number(body.servingSize) }
-      : {}),
   });
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(row);

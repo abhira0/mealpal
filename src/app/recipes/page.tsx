@@ -17,7 +17,6 @@ type Ingredient = {
   id: number;
   name: string;
   canonicalUnit: string;
-  servingSize: number | null;
 };
 
 type DraftIngredient = { ingredientId: number | null; amount: string };

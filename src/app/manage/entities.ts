@@ -124,8 +124,6 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
     itemPath: (id) => `/api/ingredients/${id}`,
     columns: [
       { key: "name", label: "Name" },
-      { key: "canonicalUnit", label: "Unit" },
-      { key: "servingSize", label: "Serving size" },
       { key: "stock", label: "In stock", format: (row) => `${row.stock ?? 0}${row.canonicalUnit ?? ""}` },
     ],
     icon: (row) => ({
@@ -136,19 +134,16 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
     fields: [
       { name: "name", label: "Name", type: "text", required: true },
       { name: "canonicalUnit", label: "Unit", type: "select", options: ["g", "ml", "oz", "count"], required: true },
-      { name: "servingSize", label: "Serving size", type: "number", optional: true },
     ],
     canEdit: true,
     canDelete: true,
     toCreatePayload: (v) => ({
       name: v.name,
       canonicalUnit: v.canonicalUnit,
-      servingSize: optNum(v.servingSize) ?? null,
     }),
     toUpdatePayload: (v) => ({
       name: v.name,
       canonicalUnit: v.canonicalUnit,
-      servingSize: optNum(v.servingSize) ?? null,
     }),
   },
 

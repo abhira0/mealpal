@@ -16,7 +16,7 @@ beforeEach(() => {
   db = makeTestDb();
   hid = seedHousehold(db);
   flourId = db.insert(schema.ingredients)
-    .values({ householdId: hid, name: "Flour", canonicalUnit: "g", servingSize: 50 })
+    .values({ householdId: hid, name: "Flour", canonicalUnit: "g" })
     .returning().all()[0].id;
   shopId = db.insert(schema.shops).values({ householdId: hid, name: "Costco" }).returning().all()[0].id;
   productId = createProduct(db, hid, {

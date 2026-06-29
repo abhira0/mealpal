@@ -16,8 +16,6 @@ export const ingredients = sqliteTable("ingredients", {
   name: text("name").notNull(),
   // canonical stock unit: one of 'g' | 'ml' | 'oz' | 'count'
   canonicalUnit: text("canonical_unit").notNull(),
-  // optional: how many canonical units equal one serving (null = servings not defined)
-  servingSize: integer("serving_size"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
