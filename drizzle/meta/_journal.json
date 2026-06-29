@@ -99,6 +99,13 @@
       "when": 1782689253983,
       "tag": "0013_slot_time_of_day",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1782689253984,
+      "tag": "0014_drop_serving_size",
+      "breakpoints": true
     }
   ]
 }
