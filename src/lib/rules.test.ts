@@ -76,4 +76,25 @@ describe("rule materialization", () => {
     topUpRules(db, hid, "2026-06-10");
     expect(listEvents(db, hid, "2026-06-03", "2026-06-03")).toHaveLength(0); // stays gone
   });
+
+  it("scope 'following' keeps the past, drops this day onward", () => {
+    createRule(db, hid, "2026-06-01", { slotId, recipeId, servings: 1, ...base, unit: "day", daysOfWeek: "1111111" });
+    const before = listEvents(db, hid, "2026-06-01", "2026-06-30").length;
+    expect(before).toBe(30);
+    const wed = listEvents(db, hid, "2026-06-10", "2026-06-10")[0];
+    deleteEvent(db, hid, wed.id, "following");
+    expect(listEvents(db, hid, "2026-06-09", "2026-06-09")).toHaveLength(1); // past kept
+    expect(listEvents(db, hid, "2026-06-10", "2026-06-30")).toHaveLength(0); // this+future gone
+    topUpRules(db, hid, "2026-06-30");
+    expect(listEvents(db, hid, "2026-06-10", "2026-06-30")).toHaveLength(0); // clamped, stays gone
+  });
+
+  it("scope 'all' removes the whole series", () => {
+    createRule(db, hid, "2026-06-01", { slotId, recipeId, servings: 1, ...base, unit: "day", daysOfWeek: "1111111" });
+    const wed = listEvents(db, hid, "2026-06-10", "2026-06-10")[0];
+    deleteEvent(db, hid, wed.id, "all");
+    expect(listEvents(db, hid, "2026-06-01", "2026-06-30")).toHaveLength(0);
+    topUpRules(db, hid, "2026-06-30");
+    expect(listEvents(db, hid, "2026-06-01", "2026-06-30")).toHaveLength(0);
+  });
 });

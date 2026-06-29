@@ -4,6 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { QuantityChip } from "@/components/QuantityChip";
+import { Sheet } from "@/components/Sheet";
+
+type DeleteScope = "one" | "following" | "all";
 
 function shortServings(n: number): string {
   const v = Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100);
@@ -21,6 +24,7 @@ export function MealCard({
   servings,
   recipeId,
   status,
+  recurring = false,
   onCooked,
   onDeleted,
 }: {
@@ -29,12 +33,14 @@ export function MealCard({
   servings: number;
   recipeId: number;
   status: string;
+  recurring?: boolean;
   onCooked?: () => void;
   onDeleted?: () => void;
 }) {
   const router = useRouter();
   const [cooking, setCooking] = useState(false);
   const [local, setLocal] = useState(status);
+  const [askScope, setAskScope] = useState(false);
   const cooked = local === "cooked";
 
   async function cook() {
@@ -60,8 +66,9 @@ export function MealCard({
     }
   }
 
-  async function remove() {
-    const res = await fetch(`/api/events/${eventId}`, { method: "DELETE" });
+  async function remove(scope: DeleteScope = "one") {
+    setAskScope(false);
+    const res = await fetch(`/api/events/${eventId}?scope=${scope}`, { method: "DELETE" });
     if (res.ok) {
       if (onDeleted) onDeleted();
       else router.refresh();
@@ -84,7 +91,12 @@ export function MealCard({
           </button>
         ) : (
           <div style={{ display: "flex", gap: 8 }}>
-            <button type="button" className="btn-add" onClick={remove} aria-label="Remove meal">
+            <button
+              type="button"
+              className="btn-add"
+              onClick={() => (recurring ? setAskScope(true) : remove("one"))}
+              aria-label="Remove meal"
+            >
               Remove
             </button>
             <button type="button" className="btn" onClick={cook} disabled={cooking}>
@@ -93,6 +105,23 @@ export function MealCard({
           </div>
         )}
       </div>
+
+      <Sheet open={askScope} title="Remove repeating meal" onClose={() => setAskScope(false)}>
+        <div className="sh-body">
+          <p className="body" style={{ color: "var(--sage)" }}>
+            “{title}” repeats. What do you want to remove?
+          </p>
+          <button type="button" className="btn block" onClick={() => remove("one")}>
+            This meal only
+          </button>
+          <button type="button" className="btn block" onClick={() => remove("following")}>
+            This and all future meals
+          </button>
+          <button type="button" className="btn block" onClick={() => remove("all")}>
+            All meals in the series
+          </button>
+        </div>
+      </Sheet>
     </div>
   );
 }
