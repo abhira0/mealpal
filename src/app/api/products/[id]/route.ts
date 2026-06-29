@@ -43,6 +43,7 @@ export async function PATCH(
     ...(pricePatch(b) ?? {}),
     ...(b?.available !== undefined ? { available: Boolean(b.available) } : {}),
     ...(b?.url !== undefined ? { url: b.url === null ? null : String(b.url).trim() || null } : {}),
+    ...(b?.imageUrl !== undefined ? { imageUrl: b.imageUrl === null ? null : String(b.imageUrl).trim() || null } : {}),
     ...nutrientPatch(b),
   });
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
