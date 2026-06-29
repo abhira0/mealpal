@@ -74,7 +74,16 @@ export function listAllProducts(db: Db, householdId: number) {
       carbsG: schema.products.carbsG,
       fiberG: schema.products.fiberG,
       sugarG: schema.products.sugarG,
+      addedSugarG: schema.products.addedSugarG,
       proteinG: schema.products.proteinG,
+      polyFatG: schema.products.polyFatG,
+      monoFatG: schema.products.monoFatG,
+      vitaminDMcg: schema.products.vitaminDMcg,
+      calciumMg: schema.products.calciumMg,
+      ironMg: schema.products.ironMg,
+      potassiumMg: schema.products.potassiumMg,
+      vitaminAMcg: schema.products.vitaminAMcg,
+      vitaminCMg: schema.products.vitaminCMg,
     })
     .from(schema.products)
     .where(eq(schema.products.householdId, householdId))
@@ -177,13 +186,24 @@ export interface ProductPatch {
   carbsG?: number | null;
   fiberG?: number | null;
   sugarG?: number | null;
+  addedSugarG?: number | null;
   proteinG?: number | null;
+  polyFatG?: number | null;
+  monoFatG?: number | null;
+  vitaminDMcg?: number | null;
+  calciumMg?: number | null;
+  ironMg?: number | null;
+  potassiumMg?: number | null;
+  vitaminAMcg?: number | null;
+  vitaminCMg?: number | null;
 }
 
 // Nutrient patch keys accepted on PATCH /api/products/[id] (per canonical unit).
 export const NUTRIENT_PATCH_KEYS = [
-  "calories", "fatG", "satFatG", "transFatG", "cholesterolMg",
-  "sodiumMg", "carbsG", "fiberG", "sugarG", "proteinG",
+  "calories", "fatG", "satFatG", "transFatG", "polyFatG", "monoFatG",
+  "cholesterolMg", "sodiumMg", "carbsG", "fiberG", "sugarG", "addedSugarG",
+  "proteinG", "vitaminDMcg", "calciumMg", "ironMg", "potassiumMg",
+  "vitaminAMcg", "vitaminCMg",
 ] as const;
 
 export function updateProduct(

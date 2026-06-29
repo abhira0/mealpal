@@ -2,28 +2,42 @@
 
 import { useState } from "react";
 
-// Nutrition is STORED per canonical unit, but a label is read PER SERVING. So
-// this editor takes the serving size + the printed per-serving numbers and
-// converts: perUnit = perServing / servingSize. Mount does the reverse.
+// The FDA Nutrition Facts label, but every number is an input. Values are
+// entered PER SERVING (as printed on a label) and stored PER CANONICAL UNIT:
+// perUnit = perServing / servingSize. Mount reverses it for display.
 
 const NUTRIENTS = [
-  { key: "calories", label: "Calories", unit: "" },
-  { key: "fatG", label: "Total fat", unit: "g" },
-  { key: "satFatG", label: "Saturated fat", unit: "g" },
-  { key: "transFatG", label: "Trans fat", unit: "g" },
-  { key: "cholesterolMg", label: "Cholesterol", unit: "mg" },
-  { key: "sodiumMg", label: "Sodium", unit: "mg" },
-  { key: "carbsG", label: "Total carbs", unit: "g" },
-  { key: "fiberG", label: "Fiber", unit: "g" },
-  { key: "sugarG", label: "Sugar", unit: "g" },
-  { key: "proteinG", label: "Protein", unit: "g" },
+  { key: "fatG", label: "Total Fat", unit: "g", dv: 78, bold: true },
+  { key: "satFatG", label: "Saturated Fat", unit: "g", dv: 20, indent: true },
+  { key: "transFatG", label: "Trans Fat", unit: "g", indent: true },
+  { key: "polyFatG", label: "Polyunsaturated Fat", unit: "g", indent: true },
+  { key: "monoFatG", label: "Monounsaturated Fat", unit: "g", indent: true },
+  { key: "cholesterolMg", label: "Cholesterol", unit: "mg", dv: 300, bold: true },
+  { key: "sodiumMg", label: "Sodium", unit: "mg", dv: 2300, bold: true },
+  { key: "carbsG", label: "Total Carbohydrate", unit: "g", dv: 275, bold: true },
+  { key: "fiberG", label: "Dietary Fiber", unit: "g", dv: 28, indent: true },
+  { key: "sugarG", label: "Total Sugars", unit: "g", indent: true },
+  { key: "addedSugarG", label: "Includes Added Sugars", unit: "g", dv: 50, indent: true },
+  { key: "proteinG", label: "Protein", unit: "g", bold: true },
+  { key: "vitaminDMcg", label: "Vitamin D", unit: "mcg", dv: 20 },
+  { key: "calciumMg", label: "Calcium", unit: "mg", dv: 1300 },
+  { key: "ironMg", label: "Iron", unit: "mg", dv: 18 },
+  { key: "potassiumMg", label: "Potassium", unit: "mg", dv: 4700 },
+  { key: "vitaminAMcg", label: "Vitamin A", unit: "mcg", dv: 900 },
+  { key: "vitaminCMg", label: "Vitamin C", unit: "mg", dv: 90 },
 ] as const;
 
-type Key = (typeof NUTRIENTS)[number]["key"];
+type Key = (typeof NUTRIENTS)[number]["key"] | "calories";
 type PerUnit = Partial<Record<Key, number | null>> & { servingSize: number | null };
 
-const str = (n: number | null | undefined) =>
-  n == null ? "" : String(Math.round(n * 1000) / 1000);
+const round3 = (n: number) => Math.round(n * 1000) / 1000;
+const str = (n: number | null | undefined) => (n == null ? "" : String(round3(n)));
+const rule = (w: number) => ({ borderBottom: `${w}px solid #000` });
+
+const inputStyle: React.CSSProperties = {
+  font: "inherit", width: 64, textAlign: "right", border: "none",
+  borderBottom: "1px solid #999", background: "transparent", color: "#000", padding: "0 2px",
+};
 
 export function NutritionFactsEditor({
   productId,
@@ -38,13 +52,21 @@ export function NutritionFactsEditor({
 }) {
   const s0 = initial.servingSize ?? 1; // derive per-serving from stored per-unit
   const [serving, setServing] = useState(str(initial.servingSize));
-  const [vals, setVals] = useState<Record<Key, string>>(() =>
-    Object.fromEntries(
-      NUTRIENTS.map((n) => [n.key, str(initial[n.key] != null ? initial[n.key]! * s0 : null)]),
-    ) as Record<Key, string>,
-  );
+  const [vals, setVals] = useState<Record<Key, string>>(() => {
+    const keys: Key[] = ["calories", ...NUTRIENTS.map((n) => n.key)];
+    return Object.fromEntries(
+      keys.map((k) => [k, str(initial[k] != null ? initial[k]! * s0 : null)]),
+    ) as Record<Key, string>;
+  });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+
+  const setVal = (k: Key, v: string) => setVals((p) => ({ ...p, [k]: v }));
+  const dv = (k: Key, dvBase?: number) => {
+    if (!dvBase) return null;
+    const v = Number(vals[k]);
+    return vals[k].trim() === "" || !Number.isFinite(v) ? null : Math.round((v / dvBase) * 100);
+  };
 
   async function save() {
     const s = Number(serving);
@@ -54,11 +76,10 @@ export function NutritionFactsEditor({
     }
     setBusy(true);
     setMsg(null);
-    // per-serving → per-unit; blank clears (null)
     const patch: Record<string, number | null> = { servingSize: s };
-    for (const n of NUTRIENTS) {
-      const raw = vals[n.key].trim();
-      patch[n.key] = raw === "" ? null : Number(raw) / s;
+    for (const k of ["calories", ...NUTRIENTS.map((n) => n.key)] as Key[]) {
+      const raw = vals[k].trim();
+      patch[k] = raw === "" ? null : Number(raw) / s; // per-serving → per-unit
     }
     const res = await fetch(`/api/products/${productId}`, {
       method: "PATCH",
@@ -70,24 +91,50 @@ export function NutritionFactsEditor({
     else setMsg((await res.json().catch(() => ({}))).error ?? "Save failed");
   }
 
+  const numInput = (k: Key) => (
+    <input style={inputStyle} type="number" inputMode="decimal" step="any"
+      value={vals[k]} onChange={(e) => setVal(k, e.target.value)} aria-label={k} />
+  );
+
   return (
-    <div className="stack-sm">
-      <label className="field">
-        <span className="field-label">Serving size{unit ? ` (${unit})` : ""}</span>
-        <input className="input" type="number" inputMode="decimal" value={serving}
-          onChange={(e) => setServing(e.target.value)} placeholder={`per serving, in ${unit || "units"}`} />
-      </label>
-      {NUTRIENTS.map((n) => (
-        <label className="field" key={n.key}>
-          <span className="field-label">{n.label}{n.unit ? ` (${n.unit})` : ""} · per serving</span>
-          <input className="input" type="number" inputMode="decimal" value={vals[n.key]}
-            onChange={(e) => setVals((v) => ({ ...v, [n.key]: e.target.value }))} />
-        </label>
-      ))}
+    <div style={{ background: "#fff", color: "#000", border: "1px solid #000", borderRadius: 4, padding: 12, fontFamily: "Helvetica, Arial, sans-serif", maxWidth: 340 }}>
+      <div style={{ fontSize: 28, fontWeight: 800, ...rule(1) }}>Nutrition Facts</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 0", ...rule(8) }}>
+        <span>Serving size</span>
+        <input style={{ ...inputStyle, width: 56 }} type="number" inputMode="decimal" step="any"
+          value={serving} onChange={(e) => setServing(e.target.value)} aria-label="serving size" />
+        <strong>{unit}</strong>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 2, ...rule(4) }}>
+        <strong style={{ fontSize: 18 }}>Calories</strong>
+        {numInput("calories")}
+      </div>
+
+      <div style={{ textAlign: "right", fontSize: 12, padding: "2px 0", ...rule(1) }}>% Daily Value*</div>
+
+      {NUTRIENTS.map((n) => {
+        const pct = dv(n.key, "dv" in n ? n.dv : undefined);
+        const last = n.key === "proteinG";
+        return (
+          <div key={n.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "2px 0", ...rule(last ? 4 : 1) }}>
+            <span style={{ paddingLeft: "indent" in n && n.indent ? 16 : 0 }}>
+              <strong style={{ fontWeight: "bold" in n && n.bold ? 700 : 400 }}>{n.label}</strong>{" "}
+              {numInput(n.key)}{n.unit}
+            </span>
+            <strong>{pct != null ? `${pct}%` : ""}</strong>
+          </div>
+        );
+      })}
+
+      <p style={{ fontSize: 10, margin: "8px 0", lineHeight: 1.3 }}>
+        Enter the values printed on the label (per serving). % Daily Value uses a 2,000 calorie diet.
+      </p>
+
       <button type="button" className="btn block" disabled={busy} onClick={save}>
         {busy ? "…" : "Save nutrition facts"}
       </button>
-      {msg && <p className="notice" style={{ margin: 0 }}>{msg}</p>}
+      {msg && <p className="notice" style={{ margin: "8px 0 0" }}>{msg}</p>}
     </div>
   );
 }

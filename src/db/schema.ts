@@ -72,7 +72,17 @@ export const products = sqliteTable("products", {
   carbsG: real("carbs_g"),
   fiberG: real("fiber_g"),
   sugarG: real("sugar_g"),
+  addedSugarG: real("added_sugar_g"),
   proteinG: real("protein_g"),
+  polyFatG: real("poly_fat_g"),
+  monoFatG: real("mono_fat_g"),
+  // micronutrients, also per canonical unit
+  vitaminDMcg: real("vitamin_d_mcg"),
+  calciumMg: real("calcium_mg"),
+  ironMg: real("iron_mg"),
+  potassiumMg: real("potassium_mg"),
+  vitaminAMcg: real("vitamin_a_mcg"),
+  vitaminCMg: real("vitamin_c_mg"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),

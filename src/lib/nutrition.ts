@@ -7,27 +7,19 @@ import { consumptionForRecipe } from "@/lib/consumption";
 type Db = BetterSQLite3Database<typeof schema>;
 
 // Nutrition is stored PER CANONICAL UNIT on each product (kcal/g, etc.), so a
-// total is just (canonical units consumed) × (per-unit value), summed.
-export interface Nutrients {
-  calories: number;
-  fatG: number;
-  satFatG: number;
-  transFatG: number;
-  cholesterolMg: number;
-  sodiumMg: number;
-  carbsG: number;
-  fiberG: number;
-  sugarG: number;
-  proteinG: number;
-}
-
+// total is just (canonical units consumed) × (per-unit value), summed. Every
+// field on a Nutrition Facts label; null on a product = not filled in.
 export const NUTRIENT_KEYS = [
-  "calories", "fatG", "satFatG", "transFatG", "cholesterolMg",
-  "sodiumMg", "carbsG", "fiberG", "sugarG", "proteinG",
+  "calories", "fatG", "satFatG", "transFatG", "polyFatG", "monoFatG",
+  "cholesterolMg", "sodiumMg", "carbsG", "fiberG", "sugarG", "addedSugarG",
+  "proteinG", "vitaminDMcg", "calciumMg", "ironMg", "potassiumMg",
+  "vitaminAMcg", "vitaminCMg",
 ] as const;
 
+export type Nutrients = Record<(typeof NUTRIENT_KEYS)[number], number>;
+
 export function zeroNutrients(): Nutrients {
-  return { calories: 0, fatG: 0, satFatG: 0, transFatG: 0, cholesterolMg: 0, sodiumMg: 0, carbsG: 0, fiberG: 0, sugarG: 0, proteinG: 0 };
+  return Object.fromEntries(NUTRIENT_KEYS.map((k) => [k, 0])) as Nutrients;
 }
 
 function addScaled(acc: Nutrients, n: Nutrients, factor: number) {
@@ -39,12 +31,9 @@ type ProductRow = typeof schema.products.$inferSelect;
 /** A product's per-unit nutrients, or null if it hasn't been filled in yet. */
 function productNutrients(p: ProductRow): Nutrients | null {
   if (p.calories == null) return null; // calories is the "filled?" sentinel
-  return {
-    calories: p.calories ?? 0, fatG: p.fatG ?? 0, satFatG: p.satFatG ?? 0,
-    transFatG: p.transFatG ?? 0, cholesterolMg: p.cholesterolMg ?? 0,
-    sodiumMg: p.sodiumMg ?? 0, carbsG: p.carbsG ?? 0, fiberG: p.fiberG ?? 0,
-    sugarG: p.sugarG ?? 0, proteinG: p.proteinG ?? 0,
-  };
+  return Object.fromEntries(
+    NUTRIENT_KEYS.map((k) => [k, (p[k] as number | null) ?? 0]),
+  ) as Nutrients;
 }
 
 export interface MealNutrition {
