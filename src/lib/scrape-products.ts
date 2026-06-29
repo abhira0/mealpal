@@ -144,10 +144,13 @@ const INSTACART_EXTRACTOR = `(() => {
 const SAYWEEE_EXTRACTOR = `(() => {
   const meta = (k) => document.querySelector('meta[property="' + k + '"]')?.getAttribute('content') ?? null;
   const imgEl = [...document.querySelectorAll('img')]
-    .filter((i) => { const u = i.currentSrc || i.src; return u && /weeecdn\\.com\\/product/.test(u) && i.naturalWidth >= 200; })
+    .filter((i) => { const u = i.currentSrc || i.src; return u && /weeecdn\\.[a-z]+\\/product\\/image/.test(u) && i.naturalWidth >= 200; })
     .sort((a, b) => b.naturalWidth * b.naturalHeight - a.naturalWidth * a.naturalHeight)[0];
   const domImg = imgEl ? (imgEl.currentSrc || imgEl.src) : null;
-  const title = meta('og:title');
+  // The rendered <h1> is the source of truth; og:title can go stale after the
+  // SPA navigates between products, so it's only a fallback.
+  const h1 = document.querySelector('h1[data-testid="wid-pdp-product-name"]');
+  const title = (h1 && h1.textContent.trim()) || meta('og:title');
   return {
     title,
     imageUrl: domImg || meta('og:image'),
