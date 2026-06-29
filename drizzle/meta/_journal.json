@@ -134,6 +134,13 @@
       "when": 1782689253988,
       "tag": "0018_add_shopping_extras",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1782689253989,
+      "tag": "0019_product_nutrition",
+      "breakpoints": true
     }
   ]
 }
