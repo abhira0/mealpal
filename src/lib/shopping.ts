@@ -7,13 +7,6 @@ type Db = BetterSQLite3Database<typeof schema>;
 // cents null = bought but not yet priced; fill it in later on the bill screen.
 export interface PurchaseInput { productId: number; quantity: number; cents?: number | null; expiresAt?: string | null; }
 
-/** Are there variant products pointing at this product as their pack parent? */
-function hasVariants(tx: Db, householdId: number, productId: number): boolean {
-  return tx.select({ id: schema.products.id }).from(schema.products)
-    .where(and(eq(schema.products.householdId, householdId), eq(schema.products.packParentId, productId)))
-    .all().length > 0;
-}
-
 /** Record a purchase: insert purchase row and restock inventory. The purchase IS the price history. */
 export function recordPurchase(db: Db, householdId: number, input: PurchaseInput) {
   return db.transaction((tx) => {
@@ -23,49 +16,10 @@ export function recordPurchase(db: Db, householdId: number, input: PurchaseInput
     const [purchase] = tx.insert(schema.purchases)
       .values({ householdId, productId: input.productId, quantity: input.quantity, cents: input.cents ?? null, expiresAt: input.expiresAt ?? null })
       .returning().all();
-    // A pack (assorted bag) restocks nothing yet — the per-variant packet counts
-    // aren't known until you check the bag, so they're entered at bill time via
-    // setPackCounts. A normal product restocks packSize × quantity right away.
-    if (!hasVariants(tx, householdId, product.id)) {
-      tx.insert(schema.stockMovements).values({
-        householdId, ingredientId: product.ingredientId, productId: product.id,
-        delta: product.packSize * input.quantity, reason: "purchase", purchaseId: purchase.id,
-      }).run();
-    }
-    return purchase;
-  });
-}
-
-/**
- * Lock in how many packets of each variant were in an assorted-pack purchase.
- * Replaces the purchase's restock movements (idempotent — safe to re-save from
- * the bill screen or correct later): one movement per variant, packSize×packets,
- * tied to the purchase so undo/expiry stay consistent. Counts of 0 add nothing.
- */
-export function setPackCounts(
-  db: Db, householdId: number, purchaseId: number,
-  counts: { productId: number; packets: number }[], expiresAt?: string | null,
-) {
-  return db.transaction((tx) => {
-    const [purchase] = tx.select().from(schema.purchases)
-      .where(and(eq(schema.purchases.id, purchaseId), eq(schema.purchases.householdId, householdId))).all();
-    if (!purchase) return undefined;
-    tx.delete(schema.stockMovements).where(eq(schema.stockMovements.purchaseId, purchaseId)).run();
-    for (const c of counts) {
-      if (!c.packets || c.packets <= 0) continue;
-      const [variant] = tx.select().from(schema.products)
-        .where(and(
-          eq(schema.products.id, c.productId),
-          eq(schema.products.householdId, householdId),
-          eq(schema.products.packParentId, purchase.productId), // must be a real variant of this pack
-        )).all();
-      if (!variant) continue;
-      tx.insert(schema.stockMovements).values({
-        householdId, ingredientId: variant.ingredientId, productId: variant.id,
-        delta: variant.packSize * c.packets, reason: "purchase", purchaseId,
-        expiresAt: expiresAt ?? purchase.expiresAt ?? null,
-      }).run();
-    }
+    tx.insert(schema.stockMovements).values({
+      householdId, ingredientId: product.ingredientId, productId: product.id,
+      delta: product.packSize * input.quantity, reason: "purchase", purchaseId: purchase.id,
+    }).run();
     return purchase;
   });
 }
@@ -110,10 +64,7 @@ export function updatePurchase(
     // or changing quantity re-points/re-sizes the linked restock so stock stays right.
     const newProductId = patch.productId ?? purchase.productId;
     const quantity = patch.quantity ?? purchase.quantity;
-    // Packs carry no single restock movement (variant packets are set via
-    // setPackCounts), so skip the packSize re-sync for them.
-    if ((patch.productId !== undefined || (patch.quantity !== undefined && patch.quantity !== purchase.quantity))
-        && !hasVariants(tx, householdId, newProductId)) {
+    if (patch.productId !== undefined || (patch.quantity !== undefined && patch.quantity !== purchase.quantity)) {
       const [product] = tx.select().from(schema.products)
         .where(and(eq(schema.products.id, newProductId), eq(schema.products.householdId, householdId))).all();
       if (!product) throw new Error("product not found in household");

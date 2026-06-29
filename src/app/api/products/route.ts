@@ -57,7 +57,6 @@ export async function POST(req: Request) {
     url: b?.url?.trim() || null,
     imageUrl: b?.imageUrl?.trim() || null,
     servingSize: b?.servingSize != null ? Number(b.servingSize) : null,
-    packParentId: b?.packParentId != null && b.packParentId !== "" ? Number(b.packParentId) : null,
   });
   return NextResponse.json(row, { status: 201 });
 }

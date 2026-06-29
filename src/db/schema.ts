@@ -50,12 +50,6 @@ export const products = sqliteTable("products", {
   name: text("name").notNull(),
   // how many of the ingredient's canonical units are in ONE unit of this product
   packSize: integer("pack_size").notNull(),
-  // assorted-pack support: if set, this product is one variant inside a parent
-  // "pack" product (e.g. a trail-mix bag). The parent is just a buyable SKU with
-  // no nutrition; buying it fans stock out to its variants at bill time. null =
-  // a normal standalone product. ponytail: plain self-ref id, no FK — a variant
-  // belongs to one pack, integrity enforced by the product picker in Manage.
-  packParentId: integer("pack_parent_id"),
   // preference rank within the ingredient (lower = preferred). default 100.
   priority: integer("priority").notNull().default(100),
   // manual price override / seed in cents; null = derive from latest purchase

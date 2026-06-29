@@ -155,13 +155,6 @@
       "when": 1782689253991,
       "tag": "0021_product_micros",
       "breakpoints": true
-    },
-    {
-      "idx": 22,
-      "version": "6",
-      "when": 1782689253992,
-      "tag": "0022_product_pack_parent",
-      "breakpoints": true
     }
   ]
 }
