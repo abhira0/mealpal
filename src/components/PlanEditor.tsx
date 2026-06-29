@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Dropdown } from "@/components/Dropdown";
 import { Stepper } from "@/components/Stepper";
 import { Sheet } from "@/components/Sheet";
@@ -157,6 +158,11 @@ export function PlanEditor() {
             <p className="loading">Loading…</p>
           ) : slots.length === 0 ? (
             <p className="body">No meal slots yet. Add some in Manage.</p>
+          ) : recipes.length === 0 ? (
+            <p className="body">
+              No recipes yet. <Link href="/recipes">Add a recipe</Link> to start
+              planning meals.
+            </p>
           ) : (
             slots.map((slot) => {
               const slotEvents = events.filter(
@@ -180,7 +186,6 @@ export function PlanEditor() {
                     type="button"
                     className="btn-add"
                     onClick={() => openAdd(slot)}
-                    disabled={recipes.length === 0}
                   >
                     + Add a meal
                   </button>
