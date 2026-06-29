@@ -11,6 +11,10 @@ import { ENTITIES, type EntitySlug, type FieldDef } from "@/app/manage/entities"
 type Row = Record<string, unknown> & { id: number | string };
 type OptionMap = Record<string, { value: string; label: string }[]>;
 
+// Loose key for matching shop names/slugs/domains: lowercase, alnum only.
+// "Patel Brothers" / "patel-brothers" / "patelbros.com" → "patelbrothers" / "patelbros".
+const norm = (s: string) => s.toLowerCase().replace(/\.com$/, "").replace(/[^a-z0-9]/g, "");
+
 // Downscale a picked image to a ~64px PNG data URL so we can store it inline
 // in the icon_url text column without bloating the row. Favicons are tiny.
 function fileToIcon(file: File): Promise<string> {
@@ -162,10 +166,14 @@ export function EntityForm({
         if (conv != null) data.packSize = Math.round(conv);
       }
 
-      // Auto-select the shop whose website matches the imported product's domain.
-      if (typeof data.url === "string" && !values.shopId) {
-        const host = domainFrom(data.url);
-        const shop = host && (optionRows.shopId ?? []).find((r) => domainFrom(r.website as string | null) === host);
+      // Auto-select the shop matching the scraped retailer, by name or website.
+      if (typeof data.shop === "string" && !values.shopId) {
+        const key = norm(data.shop);
+        const shop = (optionRows.shopId ?? []).find((r) => {
+          const name = norm(String(r.name ?? ""));
+          const dom = norm(domainFrom(r.website as string | null) ?? "");
+          return key !== "" && (name === key || name.includes(key) || key.includes(name) || (dom !== "" && (dom.includes(key) || key.includes(dom))));
+        });
         if (shop) data.shopId = shop.id;
       }
 

@@ -47,7 +47,7 @@ describe("parseScraped", () => {
 
   it("returns nulls for missing/unparseable fields", () => {
     expect(parseScraped({})).toEqual({
-      name: null, dollars: null, imageUrl: null, packSize: null, unit: null, servings: null, url: null,
+      name: null, dollars: null, imageUrl: null, packSize: null, unit: null, servings: null, shop: null, url: null,
     });
     expect(parseScraped({ priceText: "call for price", weightText: "n/a" }))
       .toMatchObject({ dollars: null, packSize: null, unit: null });

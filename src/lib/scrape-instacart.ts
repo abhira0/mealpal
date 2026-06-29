@@ -12,6 +12,7 @@ export interface RawScrape {
   imageUrl?: string | null;
   weightText?: string | null;
   servingsText?: string | null;
+  shopText?: string | null; // retailer behind the Instacart page (e.g. "Costco")
   url?: string | null;
 }
 
@@ -22,6 +23,7 @@ export interface ScrapedProduct {
   packSize: number | null; // normalized to `unit`
   unit: string | null; // 'g' | 'ml' | 'oz' | 'count'
   servings: number | null;
+  shop: string | null; // retailer name/slug, for matching the user's shops
   url: string | null;
 }
 
@@ -67,6 +69,7 @@ export function parseScraped(raw: RawScrape): ScrapedProduct {
     packSize,
     unit,
     servings,
+    shop: raw.shopText?.trim() || null,
     url: raw.url?.trim() || null,
   };
 }
@@ -92,15 +95,20 @@ const EXTRACTOR = `(() => {
     .filter((i) => { const u = i.currentSrc || i.src; return u && /product-image/.test(u) && i.naturalWidth >= 200; })
     .sort((a, b) => b.naturalWidth * b.naturalHeight - a.naturalWidth * a.naturalHeight)[0];
   const domImg = imgEl ? (imgEl.currentSrc || imgEl.src) : null;
+  // The retailer behind the page: Instacart puts it in the URL as /store/<slug>/
+  // and usually as offers.seller.name in the JSON-LD.
+  const storeSlug = (location.pathname.match(/\\/store\\/([^\\/]+)/) || [])[1] || null;
   if (p) {
     const ldImg = Array.isArray(p.image) ? p.image[0] : p.image;
     const offer = Array.isArray(p.offers) ? p.offers[0] : p.offers;
+    const seller = offer && offer.seller && offer.seller.name ? offer.seller.name : null;
     return {
       title: p.name || null,
       imageUrl: domImg || ldImg || null,
       priceText: offer && offer.price != null ? String(offer.price) : null,
       weightText: p.size || null,
       servingsText: null,
+      shopText: seller || storeSlug,
       url: location.href,
     };
   }
@@ -112,6 +120,7 @@ const EXTRACTOR = `(() => {
     priceText: (body.match(/\\$[\\d,]+\\.\\d{2}/) || [])[0] ?? null,
     weightText: (body.match(/[\\d.]+\\s*(?:fl\\.?\\s*oz|gallon|gal|quart|qt|pint|pt|cup|kg|g|ml|l|oz|lb|ct|count|pk|pack)\\b/i) || [])[0] ?? null,
     servingsText: null,
+    shopText: storeSlug,
     url: location.href,
   };
 })()`;
