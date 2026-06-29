@@ -104,11 +104,12 @@ input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:#a9a496;posi
 .sheet .o .tick{color:var(--enamel)}
 
 /* ---------- stepper ---------- */
-.stepper{display:inline-flex;align-items:center}
-.stepper button{width:38px;height:38px;border:1px solid var(--line);background:var(--paper-raised);color:var(--enamel);font-size:18px;font-weight:700;cursor:pointer}
+.stepper{display:inline-flex;align-items:stretch}
+.stepper button,.stepper .val{box-sizing:border-box;height:38px;border:1px solid var(--line)}
+.stepper button{width:38px;background:var(--paper-raised);color:var(--enamel);font-size:18px;font-weight:700;cursor:pointer}
 .stepper button:disabled{opacity:.4;cursor:default}
 .stepper button:first-child{border-radius:8px 0 0 8px}.stepper button:last-child{border-radius:0 8px 8px 0}
-.stepper .val{font-family:var(--mono);font-weight:700;font-size:14px;min-width:56px;text-align:center;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:9px 0;background:#fff}
+.stepper .val{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:14px;min-width:56px;border-left:none;border-right:none;background:#fff}
 
 /* ---------- checkbox ---------- */
 .checkbox{width:24px;height:24px;border:1.6px solid var(--line);border-radius:6px;background:#fff;position:relative;flex:none;cursor:pointer;padding:0}
