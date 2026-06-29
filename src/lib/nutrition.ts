@@ -29,9 +29,18 @@ function addScaled(acc: Nutrients, n: Nutrients, factor: number) {
 
 type ProductRow = typeof schema.products.$inferSelect;
 
+/**
+ * Has nutrition been filled in? True when any nutrient is non-null and
+ * non-zero — covers manual entry of just protein/etc. without calories, and
+ * photo-less manual saves. (calories alone is not the sentinel.)
+ */
+export function hasNutrition(p: ProductRow): boolean {
+  return NUTRIENT_KEYS.some((k) => ((p[k] as number | null) ?? 0) !== 0);
+}
+
 /** A product's per-unit nutrients, or null if it hasn't been filled in yet. */
 function productNutrients(p: ProductRow): Nutrients | null {
-  if (p.calories == null) return null; // calories is the "filled?" sentinel
+  if (!hasNutrition(p)) return null;
   return Object.fromEntries(
     NUTRIENT_KEYS.map((k) => [k, (p[k] as number | null) ?? 0]),
   ) as Nutrients;
@@ -155,7 +164,7 @@ function preferredProduct(db: Db, householdId: number, ingredientId: number): Pr
       eq(schema.products.available, true),
     ))
     .orderBy(asc(schema.products.priority)).all();
-  return products.find((p) => p.calories != null) ?? null;
+  return products.find(hasNutrition) ?? null;
 }
 
 type NutrientValues = Partial<Record<(typeof NUTRIENT_PATCH_KEYS)[number], number>>;
@@ -264,7 +273,7 @@ export function dayIngredientTable(db: Db, householdId: number, date: string): I
         )).all();
       for (const m of moves) {
         const p = m.productId != null ? productById.get(m.productId) : undefined;
-        if (!p || p.calories == null) continue; // no usable nutrition
+        if (!p || !hasNutrition(p)) continue; // no usable nutrition
         accumulate(m.ingredientId, Math.abs(m.delta), p);
       }
     } else {

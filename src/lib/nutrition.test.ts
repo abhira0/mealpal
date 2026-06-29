@@ -70,6 +70,18 @@ describe("dayNutrition", () => {
     expect(day.total.calories).toBe(0);
     expect(day.missing).toEqual(["Flour"]);
   });
+
+  it("counts a product with nutrition filled in but no calories (e.g. protein only)", () => {
+    const shopId = db.insert(schema.shops).values({ householdId: hid, name: "Mart" }).returning().all()[0].id;
+    db.insert(schema.products).values({
+      householdId: hid, ingredientId: flourId, shopId, name: "Brand A", packSize: 1000, priority: 1,
+      calories: null, proteinG: 0.1, // manually saved protein, calories left blank
+    }).returning().all();
+    event(bread().id, "planned");
+    const day = dayNutrition(db, hid, "2026-07-01");
+    expect(day.total.proteinG).toBeCloseTo(50); // 500g * 0.1
+    expect(day.missing).toEqual([]); // not flagged as missing
+  });
 });
 
 describe("cook block", () => {
