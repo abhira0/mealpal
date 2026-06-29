@@ -18,6 +18,8 @@ INSERT OR IGNORE INTO ingredients VALUES(29,8,'Oil','ml',1782697614);
 INSERT OR IGNORE INTO ingredients VALUES(30,8,'Creatine','g',1782698276);
 INSERT OR IGNORE INTO ingredients VALUES(31,8,'Roti','count',1782699865);
 INSERT OR IGNORE INTO ingredients VALUES(32,8,'Paratha','count',1782700006);
+INSERT OR IGNORE INTO ingredients VALUES(33,8,'Frozen Berries','g',1782716020);
+INSERT OR IGNORE INTO ingredients VALUES(34,8,'Chia Seeds','g',1782716128);
 INSERT OR IGNORE INTO meal_events VALUES(72,8,'2026-06-28',16,12,1,'planned',1782695784,2);
 INSERT OR IGNORE INTO meal_events VALUES(73,8,'2026-06-29',16,12,1,'planned',1782695784,2);
 INSERT OR IGNORE INTO meal_events VALUES(74,8,'2026-06-30',16,12,1,'planned',1782695784,2);
@@ -160,6 +162,8 @@ INSERT OR IGNORE INTO products VALUES(26,8,29,9,'Kirkland Signature, Organic Ext
 INSERT OR IGNORE INTO products VALUES(27,8,30,14,'Nutrex Research Creatine Monohydrate, Unflavored',300,1,1,'https://www.amazon.com/Nutrex-Research-Creatine-Drive-Gram/dp/B009EO0FSU?th=1',1782698526,'https://m.media-amazon.com/images/I/71R7hEDOLhL._AC_SL1500_.jpg',2160);
 INSERT OR IGNORE INTO products VALUES(28,8,31,13,'Franco Uncooked Phulka 18ct 1.31 lb',18,1,1,'https://www.sayweee.com/en/products/Franco-Uncooked-Phulka-18ct/100486?trace_id=9f820ccf-4a75-4ac5-8a65-26e05fb8aeff&keyword=roti&trigger_type=search_active',1782699975,'https://img08.weeecdn.net/product/image/946/394/480184DE8FD0A299.png!c864x0_q80.auto',649);
 INSERT OR IGNORE INTO products VALUES(29,8,32,13,'Deep Aloo Paratha Frozen 4pc 13.5 oz',4,1,1,'https://www.sayweee.com/en/products/Deep-Aloo-Paratha-Frozen-4pc/102708?trace_id=027915f0-12de-4b0c-bb36-2e9998ae81a9&keyword=aloo+paratha&trigger_type=search_active',1782700034,'https://img08.weeecdn.net/product/image/744/874/569B2E5783C34425.png!c864x0_q80.auto',379);
+INSERT OR IGNORE INTO products VALUES(30,8,33,9,'Kirkland Signature Three Berry Blend, 4 lbs',1814,1,1,'https://www.instacart.com/products/3105190-kirkland-signature-nature-s-three-berry-blend-4-lb-4-lb?retailerSlug=costco',1782716038,'https://www.instacart.com/assets/domains/product-image/file/large_feb63cef-7781-42a6-ad95-a51002ae4dbb.jpeg',1319);
+INSERT OR IGNORE INTO products VALUES(31,8,34,9,'Volupta Organic Chia Seeds, 64 oz',1814,1,1,'https://www.instacart.com/products/29493778-volupta-organic-chia-seeds-64-oz?retailerSlug=costco',1782716144,'https://www.instacart.com/assets/domains/product-image/file/large_743ad7bd-bc0e-4c99-a1f0-c1a1cfd3e00e.jpeg',1319);
 INSERT OR IGNORE INTO purchases VALUES(12,8,11,1,1330,NULL,1782702017);
 INSERT OR IGNORE INTO purchases VALUES(13,8,13,1,1099,NULL,1782702470);
 INSERT OR IGNORE INTO recipe_ingredients VALUES(24,12,23,43);
