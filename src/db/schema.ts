@@ -98,6 +98,10 @@ export const productVariants = sqliteTable("product_variants", {
   productId: integer("product_id").notNull().references(() => products.id),
   name: text("name").notNull(),
   nutritionPhoto: text("nutrition_photo"),
+  // one packet/serving in the parent ingredient's canonical unit (e.g. 43 g).
+  // Nutrient columns below are PER CANONICAL UNIT; the editor enters per-serving
+  // and divides by this. null = treat 1 unit as 1 serving (count-based packs).
+  servingSize: real("serving_size"),
   calories: real("calories"),
   fatG: real("fat_g"),
   satFatG: real("sat_fat_g"),

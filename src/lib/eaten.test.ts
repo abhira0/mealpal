@@ -35,4 +35,14 @@ describe("logEaten", () => {
     expect(listEaten(db, hid, "2026-06-29")).toHaveLength(1);
     expect(listEaten(db, hid, "2026-06-29")[0].count).toBe(2);
   });
+
+  it("one packet of a variant with a serving size depletes that many units", () => {
+    // a 43-unit packet variant: eating 1 packet = 43 canonical units, not 1
+    const packet = createVariant(db, hid, productId, { name: "Mega Omega", servingSize: 43, calories: 4 })!.id;
+    recordPurchase(db, hid, { productId, quantity: 1 }); // +16 more → stock 32
+    const before = currentStock(db, hid, ingId);
+    logEaten(db, hid, { date: "2026-07-01", productId, variantId: packet, count: 1 });
+    expect(currentStock(db, hid, ingId)).toBe(before - 43);
+    expect(listEaten(db, hid, "2026-07-01")[0].count).toBe(43); // stored in canonical units
+  });
 });

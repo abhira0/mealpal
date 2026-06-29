@@ -6,7 +6,7 @@ import { NUTRIENT_PATCH_KEYS } from "@/lib/products";
 type Db = BetterSQLite3Database<typeof schema>;
 
 export type VariantNutrients = Partial<Record<(typeof NUTRIENT_PATCH_KEYS)[number], number | null>>;
-export interface VariantInput extends VariantNutrients { name: string; nutritionPhoto?: string | null; }
+export interface VariantInput extends VariantNutrients { name: string; nutritionPhoto?: string | null; servingSize?: number | null; }
 export type VariantPatch = Partial<VariantInput>;
 
 /** Create a variant under a product. Returns undefined if the product isn't in

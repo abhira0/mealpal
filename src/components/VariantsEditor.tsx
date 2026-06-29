@@ -68,7 +68,11 @@ export function VariantsEditor({ productId, unit }: { productId: number; unit: s
                   {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                   {v.name}
                 </button>
-                <span className="meta">{v.calories != null ? `${v.calories} cal / ${unit || "unit"}` : "no facts yet"}</span>
+                <span className="meta">{
+                  v.calories != null
+                    ? `${Math.round(v.calories * (v.servingSize ?? 1))} cal${v.servingSize ? ` / ${v.servingSize}${unit}` : ` / ${unit || "unit"}`}`
+                    : "no facts yet"
+                }</span>
                 <button type="button" aria-label={`Delete ${v.name}`} onClick={() => remove(v.id)} style={{ color: "var(--paprika)" }}>
                   <Trash2 size={16} />
                 </button>
@@ -78,9 +82,8 @@ export function VariantsEditor({ productId, unit }: { productId: number; unit: s
                   <NutritionFactsEditor
                     savePath={`/api/variants/${v.id}`}
                     unit={unit}
-                    showServing={false}
                     initial={{
-                      servingSize: null,
+                      servingSize: v.servingSize ?? null,
                       ...Object.fromEntries(EDITOR_KEYS.map((k) => [k, v[k] ?? null])),
                     } as PerUnit}
                     onSaved={reload}
