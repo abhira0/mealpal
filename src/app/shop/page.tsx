@@ -102,7 +102,7 @@ export default function ShopPage() {
         {tab === "run" && (
           <div className="chrome-ahead">
             <span className="lbl">Buy ahead</span>
-            {[7, 14, 30].map((d) => (
+            {[7, 14, 30, 60, 90].map((d) => (
               <button key={d} onClick={() => setHorizon(d)} aria-pressed={horizon === d}>
                 {d}d
               </button>
