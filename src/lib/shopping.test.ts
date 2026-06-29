@@ -4,7 +4,7 @@ import { makeTestDb, type TestDb } from "@/test/db";
 import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
 import { createProduct } from "@/lib/products";
-import { recordPurchase, listPendingPurchases, updatePurchase, deletePurchase, learnedShelfLife, addExtra, listExtras, deleteExtra } from "@/lib/shopping";
+import { recordPurchase, listPendingPurchases, updatePurchase, deletePurchase, learnedShelfLife, addExtra, listExtras, deleteExtra, setPackCounts } from "@/lib/shopping";
 import { currentStock } from "@/lib/stock";
 
 let db: TestDb;
@@ -110,6 +110,52 @@ describe("pending purchases (bill flow)", () => {
     const row = db.select().from(schema.purchases).where(eq(schema.purchases.id, pid)).all()[0];
     expect(row.cents).toBe(1499);
     expect(row.expiresAt).toBe("2026-07-01");
+  });
+});
+
+describe("assorted packs", () => {
+  // a "trail mix bag" pack with two variants, each its own ingredient + nutrition
+  function makePack() {
+    const packId = createProduct(db, hid, {
+      ingredientId: flourId, shopId, name: "Trail Mix Bag (16)", packSize: 1, priority: 1, url: null,
+    }).id;
+    const peanutIng = db.insert(schema.ingredients).values({ householdId: hid, name: "Peanut packet", canonicalUnit: "g" }).returning().all()[0].id;
+    const raisinIng = db.insert(schema.ingredients).values({ householdId: hid, name: "Raisin packet", canonicalUnit: "g" }).returning().all()[0].id;
+    const peanut = createProduct(db, hid, { ingredientId: peanutIng, shopId, name: "Peanut", packSize: 30, priority: 1, url: null, packParentId: packId }).id;
+    const raisin = createProduct(db, hid, { ingredientId: raisinIng, shopId, name: "Raisin", packSize: 40, priority: 1, url: null, packParentId: packId }).id;
+    return { packId, peanutIng, raisinIng, peanut, raisin };
+  }
+
+  it("buying a pack restocks nothing until counts are entered", () => {
+    const { packId, peanutIng, raisinIng } = makePack();
+    recordPurchase(db, hid, { productId: packId, quantity: 1 });
+    expect(currentStock(db, hid, peanutIng)).toBe(0);
+    expect(currentStock(db, hid, raisinIng)).toBe(0);
+  });
+
+  it("setPackCounts fans packet counts out to each variant's stock", () => {
+    const { packId, peanutIng, raisinIng, peanut, raisin } = makePack();
+    const pid = recordPurchase(db, hid, { productId: packId, quantity: 1 }).id;
+    setPackCounts(db, hid, pid, [{ productId: peanut, packets: 10 }, { productId: raisin, packets: 6 }]);
+    expect(currentStock(db, hid, peanutIng)).toBe(300); // 10 × 30g
+    expect(currentStock(db, hid, raisinIng)).toBe(240); // 6 × 40g
+  });
+
+  it("re-entering counts replaces, not adds (idempotent corrections)", () => {
+    const { packId, peanutIng, peanut, raisin } = makePack();
+    const pid = recordPurchase(db, hid, { productId: packId, quantity: 1 }).id;
+    setPackCounts(db, hid, pid, [{ productId: peanut, packets: 10 }, { productId: raisin, packets: 6 }]);
+    setPackCounts(db, hid, pid, [{ productId: peanut, packets: 8 }, { productId: raisin, packets: 8 }]);
+    expect(currentStock(db, hid, peanutIng)).toBe(240); // 8 × 30g, not 18 ×
+  });
+
+  it("undoing a pack purchase reverses all its variant restocks", () => {
+    const { packId, peanutIng, raisinIng, peanut, raisin } = makePack();
+    const pid = recordPurchase(db, hid, { productId: packId, quantity: 1 }).id;
+    setPackCounts(db, hid, pid, [{ productId: peanut, packets: 10 }, { productId: raisin, packets: 6 }]);
+    deletePurchase(db, hid, pid);
+    expect(currentStock(db, hid, peanutIng)).toBe(0);
+    expect(currentStock(db, hid, raisinIng)).toBe(0);
   });
 });
 
