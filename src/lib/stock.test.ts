@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { makeTestDb, type TestDb } from "@/test/db";
 import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
-import { recordMovement, currentStock, stockByIngredient } from "@/lib/stock";
+import { recordMovement, currentStock, stockByIngredient, expiryByIngredient } from "@/lib/stock";
 
 let db: TestDb;
 let hid: number;
@@ -28,5 +28,11 @@ describe("stock ledger", () => {
     recordMovement(db, hid, { ingredientId: flourId, delta: 500, reason: "manual" });
     const map = stockByIngredient(db, hid);
     expect(map.get(flourId)).toBe(500);
+  });
+  it("surfaces the soonest expiry among positive movements, ignoring null/consumption", () => {
+    recordMovement(db, hid, { ingredientId: flourId, delta: 500, reason: "manual", expiresAt: "2026-07-10" });
+    recordMovement(db, hid, { ingredientId: flourId, delta: 500, reason: "manual", expiresAt: "2026-07-03" });
+    recordMovement(db, hid, { ingredientId: flourId, delta: -200, reason: "cooked", expiresAt: null });
+    expect(expiryByIngredient(db, hid).get(flourId)).toBe("2026-07-03");
   });
 });
