@@ -56,6 +56,30 @@ export function plannedConsumption(
 }
 
 /**
+ * First date each ingredient's running stock hits zero, walking planned meals
+ * forward from `from`. Real consumption — no shelf-life clamp. Ingredients that
+ * never run dry within [from, to] are omitted.
+ */
+export function runOutDates(
+  db: Db, householdId: number, from: string, to: string, stock: Map<number, number>,
+): Map<number, string> {
+  const events = listEvents(db, householdId, from, to).filter((e) => e.status === "planned");
+  const remaining = new Map(stock); // mutate a copy as we burn it down
+  const out = new Map<number, string>();
+  for (const ev of events) {
+    const recipe = getRecipe(db, householdId, ev.recipeId);
+    if (!recipe) continue;
+    for (const line of consumptionForRecipe(recipe, ev.servings)) {
+      if (out.has(line.ingredientId)) continue; // already dated
+      const left = (remaining.get(line.ingredientId) ?? 0) - line.amount;
+      remaining.set(line.ingredientId, left);
+      if (left < 0) out.set(line.ingredientId, ev.date);
+    }
+  }
+  return out;
+}
+
+/**
  * Delete a planned event. For rule-generated meals, `scope` chooses the reach
  * (Google-Calendar style): just this day, this + all future, or the whole series.
  * Cooked events are kept (stock already moved).

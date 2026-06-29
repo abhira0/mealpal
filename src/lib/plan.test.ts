@@ -4,7 +4,7 @@ import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
 import { createRecipe } from "@/lib/recipes";
 import { createSlot } from "@/lib/slots";
-import { addEvent, listEvents, cookEvent, plannedConsumption } from "@/lib/plan";
+import { addEvent, listEvents, cookEvent, plannedConsumption, runOutDates } from "@/lib/plan";
 import { currentStock } from "@/lib/stock";
 
 let db: TestDb;
@@ -46,6 +46,15 @@ describe("meal plan", () => {
     // horizon is 30d, but flour only keeps 3d → only the day-0 meal counts
     const map = plannedConsumption(db, hid, "2026-07-01", "2026-07-31", new Map([[flourId, 3]]));
     expect(map.get(flourId)).toBe(500);
+  });
+
+  it("dates the meal that drains stock below zero", () => {
+    // 1200g on hand; 500g/meal. Meals on 1st, 2nd, 3rd → runs dry on the 3rd.
+    addEvent(db, hid, { date: "2026-07-01", slotId, recipeId, servings: 2 });
+    addEvent(db, hid, { date: "2026-07-02", slotId, recipeId, servings: 2 });
+    addEvent(db, hid, { date: "2026-07-03", slotId, recipeId, servings: 2 });
+    const out = runOutDates(db, hid, "2026-07-01", "2026-07-31", new Map([[flourId, 1200]]));
+    expect(out.get(flourId)).toBe("2026-07-03");
   });
 
   it("cooking an event flips status and depletes stock once", () => {

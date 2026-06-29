@@ -10,6 +10,7 @@ type RawLine = {
   ingredientName: string;
   needed: number;
   product: { id: number; name: string } | null;
+  urgency?: { label: string; tone: "run" | "low" } | null;
 };
 type ShoppingMap = Record<string, RawLine[]>;
 
