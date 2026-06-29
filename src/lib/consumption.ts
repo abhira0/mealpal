@@ -72,6 +72,28 @@ export function cookChoices(db: Db, householdId: number, eventId: number): CookC
   return choices;
 }
 
+/**
+ * Ingredient names in this event's recipe that have NO in-stock product to
+ * attribute a cook to. Cooking is blocked when this is non-empty — every cooked
+ * meal must map to real products so nutrition/stock totals stay trustworthy.
+ */
+export function unstockedIngredients(db: Db, householdId: number, eventId: number): string[] {
+  const [ev] = db.select().from(schema.mealEvents)
+    .where(and(eq(schema.mealEvents.id, eventId), eq(schema.mealEvents.householdId, householdId))).all();
+  if (!ev) return [];
+  const recipe = getRecipe(db, householdId, ev.recipeId);
+  if (!recipe) return [];
+  const inStock = inStockProductsByIngredient(db, householdId);
+  const missing: string[] = [];
+  for (const line of consumptionForRecipe(recipe, ev.servings)) {
+    if ((inStock.get(line.ingredientId) ?? []).length > 0) continue;
+    const ing = db.select({ name: schema.ingredients.name }).from(schema.ingredients)
+      .where(eq(schema.ingredients.id, line.ingredientId)).all()[0];
+    missing.push(ing?.name ?? "?");
+  }
+  return missing;
+}
+
 /** Pure: scale a recipe's ingredient amounts to the requested servings. */
 export function consumptionForRecipe(
   recipe: { baseServings: number; ingredients: { ingredientId: number; amount: number }[] },
