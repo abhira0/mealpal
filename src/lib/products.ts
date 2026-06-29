@@ -15,6 +15,27 @@ export interface ProductInput {
   url: string | null;
   imageUrl?: string | null;
   servingSize?: number | null;
+  // set on a variant product to mark it as part of a parent "pack" SKU
+  packParentId?: number | null;
+}
+
+/** The variant products that make up a pack (parent product id). */
+export function packChildren(db: Db, householdId: number, packId: number) {
+  return db
+    .select()
+    .from(schema.products)
+    .where(
+      and(
+        eq(schema.products.householdId, householdId),
+        eq(schema.products.packParentId, packId),
+      ),
+    )
+    .all();
+}
+
+/** A pack is any product that has at least one variant pointing at it. */
+export function isPack(db: Db, householdId: number, productId: number): boolean {
+  return packChildren(db, householdId, productId).length > 0;
 }
 
 export function createProduct(db: Db, householdId: number, input: ProductInput) {
@@ -58,6 +79,7 @@ export function listAllProducts(db: Db, householdId: number) {
       ingredientId: schema.products.ingredientId,
       shopId: schema.products.shopId,
       packSize: schema.products.packSize,
+      packParentId: schema.products.packParentId,
       priority: schema.products.priority,
       priceCents: schema.products.priceCents,
       available: schema.products.available,
@@ -175,6 +197,7 @@ export interface ProductPatch {
   shopId?: number;
   name?: string;
   packSize?: number;
+  packParentId?: number | null;
   priority?: number;
   priceCents?: number | null;
   available?: boolean;
