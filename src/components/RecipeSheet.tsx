@@ -174,15 +174,35 @@ export function RecipeSheet({
                   }
                   onChange={(id) => updateLine(idx, { ingredientId: Number(id) })}
                 />
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  className="input mono"
-                  value={line.amount}
-                  onChange={(e) => updateLine(idx, { amount: e.target.value })}
-                  placeholder="Amount (e.g. 300)"
-                  aria-label="Amount"
-                />
+                <div style={{ position: "relative" }}>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    className="input mono"
+                    value={line.amount}
+                    onChange={(e) => updateLine(idx, { amount: e.target.value })}
+                    placeholder="Amount (e.g. 300)"
+                    aria-label="Amount"
+                  />
+                  {(() => {
+                    const unit = ingredients.find((i) => i.id === line.ingredientId)?.canonicalUnit;
+                    return unit ? (
+                      <span
+                        className="mono"
+                        style={{
+                          position: "absolute",
+                          right: 12,
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          opacity: 0.5,
+                          pointerEvents: "none",
+                        }}
+                      >
+                        {unit}
+                      </span>
+                    ) : null;
+                  })()}
+                </div>
               </div>
             ))}
             <button
