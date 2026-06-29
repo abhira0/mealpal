@@ -84,8 +84,15 @@ export function listAllProducts(db: Db, householdId: number) {
       potassiumMg: schema.products.potassiumMg,
       vitaminAMcg: schema.products.vitaminAMcg,
       vitaminCMg: schema.products.vitaminCMg,
+      // joined for the list view: shop logo + ingredient unit on each row
+      shopName: schema.shops.name,
+      shopWebsite: schema.shops.website,
+      shopIconUrl: schema.shops.iconUrl,
+      canonicalUnit: schema.ingredients.canonicalUnit,
     })
     .from(schema.products)
+    .leftJoin(schema.shops, eq(schema.products.shopId, schema.shops.id))
+    .leftJoin(schema.ingredients, eq(schema.products.ingredientId, schema.ingredients.id))
     .where(eq(schema.products.householdId, householdId))
     .orderBy(asc(schema.products.priority))
     .all();
