@@ -39,6 +39,65 @@ function fileToIcon(file: File): Promise<string> {
 // Tiny fixed option sets render as an inline radio list instead of a sheet.
 const INLINE_RADIO_MAX = 4;
 
+type Purchase = { cents: number; purchasedAt: string };
+
+const money = (c: number) => `$${(c / 100).toFixed(2)}`;
+const day = (d: string) => new Date(d).toLocaleDateString();
+
+// Inline price sparkline, oldest→newest left to right. No chart lib.
+// ponytail: points evenly spaced by index, not by date gap — fine for a trend
+// glance; switch x to a time scale if uneven gaps start to mislead.
+function Sparkline({ history }: { history: Purchase[] }) {
+  if (history.length < 2) return null;
+  const pts = [...history].reverse().map((h) => h.cents); // chronological
+  const min = Math.min(...pts);
+  const max = Math.max(...pts);
+  const span = max - min || 1;
+  const w = 280;
+  const h = 60;
+  const pad = 4;
+  const x = (i: number) => pad + (i * (w - 2 * pad)) / (pts.length - 1);
+  const y = (c: number) => h - pad - ((c - min) / span) * (h - 2 * pad);
+  const d = pts.map((c, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)} ${y(c).toFixed(1)}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} role="img" aria-label="Price trend">
+      <path d={d} fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+      {pts.map((c, i) => (
+        <circle key={i} cx={x(i)} cy={y(c)} r={2.5} fill="currentColor" />
+      ))}
+    </svg>
+  );
+}
+
+function ProductHistory({ row }: { row: Row }) {
+  const history = (row.history as Purchase[] | undefined) ?? [];
+  const effective = row.effectiveCents as number | null | undefined;
+  return (
+    <section className="card stack" style={{ marginTop: 16 }}>
+      <h2 style={{ margin: 0, fontSize: 16 }}>Price history</h2>
+      <p style={{ margin: 0 }}>
+        Effective price: <strong className="mono">{effective != null ? money(effective) : "—"}</strong>
+        {row.priceCents != null ? " (manual override)" : history.length ? " (latest purchase)" : ""}
+      </p>
+      {history.length === 0 ? (
+        <p style={{ margin: 0, opacity: 0.6 }}>No purchases recorded yet.</p>
+      ) : (
+        <>
+          <Sparkline history={history} />
+          <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+            {history.map((p, i) => (
+              <li key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderTop: i ? "1px solid var(--line, #0001)" : "none" }}>
+                <span>{day(p.purchasedAt)}</span>
+                <span className="mono">{money(p.cents)}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
+  );
+}
+
 async function getJSON(url: string): Promise<unknown> {
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error("Couldn't load");
@@ -64,6 +123,7 @@ export function EntityForm({ slug, id }: { slug: EntitySlug; id?: string }) {
   const editing = Boolean(id);
 
   const [values, setValues] = useState<Record<string, string>>({});
+  const [row, setRow] = useState<Row | null>(null);
   const [options, setOptions] = useState<OptionMap>({});
   const [optionRows, setOptionRows] = useState<Record<string, Row[]>>({});
   const [error, setError] = useState<string | null>(null);
@@ -126,6 +186,7 @@ export function EntityForm({ slug, id }: { slug: EntitySlug; id?: string }) {
           ? (data as Row[]).find((r) => String(r.id) === id)
           : undefined;
         if (!row) return;
+        setRow(row);
         const next: Record<string, string> = {};
         for (const f of config.fields) {
           if (f.prefill) {
@@ -343,6 +404,8 @@ export function EntityForm({ slug, id }: { slug: EntitySlug; id?: string }) {
             </button>
           )}
         </form>
+
+        {editing && slug === "products" && row && <ProductHistory row={row} />}
       </div>
     </>
   );
