@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
+import { createPortal } from "react-dom";
 
 type SheetProps = {
   open: boolean;
@@ -70,7 +71,9 @@ export function Sheet({ open, title, onClose, children }: SheetProps) {
 
   if (!open) return null;
 
-  return (
+  // Portal to body so an ancestor's filter/transform (e.g. .ticket's
+  // drop-shadow) doesn't become the containing block and unstick bottom:0.
+  return createPortal(
     <>
       <div className="scrim" onClick={onClose} aria-hidden="true" />
       <div
@@ -87,6 +90,7 @@ export function Sheet({ open, title, onClose, children }: SheetProps) {
         </div>
         {children}
       </div>
-    </>
+    </>,
+    document.body,
   );
 }
