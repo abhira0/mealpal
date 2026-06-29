@@ -243,20 +243,30 @@ function OverviewBody({ data, mode, openCard, setOpenCard, editing, setEditing, 
   );
 }
 
-// Breakdown lens: the full nutrient table (Total/Goal/% + a column per meal in
-// day mode), the week macro-trend chart, and actual ingredient quantities used.
+// Breakdown lens: nutrient table (Total/Goal/%) with the contribution columns
+// toggled between by-slot and by-ingredient; plus the week macro-trend chart.
 function BreakdownBody({ data, mode, date }: { data: AnalysisData; mode: "day" | "week"; date: string }) {
+  const [view, setView] = useState<"meals" | "ingredients">("meals");
   const dayMeals = mode === "day" && data.meals && data.meals.length > 0 ? data.meals : null;
   return (
     <>
       {mode === "week" && data.perDay && <WeekTrend perDay={data.perDay} />}
-      <p className="section-label">
-        Nutrients{mode === "week" ? " (daily avg) vs goal" : " — total, goal & by meal"}
-      </p>
-      {dayMeals
-        ? <MealNutrientTable n={data.nutrients} goals={data.goals} meals={dayMeals} />
-        : <NutrientTable n={data.nutrients} goals={data.goals} />}
-      <IngredientsTable date={date} mode={mode} />
+      <div className="filter">
+        <button type="button" aria-pressed={view === "meals"} onClick={() => setView("meals")}>Meals</button>
+        <button type="button" aria-pressed={view === "ingredients"} onClick={() => setView("ingredients")}>Ingredients</button>
+      </div>
+      {view === "meals" ? (
+        <>
+          <p className="section-label">
+            Nutrients{dayMeals ? " — total, goal & by slot" : mode === "week" ? " (daily avg) vs goal" : " vs goal"}
+          </p>
+          {dayMeals
+            ? <SlotNutrientTable n={data.nutrients} goals={data.goals} meals={dayMeals} />
+            : <NutrientTable n={data.nutrients} goals={data.goals} />}
+        </>
+      ) : (
+        <IngredientsTable date={date} mode={mode} />
+      )}
       <MissingNotice missing={data.missing} />
     </>
   );
@@ -374,8 +384,24 @@ function NutrientTable({ n, goals }: { n: Nutrients; goals: Goals }) {
   );
 }
 
-// Same table, plus a column per meal (day mode). Horizontal-scrolls; first column sticky.
-function MealNutrientTable({ n, goals, meals }: { n: Nutrients; goals: Goals; meals: MealLine[] }) {
+// Same table, plus a column per SLOT (day mode) — meals sharing a slot are
+// summed into one column. Horizontal-scrolls; first column sticky.
+function SlotNutrientTable({ n, goals, meals }: { n: Nutrients; goals: Goals; meals: MealLine[] }) {
+  // group meals by slot, preserving first-seen order
+  const order: string[] = [];
+  const bySlot = new Map<string, MealLine[]>();
+  for (const m of meals) {
+    if (!bySlot.has(m.slotName)) { bySlot.set(m.slotName, []); order.push(m.slotName); }
+    bySlot.get(m.slotName)!.push(m);
+  }
+  const slots = order.map((slot) => {
+    const ms = bySlot.get(slot)!;
+    return {
+      slot,
+      estimate: ms.every((m) => m.estimate),
+      value: (key: keyof Nutrients) => ms.reduce((a, m) => a + (m.nutrients[key] || 0), 0),
+    };
+  });
   return (
     <div style={{ overflowX: "auto" }}>
       <table className="mono" style={{ borderCollapse: "collapse", fontSize: 12, whiteSpace: "nowrap" }}>
@@ -385,9 +411,9 @@ function MealNutrientTable({ n, goals, meals }: { n: Nutrients; goals: Goals; me
             <th style={{ textAlign: "right", padding: "4px 8px", fontWeight: 600 }}>Total</th>
             <th style={{ textAlign: "right", padding: "4px 8px", fontWeight: 600 }}>Goal</th>
             <th style={{ textAlign: "right", padding: "4px 8px", fontWeight: 600 }}>%</th>
-            {meals.map((m, i) => (
-              <th key={i} title={m.recipeName} style={{ textAlign: "right", padding: "4px 8px", fontWeight: 600 }}>
-                {m.estimate ? "≈ " : ""}{m.slotName}
+            {slots.map((s) => (
+              <th key={s.slot} style={{ textAlign: "right", padding: "4px 8px", fontWeight: 600 }}>
+                {s.estimate ? "≈ " : ""}{s.slot}
               </th>
             ))}
           </tr>
@@ -403,8 +429,8 @@ function MealNutrientTable({ n, goals, meals }: { n: Nutrients; goals: Goals; me
                 <td style={{ textAlign: "right", padding: "4px 8px", fontWeight: r.bold ? 700 : 400 }}>{nfmt(n[r.key])}{r.unit}</td>
                 <td style={{ textAlign: "right", padding: "4px 8px", color: "var(--sage)" }}>{goal != null ? `${goal}${r.unit}` : "—"}</td>
                 <td style={{ textAlign: "right", padding: "4px 8px", fontWeight: 600, color: over ? "#9c3a1f" : "var(--ink)" }}>{pct != null ? `${pct}%` : "—"}</td>
-                {meals.map((m, i) => (
-                  <td key={i} style={{ textAlign: "right", padding: "4px 8px" }}>{nfmt(m.nutrients[r.key])}{r.unit}</td>
+                {slots.map((s) => (
+                  <td key={s.slot} style={{ textAlign: "right", padding: "4px 8px" }}>{nfmt(s.value(r.key))}{r.unit}</td>
                 ))}
               </tr>
             );
