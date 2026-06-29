@@ -49,6 +49,7 @@ export function listIngredients(db: Db, householdId: number) {
   return ingredients.map((ing) => ({
     ...ing,
     imageUrl: imageByIngredient.get(ing.id) ?? null,
+    stock: currentStock(db, householdId, ing.id), // ponytail: one query per ingredient, household scale
   }));
 }
 
