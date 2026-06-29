@@ -69,7 +69,8 @@ button{font-family:inherit}
 .input{font-family:var(--body);font-size:16px;line-height:1.2;color:var(--ink);background:var(--paper-raised);border:1px solid var(--line);border-radius:8px;padding:12px 13px;width:100%;min-height:44px}
 .input::placeholder{color:#a9a496}
 /* iOS renders empty date inputs blank with no format hint; show one. */
-input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:#a9a496;white-space:nowrap}
+input[type=date][data-empty]{position:relative}
+input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:#a9a496;position:absolute;left:13px;top:50%;transform:translateY(-50%);white-space:nowrap;pointer-events:none}
 .input.mono{font-family:var(--mono);font-size:16px}
 .search{position:relative}
 .search .input{padding-left:36px}
