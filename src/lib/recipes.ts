@@ -1,6 +1,7 @@
 import { and, asc, eq } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
+import { effectivePrice } from "@/lib/products";
 
 type Db = BetterSQLite3Database<typeof schema>;
 
@@ -72,5 +73,31 @@ export function getRecipe(db: Db, householdId: number, id: number) {
     .where(eq(schema.recipeSteps.recipeId, id)).orderBy(asc(schema.recipeSteps.position)).all();
   const media = db.select().from(schema.recipeMedia)
     .where(eq(schema.recipeMedia.recipeId, id)).all();
-  return { ...recipe, ingredients, steps, media };
+  return { ...recipe, ingredients, steps, media, costCents: recipeCostCents(db, householdId, ingredients) };
+}
+
+/**
+ * Cost in cents to cook the recipe at baseServings, or null if any ingredient's
+ * top-priority available product has no effective price. Each ingredient costs
+ * (amount / packSize) * price, using the same top-priority pick as shopping.
+ */
+function recipeCostCents(
+  db: Db, householdId: number,
+  ingredients: { ingredientId: number; amount: number }[],
+): number | null {
+  let total = 0;
+  for (const line of ingredients) {
+    const [product] = db.select().from(schema.products)
+      .where(and(
+        eq(schema.products.householdId, householdId),
+        eq(schema.products.ingredientId, line.ingredientId),
+        eq(schema.products.available, true),
+      ))
+      .orderBy(asc(schema.products.priority)).limit(1).all();
+    if (!product || product.packSize <= 0) return null;
+    const price = effectivePrice(db, product.id);
+    if (price == null) return null;
+    total += (line.amount / product.packSize) * price;
+  }
+  return Math.round(total);
 }
