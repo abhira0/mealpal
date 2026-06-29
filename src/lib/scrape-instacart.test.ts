@@ -31,6 +31,12 @@ describe("parseScraped", () => {
     expect(parseScraped({ weightText: "30 ct" })).toMatchObject({ packSize: 30, unit: "count" });
   });
 
+  it("converts volume units to ml", () => {
+    expect(parseScraped({ weightText: "1 gallon" })).toMatchObject({ packSize: 3785, unit: "ml" });
+    expect(parseScraped({ weightText: "128 fl oz" })).toMatchObject({ packSize: 3785, unit: "ml" });
+    expect(parseScraped({ weightText: "1 qt" })).toMatchObject({ packSize: 946, unit: "ml" });
+  });
+
   it("takes the first weight when several appear", () => {
     expect(parseScraped({ weightText: "1.36 kg (48 oz)" })).toMatchObject({ packSize: 1360, unit: "g" });
   });

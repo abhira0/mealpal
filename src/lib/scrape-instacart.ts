@@ -32,6 +32,11 @@ function normalizeWeight(amount: number, raw: string): { packSize: number; unit:
   if (u === "g") return { packSize: amount, unit: "g" };
   if (u === "l") return { packSize: amount * 1000, unit: "ml" };
   if (u === "ml") return { packSize: amount, unit: "ml" };
+  if (u === "gal" || u === "gallon") return { packSize: amount * 3785.41, unit: "ml" };
+  if (u === "qt" || u === "quart") return { packSize: amount * 946.353, unit: "ml" };
+  if (u === "pt" || u === "pint") return { packSize: amount * 473.176, unit: "ml" };
+  if (u === "cup") return { packSize: amount * 236.588, unit: "ml" };
+  if (u === "fl oz" || u === "floz" || u === "fl. oz") return { packSize: amount * 29.5735, unit: "ml" };
   if (u === "oz") return { packSize: amount, unit: "oz" };
   if (u === "lb") return { packSize: amount * 16, unit: "oz" };
   if (u === "ct" || u === "count" || u === "pk" || u === "pack") return { packSize: amount, unit: "count" };
@@ -46,10 +51,10 @@ export function parseScraped(raw: RawScrape): ScrapedProduct {
 
   let packSize: number | null = null;
   let unit: string | null = null;
-  const wMatch = raw.weightText?.match(/([\d.]+)\s*(kg|g|ml|l|oz|lb|ct|count|pk|pack)\b/i);
+  const wMatch = raw.weightText?.match(/([\d.]+)\s*(fl\.?\s*oz|gallon|gal|quart|qt|pint|pt|cup|kg|g|ml|l|oz|lb|ct|count|pk|pack)\b/i);
   if (wMatch) {
-    const n = normalizeWeight(Number(wMatch[1]), wMatch[2]);
-    if (n) { packSize = n.packSize; unit = n.unit; }
+    const n = normalizeWeight(Number(wMatch[1]), wMatch[2].replace(/\s+/g, " "));
+    if (n) { packSize = Math.round(n.packSize); unit = n.unit; }
   }
 
   const sMatch = raw.servingsText?.match(/(\d+)/);
@@ -105,7 +110,7 @@ const EXTRACTOR = `(() => {
     title: meta('og:title'),
     imageUrl: domImg || meta('og:image'),
     priceText: (body.match(/\\$[\\d,]+\\.\\d{2}/) || [])[0] ?? null,
-    weightText: (body.match(/[\\d.]+\\s*(?:kg|g|ml|l|oz|lb|ct|count|pk|pack)\\b/i) || [])[0] ?? null,
+    weightText: (body.match(/[\\d.]+\\s*(?:fl\\.?\\s*oz|gallon|gal|quart|qt|pint|pt|cup|kg|g|ml|l|oz|lb|ct|count|pk|pack)\\b/i) || [])[0] ?? null,
     servingsText: null,
     url: location.href,
   };
