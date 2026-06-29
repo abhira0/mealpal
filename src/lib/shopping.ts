@@ -30,6 +30,9 @@ export function listPendingPurchases(db: Db, householdId: number) {
     id: schema.purchases.id,
     productId: schema.purchases.productId,
     productName: schema.products.name,
+    shopName: schema.shops.name,
+    website: schema.shops.website,
+    iconUrl: schema.shops.iconUrl,
     quantity: schema.purchases.quantity,
     expiresAt: schema.purchases.expiresAt,
     hintCents: schema.products.priceCents, // manual override as a suggestion; may be null
@@ -37,6 +40,7 @@ export function listPendingPurchases(db: Db, householdId: number) {
   })
     .from(schema.purchases)
     .innerJoin(schema.products, eq(schema.products.id, schema.purchases.productId))
+    .innerJoin(schema.shops, eq(schema.shops.id, schema.products.shopId))
     .where(and(eq(schema.purchases.householdId, householdId), isNull(schema.purchases.cents)))
     .orderBy(desc(schema.purchases.purchasedAt))
     .all();

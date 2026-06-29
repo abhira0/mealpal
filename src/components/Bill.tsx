@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Ticket } from "@/components/ShopTicket";
 import { centsToDollars } from "@/lib/money";
 
 type Pending = {
   id: number;
   productName: string;
+  shopName: string;
+  website: string | null;
+  iconUrl: string | null;
   quantity: number;
   expiresAt: string | null;
   hintCents: number | null;
@@ -35,6 +39,17 @@ export function Bill({ onCount }: { onCount?: (n: number) => void }) {
     });
   }
 
+  // group by stop, same shape the run renders
+  const stops = useMemo(() => {
+    const m = new Map<string, Pending[]>();
+    for (const r of rows ?? []) {
+      const g = m.get(r.shopName);
+      if (g) g.push(r);
+      else m.set(r.shopName, [r]);
+    }
+    return [...m.entries()];
+  }, [rows]);
+
   return (
     <>
       {error && <p className="notice">{error}</p>}
@@ -42,8 +57,17 @@ export function Bill({ onCount }: { onCount?: (n: number) => void }) {
       {rows && rows.length === 0 && (
         <p className="empty">Nothing to price — you&apos;re all caught up.</p>
       )}
-      {rows?.map((row) => (
-        <BillRow key={row.id} row={row} onSaved={() => drop(row.id)} />
+      {stops.map(([shopName, group]) => (
+        <Ticket
+          key={shopName}
+          shopName={shopName}
+          website={group[0].website}
+          iconUrl={group[0].iconUrl}
+        >
+          {group.map((row) => (
+            <BillRow key={row.id} row={row} onSaved={() => drop(row.id)} />
+          ))}
+        </Ticket>
       ))}
     </>
   );
@@ -81,50 +105,50 @@ function BillRow({ row, onSaved }: { row: Pending; onSaved: () => void }) {
   }
 
   return (
-    <div className="card stack">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-        <strong>{row.productName}</strong>
-        <label className="eb" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          qty
-          <input
-            className="input mono"
-            inputMode="numeric"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value.replace(/[^0-9]/g, ""))}
-            style={{ width: 56 }}
-          />
-        </label>
+    <div className="ticket-row">
+      <div className="tk-main">
+        <div className="tk-name">{row.productName}</div>
+
+        <div className="bill-fields">
+          <label className="eb" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            $
+            <input
+              className="input mono"
+              inputMode="decimal"
+              value={dollars}
+              onChange={(e) => setDollars(e.target.value.replace(/[^0-9.]/g, ""))}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(); } }}
+              aria-label={`Price paid for ${row.productName}`}
+              style={{ width: 80 }}
+            />
+          </label>
+          <label className="eb" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            qty
+            <input
+              className="input mono"
+              inputMode="numeric"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value.replace(/[^0-9]/g, ""))}
+              aria-label={`Quantity of ${row.productName}`}
+              style={{ width: 56 }}
+            />
+          </label>
+          <label className="eb" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            exp
+            <input
+              className="input"
+              type="date"
+              value={expiresAt}
+              onChange={(e) => setExpiresAt(e.target.value)}
+              aria-label={`Expiry of ${row.productName}`}
+            />
+          </label>
+          <button type="button" className="btn" onClick={save} disabled={busy}>
+            {busy ? "…" : "Save"}
+          </button>
+        </div>
+        {error && <div className="eb" style={{ color: "var(--paprika)", marginTop: 6 }}>{error}</div>}
       </div>
-
-      <label className="field">
-        <span className="field-label">Price paid</span>
-        <span className="input mono" style={{ display: "inline-flex", alignItems: "center" }}>
-          <span style={{ color: "var(--sage)", marginRight: 2 }}>$</span>
-          <input
-            inputMode="decimal"
-            value={dollars}
-            onChange={(e) => setDollars(e.target.value.replace(/[^0-9.]/g, ""))}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(); } }}
-            aria-label="Price paid in dollars"
-            style={{ flex: 1, border: "none", outline: "none", background: "transparent", font: "inherit", color: "inherit" }}
-          />
-        </span>
-      </label>
-
-      <label className="field">
-        <span className="field-label">Expires · optional</span>
-        <input
-          className="input"
-          type="date"
-          value={expiresAt}
-          onChange={(e) => setExpiresAt(e.target.value)}
-        />
-      </label>
-
-      <button type="button" className="btn block" onClick={save} disabled={busy}>
-        {busy ? "…" : "Save"}
-      </button>
-      {error && <p className="eb" style={{ color: "var(--paprika)" }}>{error}</p>}
     </div>
   );
 }
