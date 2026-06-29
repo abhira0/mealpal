@@ -13,6 +13,7 @@ type Product = {
 
 export default function NutritionPhotosPage() {
   const [products, setProducts] = useState<Product[] | null>(null);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     fetch("/api/products", { cache: "no-store" })
@@ -22,6 +23,11 @@ export default function NutritionPhotosPage() {
   }, []);
 
   const withPhoto = products?.filter((p) => p.nutritionPhoto).length ?? 0;
+
+  // Filter by name, then push uploaded (has photo) ones to the bottom.
+  const shown = products
+    ?.filter((p) => p.name.toLowerCase().includes(query.toLowerCase()))
+    .sort((a, b) => Number(!!a.nutritionPhoto) - Number(!!b.nutritionPhoto));
 
   return (
     <>
@@ -36,12 +42,20 @@ export default function NutritionPhotosPage() {
           {products ? ` (${withPhoto}/${products.length} have photos)` : ""}
         </p>
 
-        {!products ? (
+        <input
+          type="search"
+          placeholder="Search products…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="input"
+        />
+
+        {!shown ? (
           <p style={{ opacity: 0.6 }}>Loading…</p>
-        ) : products.length === 0 ? (
+        ) : shown.length === 0 ? (
           <p style={{ opacity: 0.6 }}>No products yet.</p>
         ) : (
-          products.map((p) => (
+          shown.map((p) => (
             <section className="card stack" key={p.id}>
               <div className="card-row">
                 <span className="title row-main">{p.name}</span>
