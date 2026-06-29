@@ -32,6 +32,19 @@ describe("recipes", () => {
     expect(full?.media[0].url).toBe("https://youtu.be/x");
   });
 
+  it("round-trips totalMinutes through create and update", () => {
+    const r = createRecipe(db, hid, {
+      name: "Bread", baseServings: 2, notes: null, totalMinutes: 45,
+      ingredients: [], steps: [], media: [],
+    });
+    expect(getRecipe(db, hid, r.id)?.totalMinutes).toBe(45);
+    updateRecipe(db, hid, r.id, {
+      name: "Bread", baseServings: 2, notes: null, totalMinutes: null,
+      ingredients: [], steps: [], media: [],
+    });
+    expect(getRecipe(db, hid, r.id)?.totalMinutes).toBeNull();
+  });
+
   it("updates a recipe and replaces its children", () => {
     const r = createRecipe(db, hid, {
       name: "Bread", baseServings: 2, notes: "old",

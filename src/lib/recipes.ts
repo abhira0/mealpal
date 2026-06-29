@@ -10,6 +10,7 @@ export interface RecipeInput {
   name: string;
   baseServings: number;
   notes: string | null;
+  totalMinutes?: number | null;
   ingredients: { ingredientId: number; amount: number }[];
   steps: string[];
   media: { kind: string; url: string }[];
@@ -18,7 +19,7 @@ export interface RecipeInput {
 export function createRecipe(db: Db, householdId: number, input: RecipeInput) {
   return db.transaction((tx) => {
     const [recipe] = tx.insert(schema.recipes)
-      .values({ householdId, name: input.name, baseServings: input.baseServings, notes: input.notes })
+      .values({ householdId, name: input.name, baseServings: input.baseServings, notes: input.notes, totalMinutes: input.totalMinutes ?? null })
       .returning().all();
     for (const ing of input.ingredients) {
       tx.insert(schema.recipeIngredients)
@@ -37,7 +38,7 @@ export function createRecipe(db: Db, householdId: number, input: RecipeInput) {
 export function updateRecipe(db: Db, householdId: number, id: number, input: RecipeInput) {
   return db.transaction((tx) => {
     const updated = tx.update(schema.recipes)
-      .set({ name: input.name, baseServings: input.baseServings, notes: input.notes })
+      .set({ name: input.name, baseServings: input.baseServings, notes: input.notes, totalMinutes: input.totalMinutes ?? null })
       .where(and(eq(schema.recipes.id, id), eq(schema.recipes.householdId, householdId)))
       .returning().all();
     if (updated.length === 0) return undefined; // not found / not yours
