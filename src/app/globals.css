@@ -117,6 +117,9 @@ button{font-family:inherit}
 .timeline .node.node--empty{background:var(--sage)}
 
 /* ---------- week strip (Plan) ---------- */
+.jump{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.jump input[type=date]{font-family:var(--mono);font-size:12px;color:var(--ink);background:var(--paper-raised);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.jump .btn-add{padding:0;min-height:auto}
 .week{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
 .week .day{flex:0 0 auto;min-width:52px;text-align:center;padding:8px 6px;border-radius:8px;border:1px solid var(--line);background:var(--paper-raised);cursor:pointer;color:var(--ink)}
 .week .day .dow{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--sage)}

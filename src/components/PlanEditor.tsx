@@ -23,17 +23,22 @@ function isoOf(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/** 7-day window: 1 day back through 5 days ahead, centred on today. */
-function weekDays(): Date[] {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+/** 7-day strip: 1 day back through 5 days ahead, relative to a given date. */
+function windowAround(iso: string): Date[] {
+  const base = new Date(iso + "T00:00:00");
   const days: Date[] = [];
   for (let i = -1; i <= 5; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
+    const d = new Date(base);
+    d.setDate(base.getDate() + i);
     days.push(d);
   }
   return days;
+}
+
+function todayISO(): string {
+  const t = new Date();
+  t.setHours(0, 0, 0, 0);
+  return isoOf(t);
 }
 
 const DOW = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -55,16 +60,14 @@ function initials(name: string | null | undefined): string {
 }
 
 export function PlanEditor({ userName }: { userName?: string | null }) {
-  const days = useMemo(weekDays, []);
-  const todayIso = isoOf(days[1]); // days[1] is today (window starts 1 day back)
+  const todayIso = useMemo(todayISO, []);
+  const [selected, setSelected] = useState<string>(todayIso);
+
+  // The strip slides to keep `selected` in view; the events range follows it.
+  const days = useMemo(() => windowAround(selected), [selected]);
   const from = isoOf(days[0]);
   const to = isoOf(days[days.length - 1]);
 
-  const [selected, setSelected] = useState<string>(() => {
-    const t = new Date();
-    t.setHours(0, 0, 0, 0);
-    return isoOf(t);
-  });
   const [slots, setSlots] = useState<Slot[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [events, setEvents] = useState<MealEvent[]>([]);
@@ -88,24 +91,28 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
     if (res.ok) setEvents((await res.json()) as MealEvent[]);
   }, [from, to]);
 
+  // Slots and recipes don't depend on the date range — fetch once.
   useEffect(() => {
     let alive = true;
     (async () => {
-      const [sRes, rRes, eRes] = await Promise.all([
+      const [sRes, rRes] = await Promise.all([
         fetch("/api/slots"),
         fetch("/api/recipes"),
-        fetch(`/api/events?from=${from}&to=${to}`),
       ]);
       if (!alive) return;
       if (sRes.ok) setSlots((await sRes.json()) as Slot[]);
       if (rRes.ok) setRecipes((await rRes.json()) as Recipe[]);
-      if (eRes.ok) setEvents((await eRes.json()) as MealEvent[]);
       setLoading(false);
     })();
     return () => {
       alive = false;
     };
-  }, [from, to]);
+  }, []);
+
+  // Events follow the visible window.
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
 
   const daysWithMeals = useMemo(() => {
     const set = new Set<string>();
@@ -206,6 +213,23 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
       </header>
 
       <div className="content">
+        <div className="jump">
+          <input
+            type="date"
+            aria-label="Jump to date"
+            value={selected}
+            onChange={(e) => e.target.value && setSelected(e.target.value)}
+          />
+          {!isToday && (
+            <button
+              type="button"
+              className="btn-add"
+              onClick={() => setSelected(todayIso)}
+            >
+              Today
+            </button>
+          )}
+        </div>
         <div className="week" role="tablist" aria-label="Days">
           {days.map((d) => {
             const iso = isoOf(d);
