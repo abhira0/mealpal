@@ -9,6 +9,7 @@ import { dayNutrition, scorecards, zeroNutrients, mondayOf, macroSplit, dayIngre
 import { createVariant } from "@/lib/variants";
 import { logEaten } from "@/lib/eaten";
 import { createProduct } from "@/lib/products";
+import { addEvent } from "@/lib/plan";
 
 let db: TestDb;
 let hid: number;
@@ -186,5 +187,25 @@ describe("dayNutrition includes the eat-log", () => {
     const day = dayNutrition(eatDb, eatHid, "2026-06-29");
     expect(day.total.calories).toBe(360); // 180 × 2
     expect(day.total.proteinG).toBe(12);
+  });
+});
+
+describe("dayNutrition includes direct planner items", () => {
+  it("a direct product-variant item adds variant nutrition × amount", () => {
+    const shopId = db.insert(schema.shops).values({ householdId: hid, name: "Costco" }).returning().all()[0].id;
+    const productId = createProduct(db, hid, { ingredientId: flourId, shopId, name: "Trail Mix Bag", packSize: 1000, priority: 1, url: null }).id;
+    // variant: 4 kcal per gram, 43 g per packet
+    const variantId = createVariant(db, hid, productId, { name: "Mega Omega", servingSize: 43, calories: 4 })!.id;
+    addEvent(db, hid, { date: "2026-07-01", slotId, productId, variantId, servings: 1 }); // amount = 43g
+    const day = dayNutrition(db, hid, "2026-07-01");
+    expect(day.total.calories).toBe(172); // 4 × 43
+    expect(day.meals[0].recipeName).toBe("Mega Omega");
+  });
+
+  it("a direct ingredient item uses the preferred product's nutrition", () => {
+    flourProduct({ calories: 2 }); // 2 kcal/g preferred product
+    addEvent(db, hid, { date: "2026-07-01", slotId, ingredientId: flourId, amount: 100, servings: 1 });
+    const day = dayNutrition(db, hid, "2026-07-01");
+    expect(day.total.calories).toBe(200); // 2 × 100
   });
 });

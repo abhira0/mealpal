@@ -6,6 +6,9 @@ import { createRecipe } from "@/lib/recipes";
 import { createSlot } from "@/lib/slots";
 import { addEvent, listEvents, cookEvent, plannedConsumption, runOutDates } from "@/lib/plan";
 import { currentStock } from "@/lib/stock";
+import { createProduct } from "@/lib/products";
+import { createVariant } from "@/lib/variants";
+import { recordPurchase } from "@/lib/shopping";
 
 let db: TestDb;
 let hid: number;
@@ -67,5 +70,36 @@ describe("meal plan", () => {
     // cooking again is a no-op (already cooked)
     cookEvent(db, hid, ev.id);
     expect(currentStock(db, hid, flourId)).toBe(1500);
+  });
+});
+
+describe("direct items in a planner slot", () => {
+  let shopId: number;
+  let productId: number;
+  beforeEach(() => {
+    shopId = db.insert(schema.shops).values({ householdId: hid, name: "Costco" }).returning().all()[0].id;
+    productId = createProduct(db, hid, {
+      ingredientId: flourId, shopId, name: "AP Flour 25lb", packSize: 1000, priority: 1, url: null,
+    }).id;
+  });
+
+  it("a direct ingredient item plans + cooks, deducting its amount", () => {
+    recordPurchase(db, hid, { productId, quantity: 1 }); // +1000g
+    const ev = addEvent(db, hid, { date: "2026-07-01", slotId, ingredientId: flourId, amount: 200, servings: 1 });
+    expect(ev.recipeId).toBeNull();
+    expect(ev.amount).toBe(200);
+    expect(plannedConsumption(db, hid, "2026-07-01", "2026-07-01").get(flourId)).toBe(200);
+    cookEvent(db, hid, ev.id);
+    expect(currentStock(db, hid, flourId)).toBe(800); // 1000 - 200
+  });
+
+  it("a direct product item resolves amount from the variant's serving size and deducts that product", () => {
+    const variantId = createVariant(db, hid, productId, { name: "Mega Omega", servingSize: 43, calories: 4 })!.id;
+    recordPurchase(db, hid, { productId, quantity: 1 }); // +1000g on this product
+    // 2 servings × 43g/packet = 86g
+    const ev = addEvent(db, hid, { date: "2026-07-02", slotId, productId, variantId, servings: 2 });
+    expect(ev.amount).toBe(86);
+    cookEvent(db, hid, ev.id);
+    expect(currentStock(db, hid, flourId)).toBe(914); // 1000 - 86, attributed to this product
   });
 });
