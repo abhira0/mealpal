@@ -184,14 +184,21 @@ export function RecipeView({ id }: { id: string }) {
                   <tr>
                     <th style={{ textAlign: "left", padding: "6px 10px 6px 0", position: "sticky", left: 0, background: "var(--paper)" }}>Nutrient</th>
                     {recipe.nutrition.byIngredient.map((ing) => (
-                      <th key={ing.ingredientId} style={{ textAlign: "right", padding: "6px 8px" }}>
-                        {ing.name} <span style={{ opacity: 0.5, fontWeight: 400 }}>{roundScaled(ing.amount)}{ing.unit}</span>
-                      </th>
+                      <th key={ing.ingredientId} style={{ textAlign: "right", padding: "6px 8px" }}>{ing.name}</th>
                     ))}
                     <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 700 }}>Total</th>
                   </tr>
                 </thead>
                 <tbody>
+                  <tr style={{ borderTop: "1px solid var(--line, #0001)" }}>
+                    <th scope="row" style={{ textAlign: "left", fontWeight: 600, padding: "6px 10px 6px 0", position: "sticky", left: 0, background: "var(--paper)" }}>Qty</th>
+                    {recipe.nutrition.byIngredient.map((ing) => (
+                      <td key={ing.ingredientId} style={{ textAlign: "right", padding: "6px 8px", opacity: 0.6 }}>
+                        {roundScaled(ing.amount)}{ing.unit}
+                      </td>
+                    ))}
+                    <td style={{ textAlign: "right", padding: "6px 8px" }}>—</td>
+                  </tr>
                   {NUTRIENT_ROWS.map((row) => (
                     <tr key={row.key} style={{ borderTop: "1px solid var(--line, #0001)" }}>
                       <th scope="row" style={{ textAlign: "left", fontWeight: 600, padding: "6px 10px 6px 0", position: "sticky", left: 0, background: "var(--paper)" }}>
