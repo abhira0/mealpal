@@ -1,0 +1,1 @@
+ALTER TABLE `stock_movements` ADD `product_id` integer REFERENCES products(id);

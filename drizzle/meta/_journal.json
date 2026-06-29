@@ -120,6 +120,13 @@
       "when": 1782689253986,
       "tag": "0016_stock_expiry",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1782689253987,
+      "tag": "0017_stock_product",
+      "breakpoints": true
     }
   ]
 }
