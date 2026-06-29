@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import type { IngredientNutritionRow, Nutrients, Goals, Scorecard } from "@/lib/nutrition";
 import { FACT_ROWS } from "@/components/NutritionFacts";
 import { EChart } from "@/components/EChart";
-import { QuickEat } from "@/components/QuickEat";
 
 function todayISO(): string {
   const t = new Date();
@@ -68,8 +67,6 @@ export default function NutritionPage() {
             <button type="button" onClick={() => setDate(isoAddDays(date, 7))}>Next ›</button>
           </div>
         )}
-
-        {mode === "day" && <QuickEat date={date} onLogged={() => setReloadKey((k) => k + 1)} />}
 
         {loading || !data ? (
           <p style={{ opacity: 0.6 }}>Loading…</p>
