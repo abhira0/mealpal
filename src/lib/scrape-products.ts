@@ -1,6 +1,9 @@
 /**
- * Scrape an Instacart product page that's already open in a Chrome you launched
+ * Scrape a grocery product page that's already open in a Chrome you launched
  * with --remote-debugging-port=9222 (so we reuse your logged-in session).
+ *
+ * Multi-site: each entry in SITES matches a host and carries its own in-page
+ * EXTRACTOR. connectAndExtract() picks the site by the open tab's URL.
  *
  * Two halves: parseScraped() is pure and tested; connectAndExtract() is the
  * fragile I/O that grabs raw strings off the live page.
@@ -12,7 +15,7 @@ export interface RawScrape {
   imageUrl?: string | null;
   weightText?: string | null;
   servingsText?: string | null;
-  shopText?: string | null; // retailer behind the Instacart page (e.g. "Costco")
+  shopText?: string | null; // retailer behind the page (e.g. "Costco", "Weee")
   url?: string | null;
 }
 
@@ -79,7 +82,7 @@ export function parseScraped(raw: RawScrape): ScrapedProduct {
 // stale on this SPA, so they're only a fallback when JSON-LD is absent.
 // ponytail: the JSON-LD shape is the calibration knob — if Instacart drops it,
 // fall back to og/body and anything missed comes back blank for the user.
-const EXTRACTOR = `(() => {
+const INSTACART_EXTRACTOR = `(() => {
   let p = null;
   for (const s of document.querySelectorAll('script[type="application/ld+json"]')) {
     try {
@@ -133,10 +136,44 @@ const EXTRACTOR = `(() => {
   };
 })()`;
 
+// Weee! (sayweee.com) ships no JSON-LD. og: tags hold the name+weight and a
+// product image; the price is only in the rendered DOM, so we regex the first
+// "$x.xx" out of the page text. The store is always Weee.
+// ponytail: og:title is the knob — name and pack size both ride on it, so the
+// first weight token in the title ("18ct" before "1.31 lb") wins.
+const SAYWEEE_EXTRACTOR = `(() => {
+  const meta = (k) => document.querySelector('meta[property="' + k + '"]')?.getAttribute('content') ?? null;
+  const imgEl = [...document.querySelectorAll('img')]
+    .filter((i) => { const u = i.currentSrc || i.src; return u && /weeecdn\\.com\\/product/.test(u) && i.naturalWidth >= 200; })
+    .sort((a, b) => b.naturalWidth * b.naturalHeight - a.naturalWidth * a.naturalHeight)[0];
+  const domImg = imgEl ? (imgEl.currentSrc || imgEl.src) : null;
+  const title = meta('og:title');
+  return {
+    title,
+    imageUrl: domImg || meta('og:image'),
+    priceText: (document.body.innerText.match(/\\$[\\d,]+\\.\\d{2}/) || [])[0] ?? null,
+    weightText: title, // pack size rides on the title (e.g. "... 18ct 1.31 lb")
+    servingsText: null,
+    shopText: 'Weee',
+    url: location.href,
+  };
+})()`;
+
+interface Site {
+  id: string;
+  match: (url: string) => boolean;
+  extractor: string;
+}
+
+const SITES: Site[] = [
+  { id: "instacart", match: (u) => u.includes("instacart."), extractor: INSTACART_EXTRACTOR },
+  { id: "sayweee", match: (u) => u.includes("sayweee."), extractor: SAYWEEE_EXTRACTOR },
+];
+
 /**
- * Find the open Instacart product tab in a Chrome started with
- * --remote-debugging-port, evaluate EXTRACTOR in it over raw DevTools
- * Protocol, and parse the result. We talk CDP directly (Node's global
+ * Find the open product tab in a Chrome started with --remote-debugging-port,
+ * pick the matching site's EXTRACTOR by the tab URL, evaluate it over raw
+ * DevTools Protocol, and parse the result. We talk CDP directly (Node's global
  * WebSocket) because Playwright's connectOverCDP rejects a real Chrome with
  * "Browser context management is not supported".
  */
@@ -146,13 +183,17 @@ export async function connectAndExtract(
   const res = await fetch(`${endpoint}/json`);
   const targets = (await res.json()) as { type: string; url: string; webSocketDebuggerUrl?: string }[];
   const pages = targets.filter((t) => t.type === "page" && t.webSocketDebuggerUrl);
+  const supported = SITES.map((s) => s.id).join(", ");
   if (pages.length === 0) {
     throw new Error(
-      "No tabs on the debug Chrome. Launch Chrome with --remote-debugging-port=9222 AND a dedicated --user-data-dir, then open the Instacart product page in that window.",
+      `No tabs on the debug Chrome. Launch Chrome with --remote-debugging-port=9222 AND a dedicated --user-data-dir, then open a product page (${supported}) in that window.`,
     );
   }
-  const target =
-    pages.find((t) => t.url.includes("instacart.")) ?? pages[pages.length - 1];
+  let site: Site | undefined;
+  let target = pages.find((t) => (site = SITES.find((s) => s.match(t.url))) !== undefined);
+  if (!target || !site) {
+    throw new Error(`No supported product tab found. Open a product page (${supported}) in the debug Chrome.`);
+  }
 
   const ws = new WebSocket(target.webSocketDebuggerUrl!);
   try {
@@ -168,7 +209,7 @@ export async function connectAndExtract(
       };
       ws.send(JSON.stringify({
         id: 1, method: "Runtime.evaluate",
-        params: { expression: EXTRACTOR, returnByValue: true },
+        params: { expression: site!.extractor, returnByValue: true },
       }));
     });
     return parseScraped(reply.result?.result?.value ?? {});
