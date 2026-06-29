@@ -2,9 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Pencil, Trash2 } from "lucide-react";
 
 // The one standard Edit/Delete block for every entity detail view:
-// a full-width "Edit" button (opens the edit sheet) and a red "Delete X" link.
+// two icon buttons in a row — edit (opens the edit sheet) and red delete.
 export function EditDeleteActions({
   singular,
   deletePath,
@@ -33,13 +34,15 @@ export function EditDeleteActions({
 
   return (
     <>
-      <button type="button" className="btn block" onClick={onEdit}>
-        Edit
-      </button>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button type="button" className="btn block" onClick={onEdit} aria-label={`Edit ${singular}`}>
+          <Pencil size={18} />
+        </button>
+        <button type="button" className="btn block danger" onClick={remove} aria-label={`Delete ${singular}`}>
+          <Trash2 size={18} />
+        </button>
+      </div>
       {error && <p className="notice" style={{ marginTop: 0 }}>{error}</p>}
-      <button type="button" className="btn block danger" onClick={remove}>
-        Delete {singular}
-      </button>
     </>
   );
 }
