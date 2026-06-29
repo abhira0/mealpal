@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, gte } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
 
@@ -131,6 +131,24 @@ export function topUpRules(db: Db, householdId: number, today: string) {
     if (from > end) continue;
     materialize(db, rule, from, end);
   }
+}
+
+/**
+ * End a series at `fromDate`: keep past occurrences, drop this day and all future
+ * generated (planned) ones, and clamp the rule so top-up won't re-add them.
+ */
+export function endSeriesFrom(db: Db, householdId: number, ruleId: number, fromDate: string) {
+  const [rule] = db.select().from(schema.mealRules)
+    .where(and(eq(schema.mealRules.id, ruleId), eq(schema.mealRules.householdId, householdId))).all();
+  if (!rule) return;
+  const until = fmt(new Date(parse(fromDate).getTime() - DAY));
+  db.update(schema.mealRules).set({ untilDate: until })
+    .where(eq(schema.mealRules.id, ruleId)).run();
+  db.delete(schema.mealEvents).where(and(
+    eq(schema.mealEvents.ruleId, ruleId),
+    eq(schema.mealEvents.status, "planned"),
+    gte(schema.mealEvents.date, fromDate),
+  )).run();
 }
 
 /** Delete a generated meal: tombstone the day so it never regenerates, then remove the row. */
