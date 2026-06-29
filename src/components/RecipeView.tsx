@@ -23,7 +23,7 @@ type Recipe = {
   costCents: number | null;
   nutrition?: {
     perServing: FactValues;
-    byIngredient: { ingredientId: number; name: string; values: FactValues }[];
+    byIngredient: { ingredientId: number; name: string; unit: string; amount: number; values: FactValues }[];
     missing: string[];
   };
 };
@@ -64,6 +64,7 @@ export function RecipeView({ id }: { id: string }) {
   const [notFound, setNotFound] = useState(false);
   const [servings, setServings] = useState(1);
   const [editOpen, setEditOpen] = useState(false);
+  const [nutriTab, setNutriTab] = useState<"label" | "breakdown">("label");
 
   async function loadRecipe() {
     const rRes = await fetch(`/api/recipes/${id}`);
@@ -169,16 +170,23 @@ export function RecipeView({ id }: { id: string }) {
         {recipe.nutrition && recipe.nutrition.perServing.calories != null && (
           <section>
             <h2 className="title" style={{ marginBottom: 4 }}>Nutrition</h2>
-            <NutritionFacts values={recipe.nutrition.perServing} servingLabel="1 serving" />
+            <div className="filter" style={{ marginBottom: 8 }}>
+              <button type="button" aria-pressed={nutriTab === "label"} onClick={() => setNutriTab("label")}>Label</button>
+              <button type="button" aria-pressed={nutriTab === "breakdown"} onClick={() => setNutriTab("breakdown")}>Breakdown</button>
+            </div>
 
-            <p className="section-label" style={{ marginTop: 12 }}>Per-serving breakdown by ingredient</p>
+            {nutriTab === "label" ? (
+              <NutritionFacts values={recipe.nutrition.perServing} servingLabel="1 serving" />
+            ) : (
             <div style={{ overflowX: "auto" }}>
               <table className="mono" style={{ borderCollapse: "collapse", fontSize: 12, whiteSpace: "nowrap" }}>
                 <thead>
                   <tr>
                     <th style={{ textAlign: "left", padding: "6px 10px 6px 0", position: "sticky", left: 0, background: "var(--paper)" }}>Nutrient</th>
                     {recipe.nutrition.byIngredient.map((ing) => (
-                      <th key={ing.ingredientId} style={{ textAlign: "right", padding: "6px 8px" }}>{ing.name}</th>
+                      <th key={ing.ingredientId} style={{ textAlign: "right", padding: "6px 8px" }}>
+                        {ing.name} <span style={{ opacity: 0.5, fontWeight: 400 }}>{roundScaled(ing.amount)}{ing.unit}</span>
+                      </th>
                     ))}
                     <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 700 }}>Total</th>
                   </tr>
@@ -202,6 +210,7 @@ export function RecipeView({ id }: { id: string }) {
                 </tbody>
               </table>
             </div>
+            )}
 
             {recipe.nutrition.missing.length > 0 && (
               <p className="body" style={{ color: "var(--sage)", marginTop: 6 }}>

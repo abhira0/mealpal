@@ -164,25 +164,35 @@ function IngredientsTable() {
         <table className="mono" style={{ borderCollapse: "collapse", fontSize: 12, whiteSpace: "nowrap" }}>
           <thead>
             <tr>
-              <th style={{ textAlign: "left", padding: "6px 10px 6px 0", position: "sticky", left: 0, background: "var(--paper)" }}>Ingredient</th>
-              {COLS.map((c) => (
-                <th key={c.key} style={{ textAlign: "right", padding: "6px 8px" }}>{c.label}{c.unit ? ` (${c.unit})` : ""}</th>
+              <th style={{ textAlign: "left", padding: "6px 10px 6px 0", position: "sticky", left: 0, background: "var(--paper)" }}>Nutrient</th>
+              <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 700 }}>Total</th>
+              {rows.map((r) => (
+                <th key={r.ingredientId} style={{ textAlign: "right", padding: "6px 8px" }}>
+                  {r.name} <span style={{ opacity: 0.5, fontWeight: 400 }}>/100{r.unit}</span>
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.ingredientId} style={{ borderTop: "1px solid var(--line, #0001)" }}>
+            {COLS.map((c) => {
+              const present = rows.map((r) => r.values[c.key]).filter((v): v is number => v != null);
+              const total = present.length ? present.reduce((a, b) => a + b, 0) : null;
+              return (
+              <tr key={c.key} style={{ borderTop: "1px solid var(--line, #0001)" }}>
                 <th scope="row" style={{ textAlign: "left", fontWeight: 600, padding: "6px 10px 6px 0", position: "sticky", left: 0, background: "var(--paper)" }}>
-                  {r.name} <span style={{ opacity: 0.5, fontWeight: 400 }}>/100{r.unit}</span>
+                  {c.label}{c.unit ? ` (${c.unit})` : ""}
                 </th>
-                {COLS.map((c) => (
-                  <td key={c.key} style={{ textAlign: "right", padding: "6px 8px" }}>
+                <td style={{ textAlign: "right", padding: "6px 8px", fontWeight: 700 }}>
+                  {total != null ? Math.round(total) : "—"}
+                </td>
+                {rows.map((r) => (
+                  <td key={r.ingredientId} style={{ textAlign: "right", padding: "6px 8px" }}>
                     {r.values[c.key] != null ? Math.round(r.values[c.key]!) : "—"}
                   </td>
                 ))}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

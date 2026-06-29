@@ -164,7 +164,7 @@ export interface RecipeNutrition {
   /** per-serving value per nutrient (all keys; absent = unknown). */
   perServing: NutrientValues;
   /** per-serving contribution of each ingredient (for the breakdown table). */
-  byIngredient: { ingredientId: number; name: string; values: NutrientValues }[];
+  byIngredient: { ingredientId: number; name: string; unit: string; amount: number; values: NutrientValues }[];
   /** ingredient names whose preferred product has no nutrition, so totals undercount. */
   missing: string[];
 }
@@ -179,16 +179,17 @@ export function recipeNutrition(
   householdId: number,
   recipe: { baseServings: number; ingredients: { ingredientId: number; amount: number }[] },
 ): RecipeNutrition {
-  const ingredientName = new Map(
+  const ingredientInfo = new Map(
     db.select().from(schema.ingredients).where(eq(schema.ingredients.householdId, householdId)).all()
-      .map((i) => [i.id, i.name]),
+      .map((i) => [i.id, { name: i.name, unit: i.canonicalUnit }]),
   );
   const denom = recipe.baseServings > 0 ? recipe.baseServings : 1;
   const totals: Record<string, number> = {};
   const byIngredient: RecipeNutrition["byIngredient"] = [];
   const missing = new Set<string>();
   for (const line of recipe.ingredients) {
-    const name = ingredientName.get(line.ingredientId) ?? "?";
+    const info = ingredientInfo.get(line.ingredientId);
+    const name = info?.name ?? "?";
     const p = preferredProduct(db, householdId, line.ingredientId);
     if (!p) { missing.add(name); continue; }
     const values: NutrientValues = {};
@@ -198,7 +199,7 @@ export function recipeNutrition(
       values[k] = (v * line.amount) / denom; // per-serving contribution
       totals[k] = (totals[k] ?? 0) + v * line.amount;
     }
-    byIngredient.push({ ingredientId: line.ingredientId, name, values });
+    byIngredient.push({ ingredientId: line.ingredientId, name, unit: info?.unit ?? "", amount: line.amount / denom, values });
   }
   const perServing: NutrientValues = {};
   for (const k of NUTRIENT_PATCH_KEYS) if (totals[k] != null) perServing[k] = totals[k] / denom;
