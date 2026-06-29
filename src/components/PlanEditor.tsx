@@ -62,7 +62,7 @@ export function PlanEditor() {
   const [repeat, setRepeat] = useState(false);
   const [repeatDays, setRepeatDays] = useState<boolean[]>(() => Array(7).fill(true));
   const [intervalN, setIntervalN] = useState(1);
-  const [unit, setUnit] = useState<"day" | "week">("week");
+  const [unit, setUnit] = useState<"day" | "week">("day");
   const [until, setUntil] = useState("");
 
   const loadEvents = useCallback(async () => {
@@ -111,7 +111,7 @@ export function PlanEditor() {
     setRepeat(false);
     setRepeatDays(Array(7).fill(true));
     setIntervalN(1);
-    setUnit("week");
+    setUnit("day");
     setUntil("");
   }
 
@@ -263,21 +263,23 @@ export function PlanEditor() {
 
           {repeat && (
             <>
-              <div className="week" role="group" aria-label="Repeat on">
-                {DOW.map((label, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    aria-pressed={repeatDays[i]}
-                    className={repeatDays[i] ? "day on" : "day"}
-                    onClick={() =>
-                      setRepeatDays((ds) => ds.map((d, j) => (j === i ? !d : d)))
-                    }
-                  >
-                    <span className="dow">{label[0]}</span>
-                  </button>
-                ))}
-              </div>
+              {unit === "week" && (
+                <div className="week" role="group" aria-label="Repeat on">
+                  {DOW.map((label, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      aria-pressed={repeatDays[i]}
+                      className={repeatDays[i] ? "day on" : "day"}
+                      onClick={() =>
+                        setRepeatDays((ds) => ds.map((d, j) => (j === i ? !d : d)))
+                      }
+                    >
+                      <span className="dow">{label[0]}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="servings-row">
                 <span className="field-label" style={{ marginBottom: 0 }}>
                   Every

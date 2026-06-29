@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { makeTestDb, type TestDb } from "@/test/db";
 import { seedHousehold } from "@/test/fixtures";
-import { schema } from "@/db";
 import { createRecipe } from "@/lib/recipes";
 import { createSlot } from "@/lib/slots";
 import { addEvent, listEvents, deleteEvent } from "@/lib/plan";
