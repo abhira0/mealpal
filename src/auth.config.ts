@@ -1,7 +1,7 @@
 import type { NextAuthConfig } from "next-auth";
 
 // Edge-safe Auth.js config (no database / Node-only imports). Used by the
-// middleware. The full config in `src/auth.ts` extends this and adds the
+// proxy. The full config in `src/auth.ts` extends this and adds the
 // Credentials provider whose `authorize` touches better-sqlite3 (Node only).
 export const authConfig: NextAuthConfig = {
   session: { strategy: "jwt" },
