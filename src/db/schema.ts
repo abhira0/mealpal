@@ -170,6 +170,21 @@ export const purchases = sqliteTable("purchases", {
   purchasedAt: integer("purchased_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
+// Manually-added shopping-list lines (not derived from meal plans).
+// Either a tracked product (productId set) or a one-off untracked item (title set).
+export const shoppingExtras = sqliteTable("shopping_extras", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  householdId: integer("household_id").notNull().references(() => households.id),
+  // tracked: pick a product → checking it off records a real purchase + restock
+  productId: integer("product_id").references(() => products.id),
+  // one-off: free-text item not in the system (e.g. a Costco impulse buy)
+  title: text("title"),
+  // which stop it belongs to; for product lines we derive from the product instead
+  shopId: integer("shop_id").references(() => shops.id),
+  quantity: integer("quantity").notNull().default(1),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   householdId: integer("household_id")
