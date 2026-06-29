@@ -51,6 +51,24 @@ describe("deletePurchase", () => {
   });
 });
 
+describe("updatePurchase product swap", () => {
+  it("re-points the restock to the substitute product (wanted one was out)", () => {
+    const altId = createProduct(db, hid, {
+      ingredientId: flourId, shopId, name: "AP Flour 10lb",
+      packSize: 4536, priority: 2, url: null,
+    }).id;
+    const pid = recordPurchase(db, hid, { productId, quantity: 1 }).id;
+    expect(currentStock(db, hid, flourId)).toBe(11340);
+
+    updatePurchase(db, hid, pid, { productId: altId });
+    // ingredient stock now reflects the substitute's pack size, not the original
+    expect(currentStock(db, hid, flourId)).toBe(4536);
+    const mv = db.select().from(schema.stockMovements)
+      .where(eq(schema.stockMovements.purchaseId, pid)).all();
+    expect(mv[0].productId).toBe(altId);
+  });
+});
+
 describe("learnedShelfLife", () => {
   // insert a purchase with a controlled purchasedAt + expiresAt
   function buy(purchasedAt: string, expiresAt: string | null) {

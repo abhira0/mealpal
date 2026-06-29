@@ -29,6 +29,7 @@ export function listPendingPurchases(db: Db, householdId: number) {
   return db.select({
     id: schema.purchases.id,
     productId: schema.purchases.productId,
+    ingredientId: schema.products.ingredientId,
     productName: schema.products.name,
     shopName: schema.shops.name,
     website: schema.shops.website,
@@ -52,21 +53,24 @@ export function listPendingPurchases(db: Db, householdId: number) {
  */
 export function updatePurchase(
   db: Db, householdId: number, id: number,
-  patch: { cents?: number | null; expiresAt?: string | null; quantity?: number },
+  patch: { cents?: number | null; expiresAt?: string | null; quantity?: number; productId?: number },
 ) {
   return db.transaction((tx) => {
     const [purchase] = tx.select().from(schema.purchases)
       .where(and(eq(schema.purchases.id, id), eq(schema.purchases.householdId, householdId))).all();
     if (!purchase) return undefined;
 
-    if (patch.quantity !== undefined && patch.quantity !== purchase.quantity) {
+    // Swapping the product (e.g. the milk you wanted was out, you grabbed another)
+    // or changing quantity re-points/re-sizes the linked restock so stock stays right.
+    const newProductId = patch.productId ?? purchase.productId;
+    const quantity = patch.quantity ?? purchase.quantity;
+    if (patch.productId !== undefined || (patch.quantity !== undefined && patch.quantity !== purchase.quantity)) {
       const [product] = tx.select().from(schema.products)
-        .where(eq(schema.products.id, purchase.productId)).all();
-      if (product) {
-        tx.update(schema.stockMovements)
-          .set({ delta: product.packSize * patch.quantity })
-          .where(eq(schema.stockMovements.purchaseId, id)).run();
-      }
+        .where(and(eq(schema.products.id, newProductId), eq(schema.products.householdId, householdId))).all();
+      if (!product) throw new Error("product not found in household");
+      tx.update(schema.stockMovements)
+        .set({ productId: product.id, ingredientId: product.ingredientId, delta: product.packSize * quantity })
+        .where(eq(schema.stockMovements.purchaseId, id)).run();
     }
 
     const [row] = tx.update(schema.purchases)
@@ -74,6 +78,7 @@ export function updatePurchase(
         ...(patch.cents !== undefined ? { cents: patch.cents } : {}),
         ...(patch.expiresAt !== undefined ? { expiresAt: patch.expiresAt } : {}),
         ...(patch.quantity !== undefined ? { quantity: patch.quantity } : {}),
+        ...(patch.productId !== undefined ? { productId: patch.productId } : {}),
       })
       .where(and(eq(schema.purchases.id, id), eq(schema.purchases.householdId, householdId)))
       .returning().all();
