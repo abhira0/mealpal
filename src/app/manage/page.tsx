@@ -28,6 +28,7 @@ const CATALOG: { slug: EntitySlug; emoji: string }[] = [
   { slug: "ingredients", emoji: "🥚" },
   { slug: "shops", emoji: "🏪" },
   { slug: "products", emoji: "🏷️" },
+  { slug: "slots", emoji: "🍽️" },
 ];
 
 export default async function ManagePage() {

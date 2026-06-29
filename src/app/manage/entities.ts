@@ -54,7 +54,7 @@ export type EntityConfig = {
   toUpdatePayload: (values: Record<string, string>) => Record<string, unknown>;
 };
 
-export type EntitySlug = "shops" | "ingredients" | "products";
+export type EntitySlug = "shops" | "ingredients" | "products" | "slots";
 
 function num(v: string | undefined): number {
   return Number(v);
@@ -191,6 +191,25 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
       url: optStr(v.url),
       imageUrl: optStr(v.imageUrl),
     }),
+  },
+
+  slots: {
+    label: "Meal slots",
+    singular: "Slot",
+    listPath: "/api/slots",
+    itemPath: (id) => `/api/slots/${id}`,
+    columns: [
+      { key: "name", label: "Name" },
+      { key: "position", label: "Order" },
+    ],
+    fields: [
+      { name: "name", label: "Name", type: "text", required: true },
+      { name: "position", label: "Order", type: "number", optional: true },
+    ],
+    canEdit: true,
+    canDelete: true,
+    toCreatePayload: (v) => ({ name: v.name, position: num(v.position) || 0 }),
+    toUpdatePayload: (v) => ({ name: v.name, position: num(v.position) || 0 }),
   },
 };
 

@@ -16,6 +16,19 @@ export function listSlots(db: Db, householdId: number) {
     .orderBy(asc(schema.mealSlots.position)).all();
 }
 
+export function updateSlot(
+  db: Db,
+  householdId: number,
+  id: number,
+  values: { name: string; position?: number },
+) {
+  const [row] = db.update(schema.mealSlots)
+    .set({ name: values.name, ...(values.position !== undefined ? { position: values.position } : {}) })
+    .where(and(eq(schema.mealSlots.id, id), eq(schema.mealSlots.householdId, householdId)))
+    .returning().all();
+  return row;
+}
+
 export function deleteSlot(db: Db, householdId: number, id: number): boolean {
   const rows = db.delete(schema.mealSlots)
     .where(and(eq(schema.mealSlots.id, id), eq(schema.mealSlots.householdId, householdId)))
