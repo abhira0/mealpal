@@ -534,7 +534,82 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
           >
             {saving ? "Adding…" : repeat ? "Add repeating meal" : "Add meal"}
           </button>
+          <button type="button" className="btn-add" onClick={() => setStep("type")}>← Back</button>
         </div>
+        )}
+
+        {step === "details" && kind === "product" && (
+          <div className="sh-body">
+            <div className="field">
+              <span className="field-label">Product</span>
+              <Dropdown
+                label="Product"
+                value={pickProduct}
+                options={products.map((p) => ({ id: p.id, label: p.name }))}
+                onChange={(id) => selectProduct(Number(id))}
+              />
+            </div>
+            {variants.length > 0 && (
+              <div className="field">
+                <span className="field-label">Variant</span>
+                <Dropdown
+                  label="Variant"
+                  value={pickVariant}
+                  options={variants.map((v) => ({ id: v.id, label: v.name }))}
+                  onChange={(id) => setPickVariant(Number(id))}
+                />
+              </div>
+            )}
+            <div className="servings-row">
+              <span className="field-label" style={{ marginBottom: 0 }}>Servings</span>
+              <Stepper value={pickServings} min={1} onChange={setPickServings} />
+            </div>
+            <button
+              type="button"
+              className="btn block"
+              onClick={saveMeal}
+              disabled={saving || pickProduct == null || (variants.length > 0 && pickVariant == null)}
+            >
+              {saving ? "Adding…" : "Add"}
+            </button>
+            <button type="button" className="btn-add" onClick={() => setStep("type")}>← Back</button>
+          </div>
+        )}
+
+        {step === "details" && kind === "ingredient" && (
+          <div className="sh-body">
+            <div className="field">
+              <span className="field-label">Ingredient</span>
+              <Dropdown
+                label="Ingredient"
+                value={pickIngredient}
+                options={ingredients.map((i) => ({ id: i.id, label: i.name }))}
+                onChange={(id) => setPickIngredient(Number(id))}
+              />
+            </div>
+            <div className="field">
+              <span className="field-label">
+                Amount{pickIngredient != null && ingredientUnit.get(pickIngredient) ? ` (${ingredientUnit.get(pickIngredient)})` : ""}
+              </span>
+              <input
+                className="input mono"
+                inputMode="decimal"
+                value={pickAmount}
+                onChange={(e) => setPickAmount(e.target.value.replace(/[^0-9.]/g, ""))}
+                placeholder="e.g. 43"
+              />
+            </div>
+            <button
+              type="button"
+              className="btn block"
+              onClick={saveMeal}
+              disabled={saving || pickIngredient == null || !(Number(pickAmount) > 0)}
+            >
+              {saving ? "Adding…" : "Add"}
+            </button>
+            <button type="button" className="btn-add" onClick={() => setStep("type")}>← Back</button>
+          </div>
+        )}
       </Sheet>
     </>
   );
