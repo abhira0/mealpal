@@ -205,7 +205,7 @@ function OverviewBody({ data, mode, openCard, setOpenCard, editing, setEditing, 
   return (
     <>
       <p className="section-label">Calories &amp; macros{mode === "week" ? " (daily avg)" : ""}</p>
-      <CalorieMacroRing cal={cal} macros={data.macros} goal={goals.calorieGoal} />
+      <CalorieMacroRing cal={cal} macros={data.macros} goal={goals.calorieGoal} n={n} />
       <p className="mono" style={{ textAlign: "center", margin: "-8px 0 0", fontSize: 12, color: "var(--sage)" }}>
         of {goals.calorieGoal} kcal · {pct}%{mode === "week" ? " · daily avg" : ""}
       </p>
@@ -291,12 +291,17 @@ const nfmt = (x: number) => (x < 10 ? Math.round(x * 10) / 10 : Math.round(x));
 
 // Combined view: inner donut = macro split, outer thin arc = calorie progress
 // toward goal, calorie total in the center. One chart instead of two.
-function CalorieMacroRing({ cal, macros, goal }: { cal: number; macros: AnalysisData["macros"]; goal: number }) {
+function CalorieMacroRing({ cal, macros, goal, n }: { cal: number; macros: AnalysisData["macros"]; goal: number; n: Nutrients }) {
   if (macros.carbs + macros.fat + macros.protein === 0)
     return <p style={{ opacity: 0.6, textAlign: "center", margin: 0 }}>No calories logged.</p>;
   const r = (x: number) => Math.round(x);
+  // params.data carries our custom `grams`; gauge series shows calories vs goal.
+  const tip = (p: { seriesType: string; name: string; value: number; data?: { grams?: number } }) =>
+    p.seriesType === "gauge"
+      ? `Calories: ${Math.round(p.value)} / ${goal} kcal · ${pctOf(p.value, goal) ?? 0}%`
+      : `${p.name}: ${p.value}% of calories · ${p.data?.grams ?? 0} g`;
   const option = {
-    tooltip: { trigger: "item", formatter: "{b}: {c}% of calories" },
+    tooltip: { trigger: "item", formatter: tip },
     legend: {
       bottom: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 11 },
       data: ["Carbs", "Fat", "Protein"],
@@ -305,15 +310,16 @@ function CalorieMacroRing({ cal, macros, goal }: { cal: number; macros: Analysis
       {
         name: "Macros", type: "pie", radius: ["42%", "62%"], center: ["50%", "46%"],
         avoidLabelOverlap: false, label: { show: false }, labelLine: { show: false },
+        emphasis: { scaleSize: 6, itemStyle: { shadowBlur: 6, shadowColor: "rgba(0,0,0,0.2)" } },
         data: [
-          { value: r(macros.carbs), name: "Carbs", itemStyle: { color: MACRO_COLOR.carbs } },
-          { value: r(macros.fat), name: "Fat", itemStyle: { color: MACRO_COLOR.fat } },
-          { value: r(macros.protein), name: "Protein", itemStyle: { color: MACRO_COLOR.protein } },
+          { value: r(macros.carbs), name: "Carbs", grams: r(n.carbsG), itemStyle: { color: MACRO_COLOR.carbs } },
+          { value: r(macros.fat), name: "Fat", grams: r(n.fatG), itemStyle: { color: MACRO_COLOR.fat } },
+          { value: r(macros.protein), name: "Protein", grams: r(n.proteinG), itemStyle: { color: MACRO_COLOR.protein } },
         ],
       },
       {
         type: "gauge", radius: "92%", center: ["50%", "46%"], startAngle: 90, endAngle: -270,
-        min: 0, max: goal || 1, silent: true,
+        min: 0, max: goal || 1, silent: false,
         progress: { show: true, width: 7, roundCap: true, itemStyle: { color: MACRO_COLOR.protein } },
         axisLine: { lineStyle: { width: 7, color: [[1, "#e3ddcc"]] } },
         pointer: { show: false }, axisTick: { show: false }, splitLine: { show: false }, axisLabel: { show: false },
