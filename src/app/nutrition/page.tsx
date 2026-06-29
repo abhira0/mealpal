@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { DayNutrition, IngredientNutritionRow, Nutrients } from "@/lib/nutrition";
-import { FACT_ROWS } from "@/components/NutritionFacts";
+import { NutritionFacts, FACT_ROWS } from "@/components/NutritionFacts";
 
 function todayISO(): string {
   const t = new Date();
@@ -13,34 +13,11 @@ function todayISO(): string {
 
 const round = (n: number) => Math.round(n);
 const g = (n: number) => `${Math.round(n)}g`;
-const mg = (n: number) => `${Math.round(n)}mg`;
-const mcg = (n: number) => `${Math.round(n)}mcg`;
 
 // Compact macro line for a single meal.
 function macroLine(n: Nutrients): string {
   return `${round(n.calories)} kcal · P ${g(n.proteinG)} · C ${g(n.carbsG)} · F ${g(n.fatG)}`;
 }
-
-const TOTAL_ROWS: { label: string; key: keyof Nutrients; fmt: (n: number) => string }[] = [
-  { label: "Protein", key: "proteinG", fmt: g },
-  { label: "Carbs", key: "carbsG", fmt: g },
-  { label: "— Sugar", key: "sugarG", fmt: g },
-  { label: "— Fiber", key: "fiberG", fmt: g },
-  { label: "— Added sugar", key: "addedSugarG", fmt: g },
-  { label: "Fat", key: "fatG", fmt: g },
-  { label: "— Saturated", key: "satFatG", fmt: g },
-  { label: "— Trans", key: "transFatG", fmt: g },
-  { label: "— Poly", key: "polyFatG", fmt: g },
-  { label: "— Mono", key: "monoFatG", fmt: g },
-  { label: "Cholesterol", key: "cholesterolMg", fmt: mg },
-  { label: "Sodium", key: "sodiumMg", fmt: mg },
-  { label: "Vitamin D", key: "vitaminDMcg", fmt: mcg },
-  { label: "Calcium", key: "calciumMg", fmt: mg },
-  { label: "Iron", key: "ironMg", fmt: mg },
-  { label: "Potassium", key: "potassiumMg", fmt: mg },
-  { label: "Vitamin A", key: "vitaminAMcg", fmt: mcg },
-  { label: "Vitamin C", key: "vitaminCMg", fmt: mg },
-];
 
 export default function NutritionPage() {
   const [tab, setTab] = useState<"day" | "ingredients">("day");
@@ -89,19 +66,9 @@ export default function NutritionPage() {
         </label>
 
         {total && (
-          <section className="card stack">
+          <section className="stack">
             <p className="section-label">Day total</p>
-            <p style={{ margin: 0, fontSize: 32, fontWeight: 700 }} className="mono">
-              {round(total.calories)} <span style={{ fontSize: 16, fontWeight: 500 }}>kcal</span>
-            </p>
-            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-              {TOTAL_ROWS.map((row, i) => (
-                <li key={row.key} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderTop: i ? "1px solid var(--line, #0001)" : "none" }}>
-                  <span>{row.label}</span>
-                  <span className="mono">{row.fmt(total[row.key])}</span>
-                </li>
-              ))}
-            </ul>
+            <NutritionFacts values={total} servingLabel="Whole day" />
             {data!.missing.length > 0 && (
               <p className="notice" style={{ margin: 0 }}>
                 Missing nutrition for: {data!.missing.join(", ")}. Totals undercount until their products are filled in.
@@ -167,13 +134,18 @@ function IngredientsTable() {
               <th style={{ textAlign: "left", padding: "6px 10px 6px 0", position: "sticky", left: 0, background: "var(--paper)" }}>Nutrient</th>
               <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 700 }}>Total</th>
               {rows.map((r) => (
-                <th key={r.ingredientId} style={{ textAlign: "right", padding: "6px 8px" }}>
-                  {r.name} <span style={{ opacity: 0.5, fontWeight: 400 }}>/100{r.unit}</span>
-                </th>
+                <th key={r.ingredientId} style={{ textAlign: "right", padding: "6px 8px" }}>{r.name}</th>
               ))}
             </tr>
           </thead>
           <tbody>
+            <tr style={{ borderTop: "1px solid var(--line, #0001)" }}>
+              <th scope="row" style={{ textAlign: "left", fontWeight: 600, padding: "6px 10px 6px 0", position: "sticky", left: 0, background: "var(--paper)" }}>Qty</th>
+              <td style={{ textAlign: "right", padding: "6px 8px" }}>—</td>
+              {rows.map((r) => (
+                <td key={r.ingredientId} style={{ textAlign: "right", padding: "6px 8px", opacity: 0.6 }}>100{r.unit}</td>
+              ))}
+            </tr>
             {COLS.map((c) => {
               const present = rows.map((r) => r.values[c.key]).filter((v): v is number => v != null);
               const total = present.length ? present.reduce((a, b) => a + b, 0) : null;
