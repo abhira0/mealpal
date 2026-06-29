@@ -20,6 +20,7 @@ export function EntityList({ slug }: { slug: EntitySlug }) {
   const [refs, setRefs] = useState<RefMaps>({});
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [query, setQuery] = useState("");
 
   const refSlugs = useMemo(
     () =>
@@ -89,6 +90,13 @@ export function EntityList({ slug }: { slug: EntitySlug }) {
     return raw == null || raw === "" ? "—" : String(raw);
   }
 
+  const q = query.trim().toLowerCase();
+  const shown = q
+    ? rows.filter((row) =>
+        config.columns.some((col) => cellValue(row, col).toLowerCase().includes(q)),
+      )
+    : rows;
+
   return (
     <>
       <header className="chrome">
@@ -99,11 +107,29 @@ export function EntityList({ slug }: { slug: EntitySlug }) {
       <div className="content stack-sm">
         {error && <p className="notice">{error}</p>}
 
+        {rows.length > 0 && (
+          <div className="search">
+            <span className="search-icon" aria-hidden="true">⌕</span>
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={`Search ${config.label.toLowerCase()}`}
+              aria-label={`Search ${config.label.toLowerCase()}`}
+              className="input"
+            />
+          </div>
+        )}
+
         {loaded && rows.length === 0 && !error && (
           <p className="empty">No {config.label.toLowerCase()} yet.</p>
         )}
 
-        {rows.map((row) => {
+        {loaded && rows.length > 0 && shown.length === 0 && (
+          <p className="empty">No {config.label.toLowerCase()} match your search.</p>
+        )}
+
+        {shown.map((row) => {
           const icon = config.icon?.(row);
           const iconBadge = icon && (
             <span className="icon-badge">
@@ -124,8 +150,8 @@ export function EntityList({ slug }: { slug: EntitySlug }) {
                   {cellValue(row, config.columns[0])}
                 </span>
                 <span style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                  <span style={{ flex: "0 0 40%" }}>
-                    <Favicon name={icon.name} website={icon.website} iconUrl={icon.iconUrl} size={120} />
+                  <span style={{ flex: "0 0 20%" }}>
+                    <Favicon name={icon.name} website={icon.website} iconUrl={icon.iconUrl} size={64} />
                   </span>
                   <span style={{ flex: "1 1 auto", minWidth: 0 }}>{details}</span>
                 </span>
