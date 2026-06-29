@@ -3,6 +3,7 @@ import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
 import { getRecipe } from "@/lib/recipes";
 import { consumptionForRecipe } from "@/lib/consumption";
+import { NUTRIENT_PATCH_KEYS } from "@/lib/products";
 
 type Db = BetterSQLite3Database<typeof schema>;
 
@@ -143,4 +144,53 @@ function preferredNutrients(db: Db, householdId: number, ingredientId: number): 
     if (pn) return pn;
   }
   return null;
+}
+
+/** Preferred available product row (lowest priority) with nutrition filled in. */
+function preferredProduct(db: Db, householdId: number, ingredientId: number): ProductRow | null {
+  const products = db.select().from(schema.products)
+    .where(and(
+      eq(schema.products.householdId, householdId),
+      eq(schema.products.ingredientId, ingredientId),
+      eq(schema.products.available, true),
+    ))
+    .orderBy(asc(schema.products.priority)).all();
+  return products.find((p) => p.calories != null) ?? null;
+}
+
+export interface RecipeNutrition {
+  /** per-serving value per nutrient (all keys; absent = unknown). */
+  perServing: Partial<Record<(typeof NUTRIENT_PATCH_KEYS)[number], number>>;
+  /** ingredient names whose preferred product has no nutrition, so totals undercount. */
+  missing: string[];
+}
+
+/**
+ * A recipe's per-serving nutrition: sum each ingredient's preferred-product
+ * per-unit values × its amount, then divide by baseServings. Covers the full
+ * nutrient set (incl. micronutrients), unlike the meal-plan Nutrients subset.
+ */
+export function recipeNutrition(
+  db: Db,
+  householdId: number,
+  recipe: { baseServings: number; ingredients: { ingredientId: number; amount: number }[] },
+): RecipeNutrition {
+  const ingredientName = new Map(
+    db.select().from(schema.ingredients).where(eq(schema.ingredients.householdId, householdId)).all()
+      .map((i) => [i.id, i.name]),
+  );
+  const totals: Record<string, number> = {};
+  const missing = new Set<string>();
+  for (const line of recipe.ingredients) {
+    const p = preferredProduct(db, householdId, line.ingredientId);
+    if (!p) { missing.add(ingredientName.get(line.ingredientId) ?? "?"); continue; }
+    for (const k of NUTRIENT_PATCH_KEYS) {
+      const v = p[k];
+      if (v != null) totals[k] = (totals[k] ?? 0) + v * line.amount;
+    }
+  }
+  const denom = recipe.baseServings > 0 ? recipe.baseServings : 1;
+  const perServing: RecipeNutrition["perServing"] = {};
+  for (const k of NUTRIENT_PATCH_KEYS) if (totals[k] != null) perServing[k] = totals[k] / denom;
+  return { perServing, missing: [...missing] };
 }

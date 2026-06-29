@@ -6,6 +6,7 @@ import { QuantityChip } from "@/components/QuantityChip";
 import { Stepper } from "@/components/Stepper";
 import { RecipeSheet } from "@/components/RecipeSheet";
 import { EditDeleteActions } from "@/components/EditDeleteActions";
+import { NutritionFacts, type FactValues } from "@/components/NutritionFacts";
 
 type Media = { kind: string; url: string };
 type RecipeIngredient = { ingredientId: number; amount: number };
@@ -20,6 +21,7 @@ type Recipe = {
   steps: Step[];
   media: Media[];
   costCents: number | null;
+  nutrition?: { perServing: FactValues; missing: string[] };
 };
 
 type Ingredient = {
@@ -156,6 +158,18 @@ export function RecipeView({ id }: { id: string }) {
         ) : null}
 
         {recipe.notes ? <p className="body" style={{ color: "var(--sage)" }}>{recipe.notes}</p> : null}
+
+        {recipe.nutrition && recipe.nutrition.perServing.calories != null && (
+          <section>
+            <h2 className="title" style={{ marginBottom: 4 }}>Nutrition</h2>
+            <NutritionFacts values={recipe.nutrition.perServing} servingLabel="1 serving" />
+            {recipe.nutrition.missing.length > 0 && (
+              <p className="body" style={{ color: "var(--sage)", marginTop: 6 }}>
+                Missing nutrition for: {recipe.nutrition.missing.join(", ")} — totals may be low.
+              </p>
+            )}
+          </section>
+        )}
 
         <EditDeleteActions
           singular="recipe"

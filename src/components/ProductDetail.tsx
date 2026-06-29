@@ -7,7 +7,7 @@ import { Favicon } from "@/components/Favicon";
 import { Sheet } from "@/components/Sheet";
 import { EntityForm } from "@/components/EntityForm";
 import { EditDeleteActions } from "@/components/EditDeleteActions";
-import { NutritionFacts } from "@/components/NutritionFacts";
+import { NutritionFacts, type FactValues } from "@/components/NutritionFacts";
 
 type Purchase = { cents: number; purchasedAt: string };
 type Product = {
@@ -39,6 +39,20 @@ type Shop = { id: number; name: string; website: string | null; iconUrl: string 
 
 const money = (c: number | null) => (c == null ? "—" : `$${(c / 100).toFixed(2)}`);
 const day = (d: string) => new Date(d).toLocaleDateString();
+
+// per-unit product values × serving size → per-serving values for the label
+const PRODUCT_FACT_KEYS = [
+  "calories", "fatG", "satFatG", "transFatG", "cholesterolMg",
+  "sodiumMg", "carbsG", "fiberG", "sugarG", "proteinG",
+] as const;
+function scalePerServing(p: Product, s: number): FactValues {
+  const out: FactValues = {};
+  for (const k of PRODUCT_FACT_KEYS) {
+    const v = p[k];
+    if (v != null) out[k] = v * s;
+  }
+  return out;
+}
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -135,7 +149,10 @@ export function ProductDetail({ id }: { id: string }) {
         {product.calories != null && (
           <>
             <span className="section-label">Nutrition facts</span>
-            <NutritionFacts facts={product} unit={unit} />
+            <NutritionFacts
+              values={scalePerServing(product, product.servingSize ?? 1)}
+              servingLabel={product.servingSize != null ? `${product.servingSize}${unit}` : `1${unit} (per ${unit || "unit"})`}
+            />
             {product.servingSize == null && (
               <p className="empty">Showing per {unit || "unit"}. Set a serving size to see per-serving values.</p>
             )}
