@@ -80,7 +80,6 @@ export function ShopDetail({ id }: { id: string }) {
               {shop.website && (
                 <span className="meta" style={{ display: "block" }}>{shop.website}</span>
               )}
-              <span className="chip">{products.length} {products.length === 1 ? "product" : "products"}</span>
             </span>
           </div>
         </section>
@@ -91,6 +90,8 @@ export function ShopDetail({ id }: { id: string }) {
           backHref="/manage/shops"
           onEdit={() => setEditing(true)}
         />
+
+        <span className="chip">{products.length} {products.length === 1 ? "product" : "products"}</span>
 
         <section className="card">
           {products.length === 0 ? (
