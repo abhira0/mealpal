@@ -88,6 +88,51 @@ export const products = sqliteTable("products", {
     .$defaultFn(() => new Date()),
 });
 
+// An assorted product (e.g. a trail-mix bag) can carry several nutrition
+// profiles — one per assorted type. Values are PER CANONICAL UNIT of the parent
+// product's ingredient (use unit 'count' so one packet = one unit = one serving).
+// null on a field = not filled in yet, same convention as products.
+export const productVariants = sqliteTable("product_variants", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  householdId: integer("household_id").notNull().references(() => households.id),
+  productId: integer("product_id").notNull().references(() => products.id),
+  name: text("name").notNull(),
+  nutritionPhoto: text("nutrition_photo"),
+  calories: real("calories"),
+  fatG: real("fat_g"),
+  satFatG: real("sat_fat_g"),
+  transFatG: real("trans_fat_g"),
+  cholesterolMg: real("cholesterol_mg"),
+  sodiumMg: real("sodium_mg"),
+  carbsG: real("carbs_g"),
+  fiberG: real("fiber_g"),
+  sugarG: real("sugar_g"),
+  addedSugarG: real("added_sugar_g"),
+  proteinG: real("protein_g"),
+  polyFatG: real("poly_fat_g"),
+  monoFatG: real("mono_fat_g"),
+  vitaminDMcg: real("vitamin_d_mcg"),
+  calciumMg: real("calcium_mg"),
+  ironMg: real("iron_mg"),
+  potassiumMg: real("potassium_mg"),
+  vitaminAMcg: real("vitamin_a_mcg"),
+  vitaminCMg: real("vitamin_c_mg"),
+});
+
+// The quick eat-log: one row per packet (or count) eaten on a date. variantId
+// names which nutrition profile when the product is assorted; null = the
+// product's own nutrition. Pairs with an 'eaten' stock movement that depletes
+// the product.
+export const consumptions = sqliteTable("consumptions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  householdId: integer("household_id").notNull().references(() => households.id),
+  date: text("date").notNull(), // YYYY-MM-DD, local date-only (no tz games)
+  productId: integer("product_id").notNull().references(() => products.id),
+  variantId: integer("variant_id").references(() => productVariants.id),
+  count: integer("count").notNull().default(1), // canonical units eaten
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
 export const recipes = sqliteTable("recipes", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   householdId: integer("household_id").notNull().references(() => households.id),
@@ -176,7 +221,7 @@ export const stockMovements = sqliteTable("stock_movements", {
   productId: integer("product_id").references(() => products.id),
   // signed canonical units: + purchase, - cooked, +/- manual
   delta: integer("delta").notNull(),
-  reason: text("reason").notNull(), // 'purchase' | 'cooked' | 'manual'
+  reason: text("reason").notNull(), // 'purchase' | 'cooked' | 'manual' | 'eaten'
   mealEventId: integer("meal_event_id").references(() => mealEvents.id),
   purchaseId: integer("purchase_id"),
   at: integer("at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),

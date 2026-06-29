@@ -8,7 +8,7 @@ export interface MovementInput {
   ingredientId: number;
   productId?: number | null;
   delta: number;
-  reason: "purchase" | "cooked" | "manual";
+  reason: "purchase" | "cooked" | "manual" | "eaten";
   mealEventId?: number | null;
   purchaseId?: number | null;
   expiresAt?: string | null;
