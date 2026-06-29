@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Plus } from "lucide-react";
+import { Dropdown } from "@/components/Dropdown";
 
 type Product = { id: number; name: string };
 type Shop = { id: number; name: string };
@@ -69,17 +70,13 @@ export function AddExtra({
         </div>
 
         {mode === "product" ? (
-          <select
-            className="input"
-            value={productId}
-            onChange={(e) => setProductId(e.target.value)}
-            aria-label="Product to add"
-          >
-            <option value="">Choose a product…</option>
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
+          <Dropdown
+            label="Product to add"
+            placeholder="Choose a product…"
+            value={productId ? Number(productId) : null}
+            options={products.map((p) => ({ id: p.id, label: p.name }))}
+            onChange={(id) => setProductId(String(id))}
+          />
         ) : (
           <>
             <input
@@ -89,17 +86,13 @@ export function AddExtra({
               onChange={(e) => setTitle(e.target.value)}
               aria-label="Item name"
             />
-            <select
-              className="input"
-              value={shopId}
-              onChange={(e) => setShopId(e.target.value)}
-              aria-label="Stop (optional)"
-            >
-              <option value="">No stop</option>
-              {shops.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
+            <Dropdown
+              label="Stop (optional)"
+              placeholder="No stop"
+              value={shopId ? Number(shopId) : null}
+              options={shops.map((s) => ({ id: s.id, label: s.name }))}
+              onChange={(id) => setShopId(String(id))}
+            />
           </>
         )}
 
