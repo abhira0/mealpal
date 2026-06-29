@@ -19,7 +19,7 @@ type Pending = {
   hintCents: number | null;
 };
 
-type Product = { id: number; name: string; ingredientId: number };
+type Product = { id: number; name: string; ingredientId: number; packParentId: number | null; canonicalUnit: string | null; packSize: number };
 
 export function Bill({ onCount }: { onCount?: (n: number) => void }) {
   const [rows, setRows] = useState<Pending[] | null>(null);
@@ -84,6 +84,7 @@ export function Bill({ onCount }: { onCount?: (n: number) => void }) {
               key={row.id}
               row={row}
               alts={products.filter((p) => p.ingredientId === row.ingredientId)}
+              variants={products.filter((p) => p.packParentId === row.productId)}
               onSaved={() => drop(row.id)}
               onSwapped={reload}
             />
@@ -97,19 +98,24 @@ export function Bill({ onCount }: { onCount?: (n: number) => void }) {
 function BillRow({
   row,
   alts,
+  variants,
   onSaved,
   onSwapped,
 }: {
   row: Pending;
   alts: Product[];
+  variants: Product[];
   onSaved: () => void;
   onSwapped: () => void;
 }) {
+  const isPack = variants.length > 0;
   const [dollars, setDollars] = useState(
     row.hintCents != null ? centsToDollars(row.hintCents).toFixed(2) : "",
   );
   const [expiresAt, setExpiresAt] = useState(row.expiresAt ?? "");
   const [quantity, setQuantity] = useState(String(row.quantity));
+  // pack only: variant product id -> packet count, as typed
+  const [packets, setPackets] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -127,7 +133,9 @@ function BillRow({
       body: JSON.stringify({
         dollars: amount,
         expiresAt: expiresAt || null,
-        quantity: Number(quantity) || 1,
+        ...(isPack
+          ? { packCounts: variants.map((v) => ({ productId: v.id, packets: Number(packets[v.id]) || 0 })) }
+          : { quantity: Number(quantity) || 1 }),
       }),
     });
     setBusy(false);
@@ -173,6 +181,27 @@ function BillRow({
           <div className="tk-name">{row.productName}</div>
         )}
 
+        {isPack && (
+          <div className="stack-sm" style={{ margin: "8px 0" }}>
+            <div className="eb">How many of each packet were in the bag?</div>
+            {variants.map((v) => (
+              <label key={v.id} className="eb" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  className="input mono"
+                  inputMode="numeric"
+                  value={packets[v.id] ?? ""}
+                  onChange={(e) =>
+                    setPackets((p) => ({ ...p, [v.id]: e.target.value.replace(/[^0-9]/g, "") }))
+                  }
+                  aria-label={`Packets of ${v.name}`}
+                  style={{ width: 56 }}
+                />
+                <span>{v.name}</span>
+              </label>
+            ))}
+          </div>
+        )}
+
         <div className="bill-fields">
           <label className="eb" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
             $
@@ -186,17 +215,19 @@ function BillRow({
               style={{ width: 80 }}
             />
           </label>
-          <label className="eb" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-            qty
-            <input
-              className="input mono"
-              inputMode="numeric"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value.replace(/[^0-9]/g, ""))}
-              aria-label={`Quantity of ${row.productName}`}
-              style={{ width: 56 }}
-            />
-          </label>
+          {!isPack && (
+            <label className="eb" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              qty
+              <input
+                className="input mono"
+                inputMode="numeric"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value.replace(/[^0-9]/g, ""))}
+                aria-label={`Quantity of ${row.productName}`}
+                style={{ width: 56 }}
+              />
+            </label>
+          )}
           <label className="eb" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
             exp
             <input

@@ -215,6 +215,7 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
       { name: "shopId", label: "Shop", type: "select", optionsFrom: "shops", optionLabel: "name", required: true },
       { name: "name", label: "Name", type: "text", required: true },
       { name: "packSize", label: "Pack size", type: "number", required: true, unitFrom: { field: "ingredientId", attr: "canonicalUnit" } },
+      { name: "packParentId", label: "Part of an assorted pack? Pick the parent bag (this product is one variant inside it)", type: "select", optionsFrom: "products", optionLabel: "name", optional: true },
       { name: "dollars", label: "Price ($) — manual override; blank = use latest purchase", type: "number", optional: true, prefill: (r) => (r.priceCents != null ? String(Number(r.priceCents) / 100) : "") },
       // priority is set by drag-reorder on the ingredient detail page, not here
       { name: "url", label: "URL", type: "text", optional: true },
@@ -228,6 +229,7 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
       shopId: num(v.shopId),
       name: v.name,
       packSize: num(v.packSize) || 1,
+      packParentId: v.packParentId ? num(v.packParentId) : null,
       dollars: optNum(v.dollars),
       url: optStr(v.url),
       imageUrl: optStr(v.imageUrl),
@@ -237,6 +239,8 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
       shopId: num(v.shopId),
       name: v.name,
       packSize: num(v.packSize) || 1,
+      // "" → null clears the link; a chosen id makes this a variant of that pack
+      packParentId: v.packParentId ? num(v.packParentId) : null,
       // "" → null clears the override; absent stays absent (PATCH ignores undefined)
       dollars: v.dollars ?? undefined,
       url: optStr(v.url),
