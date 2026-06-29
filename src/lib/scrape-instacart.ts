@@ -95,20 +95,28 @@ const EXTRACTOR = `(() => {
     .filter((i) => { const u = i.currentSrc || i.src; return u && /product-image/.test(u) && i.naturalWidth >= 200; })
     .sort((a, b) => b.naturalWidth * b.naturalHeight - a.naturalWidth * a.naturalHeight)[0];
   const domImg = imgEl ? (imgEl.currentSrc || imgEl.src) : null;
-  // The retailer behind the page: Instacart puts it in the URL as /store/<slug>/
-  // and usually as offers.seller.name in the JSON-LD.
-  const storeSlug = (location.pathname.match(/\\/store\\/([^\\/]+)/) || [])[1] || null;
+  // The retailer behind the page. /products/ catalog pages have no store slug in
+  // their own URL, but carry a "shopping at <store>" link to /store/<slug>/, so
+  // check the path first then any such link. Also collect JSON-LD seller names.
+  let storeSlug = (location.pathname.match(/\\/store\\/([^\\/?#]+)/) || [])[1] || null;
+  if (!storeSlug || storeSlug === 'storefront') {
+    for (const a of document.querySelectorAll('a[href*="/store/"]')) {
+      const m = (a.getAttribute('href') || '').match(/\\/store\\/([^\\/?#]+)/);
+      if (m && m[1] !== 'storefront' && m[1] !== 's') { storeSlug = m[1]; break; }
+    }
+  }
   if (p) {
     const ldImg = Array.isArray(p.image) ? p.image[0] : p.image;
-    const offer = Array.isArray(p.offers) ? p.offers[0] : p.offers;
-    const seller = offer && offer.seller && offer.seller.name ? offer.seller.name : null;
+    const offers = [].concat(p.offers || []);
+    const offer = offers[0];
+    const sellers = offers.map((o) => o && o.seller && o.seller.name).filter(Boolean);
     return {
       title: p.name || null,
       imageUrl: domImg || ldImg || null,
       priceText: offer && offer.price != null ? String(offer.price) : null,
       weightText: p.size || null,
       servingsText: null,
-      shopText: seller || storeSlug,
+      shopText: [storeSlug, ...sellers].filter(Boolean).join('|') || null,
       url: location.href,
     };
   }
