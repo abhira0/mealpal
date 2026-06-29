@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Dropdown } from "@/components/Dropdown";
-import { Favicon } from "@/components/Favicon";
+import { Favicon, domainFrom } from "@/components/Favicon";
+import { convertCanonical } from "@/lib/units";
 import { ENTITIES, type EntitySlug, type FieldDef } from "@/app/manage/entities";
 
 type Row = Record<string, unknown> & { id: number | string };
@@ -151,6 +152,23 @@ export function EntityForm({
     setError(null);
     try {
       const data = (await sendJSON(config.importPath, "POST", {})) as Record<string, unknown>;
+
+      // Convert the scraped pack size into the chosen ingredient's unit (oz↔g).
+      // Without an ingredient picked or across dimensions (ml↔g), keep it as scraped.
+      const ingRow = (optionRows.ingredientId ?? []).find((r) => String(r.id) === values.ingredientId);
+      const target = ingRow?.canonicalUnit;
+      if (typeof target === "string" && typeof data.packSize === "number" && typeof data.unit === "string") {
+        const conv = convertCanonical(data.packSize, data.unit, target);
+        if (conv != null) data.packSize = Math.round(conv);
+      }
+
+      // Auto-select the shop whose website matches the imported product's domain.
+      if (typeof data.url === "string" && !values.shopId) {
+        const host = domainFrom(data.url);
+        const shop = host && (optionRows.shopId ?? []).find((r) => domainFrom(r.website as string | null) === host);
+        if (shop) data.shopId = shop.id;
+      }
+
       const fieldNames = new Set(config.fields.map((f) => f.name));
       setValues((v) => {
         const next = { ...v };
