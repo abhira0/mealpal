@@ -77,26 +77,38 @@ export default function PantryPage() {
           <p className="empty">No ingredients yet.</p>
         )}
 
-        {ingredients?.map((ing) => {
-          const qty = stock[String(ing.id)] ?? 0;
-          if (qty === 0) return null; // nothing in stock — hide
-          const exp = expiry[String(ing.id)];
+        {(() => {
+          if (!ingredients) return null;
+          const present = ingredients.filter((i) => (stock[String(i.id)] ?? 0) > 0);
+          const out = ingredients.filter((i) => (stock[String(i.id)] ?? 0) <= 0);
+          const row = (ing: Ingredient) => {
+            const qty = stock[String(ing.id)] ?? 0;
+            const exp = expiry[String(ing.id)];
+            return (
+              <button
+                key={ing.id}
+                type="button"
+                className="card"
+                style={{ textAlign: "left", width: "100%", cursor: "pointer" }}
+                onClick={() => setEditing(ing)}
+              >
+                <div className="card-row">
+                  <span style={{ fontWeight: 600, fontSize: 16 }}>{ing.name}</span>
+                  <span className="meta">{formatQty(qty, ing.canonicalUnit)}</span>
+                </div>
+                {exp && <p className="meta">soonest expiry · {exp}</p>}
+              </button>
+            );
+          };
           return (
-            <button
-              key={ing.id}
-              type="button"
-              className="card"
-              style={{ textAlign: "left", width: "100%", cursor: "pointer" }}
-              onClick={() => setEditing(ing)}
-            >
-              <div className="card-row">
-                <span style={{ fontWeight: 600, fontSize: 16 }}>{ing.name}</span>
-                <span className="meta">{formatQty(qty, ing.canonicalUnit)}</span>
-              </div>
-              {exp && <p className="meta">soonest expiry · {exp}</p>}
-            </button>
+            <>
+              {present.length > 0 && <p className="eb">In stock</p>}
+              {present.map(row)}
+              {out.length > 0 && <p className="eb" style={{ marginTop: 16 }}>Out of stock</p>}
+              {out.map(row)}
+            </>
           );
-        })}
+        })()}
       </main>
 
       <Sheet
