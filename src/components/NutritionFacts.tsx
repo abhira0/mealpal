@@ -46,7 +46,7 @@ export function NutritionFacts({ values, servingLabel }: { values: FactValues; s
   const lastVisibleIdx = FACT_ROWS.map((r) => values[r.key] != null).lastIndexOf(true);
 
   return (
-    <div style={{ background: "#fff", color: "#000", border: "1px solid #000", borderRadius: 4, padding: 12, fontFamily: "Helvetica, Arial, sans-serif", maxWidth: 320 }}>
+    <div style={{ background: "#fff", color: "#000", border: "1px solid #000", borderRadius: 4, padding: 12, fontFamily: "Helvetica, Arial, sans-serif", maxWidth: 320, margin: "0 auto" }}>
       <div style={{ fontSize: 28, fontWeight: 800, ...rule(1) }}>Nutrition Facts</div>
       <div style={{ padding: "2px 0", ...rule(8) }}>
         Serving size <strong>{servingLabel}</strong>
