@@ -34,19 +34,19 @@ const TOTAL_ROWS: { label: string; key: keyof Nutrients; fmt: (n: number) => str
 export default function NutritionPage() {
   const [date, setDate] = useState(todayISO);
   const [data, setData] = useState<DayNutrition | null>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     fetch(`/api/nutrition?date=${date}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (!cancelled) { setData(d); setLoading(false); } })
-      .catch(() => { if (!cancelled) setLoading(false); });
+      .then((d) => { if (!cancelled) setData(d); })
+      .catch(() => { if (!cancelled) setData(null); });
     return () => { cancelled = true; };
   }, [date]);
 
-  const total = data?.total;
+  // loading = we don't yet have data for the requested date (no setState-in-effect)
+  const loading = data?.date !== date;
+  const total = loading ? null : data?.total;
 
   return (
     <>
