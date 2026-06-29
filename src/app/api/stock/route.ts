@@ -1,18 +1,17 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { stockByIngredient, stockByProduct, expiryByIngredient, adjustStock } from "@/lib/stock";
+import { stockByIngredient, stockByProduct, expiryByIngredient, expiryByProduct, adjustStock } from "@/lib/stock";
 
 export async function GET() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const qty = stockByIngredient(db, session.user.householdId);
-  const byProduct = stockByProduct(db, session.user.householdId);
-  const expiry = expiryByIngredient(db, session.user.householdId);
+  const hid = session.user.householdId;
   return NextResponse.json({
-    qty: Object.fromEntries(qty),
-    byProduct: Object.fromEntries(byProduct),
-    expiry: Object.fromEntries(expiry),
+    qty: Object.fromEntries(stockByIngredient(db, hid)),
+    byProduct: Object.fromEntries(stockByProduct(db, hid)),
+    expiry: Object.fromEntries(expiryByIngredient(db, hid)),
+    expiryByProduct: Object.fromEntries(expiryByProduct(db, hid)),
   });
 }
 

@@ -64,6 +64,45 @@ export function stockByProduct(db: Db, householdId: number): Map<number, number>
   return new Map(rows.map((r) => [r.productId as number, r.total]));
 }
 
+/**
+ * Soonest non-null expiry per product, from manual backfill (stock_movements)
+ * and purchases. productId -> earliest YYYY-MM-DD. Mirrors expiryByIngredient.
+ */
+export function expiryByProduct(db: Db, householdId: number): Map<number, string> {
+  const manual = db
+    .select({
+      productId: schema.stockMovements.productId,
+      soonest: sql<string>`min(${schema.stockMovements.expiresAt})`,
+    })
+    .from(schema.stockMovements)
+    .where(and(
+      eq(schema.stockMovements.householdId, householdId),
+      sql`${schema.stockMovements.productId} is not null`,
+      sql`${schema.stockMovements.expiresAt} is not null`,
+    ))
+    .groupBy(schema.stockMovements.productId).all();
+
+  const bought = db
+    .select({
+      productId: schema.purchases.productId,
+      soonest: sql<string>`min(${schema.purchases.expiresAt})`,
+    })
+    .from(schema.purchases)
+    .where(and(
+      eq(schema.purchases.householdId, householdId),
+      sql`${schema.purchases.expiresAt} is not null`,
+    ))
+    .groupBy(schema.purchases.productId).all();
+
+  const out = new Map<number, string>();
+  for (const r of [...manual, ...bought]) {
+    if (r.productId == null || !r.soonest) continue;
+    const prev = out.get(r.productId);
+    if (!prev || r.soonest < prev) out.set(r.productId, r.soonest); // YYYY-MM-DD sorts lexically
+  }
+  return out;
+}
+
 /** Manual correction (spills, recounts) or backfill. Positive or negative. */
 export function adjustStock(
   db: Db, householdId: number, ingredientId: number, delta: number,
