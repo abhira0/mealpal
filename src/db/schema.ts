@@ -143,6 +143,7 @@ export const recipes = sqliteTable("recipes", {
   name: text("name").notNull(),
   baseServings: integer("base_servings").notNull().default(1),
   notes: text("notes"),
+  totalMinutes: integer("total_minutes"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 

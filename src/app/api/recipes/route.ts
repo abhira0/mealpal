@@ -18,6 +18,7 @@ export async function POST(req: Request) {
     name: String(b.name).trim(),
     baseServings: Number(b.baseServings) || 1,
     notes: b.notes?.trim() || null,
+    totalMinutes: Number(b.totalMinutes) || null,
     ingredients: Array.isArray(b.ingredients)
       ? b.ingredients.map((i: { ingredientId: number; amount: number }) => ({ ingredientId: Number(i.ingredientId), amount: Number(i.amount) }))
       : [],

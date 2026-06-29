@@ -15,6 +15,7 @@ export type EditableRecipe = {
   name: string;
   baseServings: number;
   notes: string | null;
+  totalMinutes?: number | null;
   ingredients: { ingredientId: number; amount: number }[];
   steps: { position: number; text: string }[];
   media?: Media[];
@@ -60,6 +61,7 @@ export function RecipeSheet({
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [name, setName] = useState("");
   const [baseServings, setBaseServings] = useState(2);
+  const [totalMinutes, setTotalMinutes] = useState("");
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<DraftIngredient[]>([{ ingredientId: null, amount: "" }]);
   const [steps, setSteps] = useState<string[]>([""]);
@@ -85,6 +87,7 @@ export function RecipeSheet({
     if (recipe) {
       setName(recipe.name);
       setBaseServings(recipe.baseServings || 1);
+      setTotalMinutes(recipe.totalMinutes ? String(recipe.totalMinutes) : "");
       setNotes(recipe.notes ?? "");
       setLines(
         recipe.ingredients.length
@@ -98,6 +101,7 @@ export function RecipeSheet({
     } else {
       setName("");
       setBaseServings(2);
+      setTotalMinutes("");
       setNotes("");
       setLines([{ ingredientId: null, amount: "" }]);
       setSteps([""]);
@@ -122,6 +126,7 @@ export function RecipeSheet({
     const body = {
       name: name.trim(),
       baseServings,
+      totalMinutes: Number(totalMinutes) || null,
       notes: notes.trim() || null,
       ingredients: lines
         .filter((l) => l.ingredientId != null && l.amount.trim() !== "")
@@ -160,6 +165,18 @@ export function RecipeSheet({
           <span className="field-label" style={{ marginBottom: 0 }}>Base servings</span>
           <Stepper value={baseServings} min={1} onChange={setBaseServings} />
         </div>
+
+        <label className="field">
+          <span className="field-label">Total time (min)</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            className="input mono"
+            value={totalMinutes}
+            onChange={(e) => setTotalMinutes(e.target.value.replace(/[^0-9]/g, ""))}
+            placeholder="Optional, e.g. 15"
+          />
+        </label>
 
         <div className="field">
           <span className="field-label">Ingredients</span>
