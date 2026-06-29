@@ -29,6 +29,15 @@ const TABS: Tab[] = [
     ),
   },
   {
+    href: "/nutrition",
+    label: "Nutrition",
+    icon: (
+      <svg {...ICON_PROPS}>
+        <path d="M12 3c2 3 4 4.5 4 8a4 4 0 0 1-8 0c0-1.5.5-2.5 1.5-3.5C10 9 11 7 12 3Z" />
+      </svg>
+    ),
+  },
+  {
     href: "/pantry",
     label: "Pantry",
     icon: (
