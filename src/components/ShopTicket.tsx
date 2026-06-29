@@ -11,7 +11,7 @@ export type ShopLine = {
   ingredientName: string;
   needed: number;
   unit?: string;
-  product: { id: number; name: string } | null;
+  product: { id: number; name: string; packSize?: number } | null;
   /** Run-out urgency, best-effort. e.g. "out now", "~ Mon". */
   urgency?: { label: string; tone: "run" | "low" } | null;
   /** Set when this is a manually-added line; checking it off deletes it (and buys, if it has a product). */
@@ -182,7 +182,12 @@ function ShopLineRow({
           {line.extraId != null ? (
             line.needed > 1 && <QuantityChip value={`×${line.needed}`} tone="default" />
           ) : (
-            <QuantityChip value={`need ${formatNeeded(line)}`} tone="default" />
+            <>
+              <QuantityChip value={`need ${formatNeeded(line)}`} tone="default" />
+              {line.product?.packSize ? (
+                <QuantityChip value={`buy ×${Math.ceil(line.needed / line.product.packSize)}`} tone="default" />
+              ) : null}
+            </>
           )}
           {line.urgency && (
             <QuantityChip value={line.urgency.label} tone={line.urgency.tone} />
