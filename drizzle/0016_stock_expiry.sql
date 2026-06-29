@@ -1,0 +1,1 @@
+ALTER TABLE `stock_movements` ADD `expires_at` text;
