@@ -18,6 +18,7 @@ type Recipe = {
   ingredients: RecipeIngredient[];
   steps: Step[];
   media: Media[];
+  costCents: number | null;
 };
 
 type Ingredient = {
@@ -158,6 +159,11 @@ export function RecipeView({ id }: { id: string }) {
         <section>
           <h2 className="title" style={{ marginBottom: 4 }}>
             Ingredients
+            {recipe.costCents != null && recipe.baseServings > 0 ? (
+              <span className="body" style={{ color: "var(--sage)", fontWeight: 400, float: "right" }}>
+                ${(recipe.costCents / recipe.baseServings / 100).toFixed(2)} / meal
+              </span>
+            ) : null}
           </h2>
           {recipe.ingredients.map((line) => {
             const ing = lookup.get(line.ingredientId);
