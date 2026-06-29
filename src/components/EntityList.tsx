@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { ChevronRight } from "lucide-react";
 import { ENTITIES, type ColumnDef, type EntitySlug } from "@/app/manage/entities";
 import { Favicon } from "@/components/Favicon";
 
@@ -126,7 +127,7 @@ export function EntityList({ slug }: { slug: EntitySlug }) {
             className="btn"
             style={{ flex: rows.length > 0 ? "0 0 auto" : 1, textDecoration: "none" }}
           >
-            + Add {config.singular.toLowerCase()}
+            + New
           </Link>
         </div>
 
@@ -181,7 +182,7 @@ export function EntityList({ slug }: { slug: EntitySlug }) {
                 <Link href={`/manage/${slug}/${row.id}`} className="row-link">
                   {badge}
                   {main}
-                  <span className="arrow" aria-hidden="true">›</span>
+                  <ChevronRight className="arrow" size={16} aria-hidden="true" />
                 </Link>
               ) : (
                 <>

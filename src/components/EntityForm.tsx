@@ -444,7 +444,9 @@ export function EntityForm({
             {busy ? "…" : editing ? "Save changes" : `Add ${config.singular.toLowerCase()}`}
           </button>
 
-          {editing && config.canDelete && (
+          {/* Delete lives on the detail page, not the edit sheet — only the
+              standalone (non-embedded) form offers it. */}
+          {editing && config.canDelete && !embedded && (
             <button
               type="button"
               className="btn-link danger"
@@ -456,7 +458,7 @@ export function EntityForm({
           )}
         </form>
 
-        {editing && slug === "products" && row && <ProductHistory row={row} />}
+        {!embedded && editing && slug === "products" && row && <ProductHistory row={row} />}
       </div>
     </>
   );

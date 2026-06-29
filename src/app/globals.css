@@ -55,8 +55,10 @@ button{font-family:inherit}
 .btn-link{font-family:var(--body);font-weight:600;font-size:14px;color:var(--enamel);background:none;border:none;cursor:pointer;padding:8px 0;min-height:44px;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
 .btn-add{font-family:var(--body);font-weight:700;font-size:14px;color:var(--enamel);background:none;border:none;cursor:pointer;padding:8px 0;min-height:44px;text-align:left}
 .btn-link.danger{color:var(--paprika);justify-content:center;width:100%}
+.icon-btn{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;flex:none;background:none;border:none;cursor:pointer;color:var(--enamel)}
+.icon-btn.danger{color:var(--paprika)}
 .trigger.add{justify-content:center;color:var(--enamel)}
-.btn:focus-visible,.chip:focus-visible,.trigger:focus-visible,.input:focus-visible,.btn-link:focus-visible,.btn-add:focus-visible,.checkbox:focus-visible,.row-link:focus-visible,.account-row:focus-visible,.week .day:focus-visible,.tab:focus-visible,.tabs button:focus-visible,.filter button:focus-visible,.unit-radio button:focus-visible,.stepper button:focus-visible,.sheet .o:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(17,94,89,.25)}
+.btn:focus-visible,.chip:focus-visible,.trigger:focus-visible,.input:focus-visible,.btn-link:focus-visible,.icon-btn:focus-visible,.btn-add:focus-visible,.checkbox:focus-visible,.row-link:focus-visible,.account-row:focus-visible,.week .day:focus-visible,.tab:focus-visible,.tabs button:focus-visible,.filter button:focus-visible,.unit-radio button:focus-visible,.stepper button:focus-visible,.sheet .o:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(17,94,89,.25)}
 
 /* ---------- chips ---------- */
 .chip{font-family:var(--mono);font-weight:700;font-size:11px;background:var(--chip-bg);color:var(--ink);padding:4px 8px;border-radius:4px;border-left:3px solid var(--sage);white-space:nowrap;display:inline-block}
@@ -70,6 +72,8 @@ button{font-family:inherit}
 /* 16px min on text inputs so iOS doesn't auto-zoom the page on focus. */
 .input{font-family:var(--body);font-size:16px;line-height:1.2;color:var(--ink);background:var(--paper-raised);border:1px solid var(--line);border-radius:8px;padding:12px 13px;width:100%;min-height:44px}
 .input::placeholder{color:#a9a496}
+/* iOS sizes native date/time inputs by their content and ignores width:100%, so they overflow right. Strip the native appearance to make them honor the box. */
+.input[type=date],.input[type=time]{-webkit-appearance:none;appearance:none;min-width:0}
 /* iOS renders empty date inputs blank with no format hint; show one. */
 input[type=date][data-empty]{position:relative}
 input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:#a9a496;position:absolute;left:13px;top:50%;transform:translateY(-50%);white-space:nowrap;pointer-events:none}
