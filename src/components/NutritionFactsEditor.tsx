@@ -28,7 +28,11 @@ const NUTRIENTS = [
 ] as const;
 
 type Key = (typeof NUTRIENTS)[number]["key"] | "calories";
-type PerUnit = Partial<Record<Key, number | null>> & { servingSize: number | null };
+export type PerUnit = Partial<Record<Key, number | null>> & { servingSize: number | null };
+
+// Every editable nutrient key (per serving). Callers build `initial` from this
+// so no field can be silently dropped from the prefill.
+export const EDITOR_KEYS = ["calories", ...NUTRIENTS.map((n) => n.key)] as Key[];
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 const str = (n: number | null | undefined) => (n == null ? "" : String(round3(n)));
@@ -52,12 +56,11 @@ export function NutritionFactsEditor({
 }) {
   const s0 = initial.servingSize ?? 1; // derive per-serving from stored per-unit
   const [serving, setServing] = useState(str(initial.servingSize));
-  const [vals, setVals] = useState<Record<Key, string>>(() => {
-    const keys: Key[] = ["calories", ...NUTRIENTS.map((n) => n.key)];
-    return Object.fromEntries(
-      keys.map((k) => [k, str(initial[k] != null ? initial[k]! * s0 : null)]),
-    ) as Record<Key, string>;
-  });
+  const [vals, setVals] = useState<Record<Key, string>>(() =>
+    Object.fromEntries(
+      EDITOR_KEYS.map((k) => [k, str(initial[k] != null ? initial[k]! * s0 : null)]),
+    ) as Record<Key, string>,
+  );
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -77,7 +80,7 @@ export function NutritionFactsEditor({
     setBusy(true);
     setMsg(null);
     const patch: Record<string, number | null> = { servingSize: s };
-    for (const k of ["calories", ...NUTRIENTS.map((n) => n.key)] as Key[]) {
+    for (const k of EDITOR_KEYS) {
       const raw = vals[k].trim();
       patch[k] = raw === "" ? null : Number(raw) / s; // per-serving → per-unit
     }
