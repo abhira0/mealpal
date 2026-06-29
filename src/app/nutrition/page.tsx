@@ -13,6 +13,7 @@ function todayISO(): string {
 const round = (n: number) => Math.round(n);
 const g = (n: number) => `${Math.round(n)}g`;
 const mg = (n: number) => `${Math.round(n)}mg`;
+const mcg = (n: number) => `${Math.round(n)}mcg`;
 
 // Compact macro line for a single meal.
 function macroLine(n: Nutrients): string {
@@ -24,11 +25,20 @@ const TOTAL_ROWS: { label: string; key: keyof Nutrients; fmt: (n: number) => str
   { label: "Carbs", key: "carbsG", fmt: g },
   { label: "— Sugar", key: "sugarG", fmt: g },
   { label: "— Fiber", key: "fiberG", fmt: g },
+  { label: "— Added sugar", key: "addedSugarG", fmt: g },
   { label: "Fat", key: "fatG", fmt: g },
   { label: "— Saturated", key: "satFatG", fmt: g },
   { label: "— Trans", key: "transFatG", fmt: g },
+  { label: "— Poly", key: "polyFatG", fmt: g },
+  { label: "— Mono", key: "monoFatG", fmt: g },
   { label: "Cholesterol", key: "cholesterolMg", fmt: mg },
   { label: "Sodium", key: "sodiumMg", fmt: mg },
+  { label: "Vitamin D", key: "vitaminDMcg", fmt: mcg },
+  { label: "Calcium", key: "calciumMg", fmt: mg },
+  { label: "Iron", key: "ironMg", fmt: mg },
+  { label: "Potassium", key: "potassiumMg", fmt: mg },
+  { label: "Vitamin A", key: "vitaminAMcg", fmt: mcg },
+  { label: "Vitamin C", key: "vitaminCMg", fmt: mg },
 ];
 
 export default function NutritionPage() {
