@@ -167,8 +167,10 @@ function BillRow({
   onRemoved: () => void;
   onSwapped: () => void;
 }) {
+  // The field is the TOTAL paid; we store per-unit cents (= total / qty), since
+  // that's what the app reuses as the product's price. Prefill = stored unit × qty.
   const [dollars, setDollars] = useState(
-    row.hintCents != null ? centsToDollars(row.hintCents).toFixed(2) : "",
+    row.hintCents != null ? centsToDollars(row.hintCents * row.quantity).toFixed(2) : "",
   );
   const [expiresAt, setExpiresAt] = useState(row.expiresAt ?? "");
   const [quantity, setQuantity] = useState(String(row.quantity));
@@ -181,15 +183,18 @@ function BillRow({
       setError("Enter a price.");
       return;
     }
+    const qty = Number(quantity) || 1;
     setBusy(true);
     setError(null);
     const res = await fetch(`/api/purchases/${row.id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        dollars: amount,
+        // amount is the total paid; store per-unit cents. ponytail: rounds to the
+        // cent, so total/qty that isn't exact loses a cent or two — fine for groceries.
+        cents: Math.round(Math.round(amount * 100) / qty),
         expiresAt: expiresAt || null,
-        quantity: Number(quantity) || 1,
+        quantity: qty,
       }),
     });
     setBusy(false);
@@ -237,14 +242,14 @@ function BillRow({
 
         <div className="bill-fields">
           <label className="eb" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-            $
+            $ total
             <input
               className="input mono"
               inputMode="decimal"
               value={dollars}
               onChange={(e) => setDollars(e.target.value.replace(/[^0-9.]/g, ""))}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(); } }}
-              aria-label={`Price paid for ${row.productName}`}
+              aria-label={`Total paid for ${row.productName}`}
               style={{ width: 80 }}
             />
           </label>
