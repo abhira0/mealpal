@@ -48,9 +48,10 @@ export function listPendingPurchases(db: Db, householdId: number) {
 }
 
 /** Full purchase history, newest first. Same shape as pending, but seeded with
- *  the price actually paid (so the bill row prefills it) and every row, priced or not. */
-export function listPurchaseHistory(db: Db, householdId: number) {
-  return db.select({
+ *  the price actually paid (so the bill row prefills it) and every row, priced or not.
+ *  Paginated via limit/offset for the history tab's infinite scroll. */
+export function listPurchaseHistory(db: Db, householdId: number, opts: { limit?: number; offset?: number } = {}) {
+  const q = db.select({
     id: schema.purchases.id,
     productId: schema.purchases.productId,
     ingredientId: schema.products.ingredientId,
@@ -68,7 +69,10 @@ export function listPurchaseHistory(db: Db, householdId: number) {
     .innerJoin(schema.shops, eq(schema.shops.id, schema.products.shopId))
     .where(eq(schema.purchases.householdId, householdId))
     .orderBy(desc(schema.purchases.purchasedAt))
-    .all();
+    .$dynamic();
+  if (opts.limit != null) q.limit(opts.limit);
+  if (opts.offset != null) q.offset(opts.offset);
+  return q.all();
 }
 
 /**

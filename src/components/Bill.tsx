@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { Ticket } from "@/components/ShopTicket";
 import { Dropdown } from "@/components/Dropdown";
@@ -24,30 +24,57 @@ type Product = { id: number; name: string; ingredientId: number };
 
 // history mode lists every purchase (priced or not) for review/editing, instead
 // of just the unpriced ones awaiting a price on the bill screen.
+const PAGE = 50; // history page size for infinite scroll
+
 export function Bill({ onCount, history = false }: { onCount?: (n: number) => void; history?: boolean }) {
   const [rows, setRows] = useState<Pending[] | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [exhausted, setExhausted] = useState(false); // history: no more pages
+  const busyRef = useRef(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  function reload() {
-    return fetch(history ? "/api/purchases?all=1" : "/api/purchases")
+  // First page (history) or the whole pending list. Also used to regroup after a swap.
+  const loadFirst = useCallback(() => {
+    return fetch(history ? `/api/purchases?all=1&limit=${PAGE}` : "/api/purchases")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((j) => {
-        setRows(j as Pending[]);
-        onCount?.((j as Pending[]).length);
+      .then((j: Pending[]) => {
+        setRows(j);
+        onCount?.(j.length);
+        setExhausted(history && j.length < PAGE); // also resets after a swap-reload
       })
       .catch(() => setError("Couldn't load the bill."));
-  }
+  }, [history, onCount]);
+
+  // history: append the next page when the sentinel scrolls into view.
+  const loadMore = useCallback(() => {
+    if (!history || busyRef.current || exhausted || rows === null) return;
+    busyRef.current = true;
+    fetch(`/api/purchases?all=1&offset=${rows.length}&limit=${PAGE}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((j: Pending[]) => {
+        setRows((prev) => [...(prev ?? []), ...j]);
+        if (j.length < PAGE) setExhausted(true);
+      })
+      .catch(() => setError("Couldn't load more."))
+      .finally(() => { busyRef.current = false; });
+  }, [history, exhausted, rows]);
 
   useEffect(() => {
-    reload();
+    loadFirst();
     fetch("/api/products")
       .then((r) => (r.ok ? r.json() : []))
       .then((ps: Product[]) => setProducts(ps))
       .catch(() => {});
-    // ponytail: fetch once on mount; tab badge driven via onCount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadFirst]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !history) return;
+    const io = new IntersectionObserver((es) => { if (es[0].isIntersecting) loadMore(); });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [loadMore, history]);
 
   function drop(id: number) {
     setRows((rs) => {
@@ -57,19 +84,43 @@ export function Bill({ onCount, history = false }: { onCount?: (n: number) => vo
     });
   }
 
-  // bill groups by stop (the run's shape); history groups by purchase date.
+  // pending: flat by stop. history: by purchase date, then by stop within the date.
   const stops = useMemo(() => {
     const m = new Map<string, Pending[]>();
     for (const r of rows ?? []) {
-      const key = history
-        ? r.purchasedAt ? new Date(r.purchasedAt).toLocaleDateString() : "Undated"
-        : r.shopName;
-      const g = m.get(key);
+      const g = m.get(r.shopName);
       if (g) g.push(r);
-      else m.set(key, [r]);
+      else m.set(r.shopName, [r]);
     }
     return [...m.entries()];
-  }, [rows, history]);
+  }, [rows]);
+
+  const dateGroups = useMemo(() => {
+    const byDate = new Map<string, Map<string, Pending[]>>();
+    for (const r of rows ?? []) {
+      const date = r.purchasedAt ? new Date(r.purchasedAt).toLocaleDateString() : "Undated";
+      let shops = byDate.get(date);
+      if (!shops) byDate.set(date, (shops = new Map()));
+      const g = shops.get(r.shopName);
+      if (g) g.push(r);
+      else shops.set(r.shopName, [r]);
+    }
+    return [...byDate.entries()].map(([d, shops]) => [d, [...shops.entries()]] as const);
+  }, [rows]);
+
+  function renderRow(row: Pending) {
+    return (
+      <BillRow
+        key={row.id}
+        row={row}
+        alts={products.filter((p) => p.ingredientId === row.ingredientId)}
+        // pending: a priced row leaves the list. history: keep it (BillRow holds the edit).
+        onSaved={history ? () => {} : () => drop(row.id)}
+        onRemoved={() => drop(row.id)}
+        onSwapped={loadFirst}
+      />
+    );
+  }
 
   return (
     <>
@@ -80,27 +131,25 @@ export function Bill({ onCount, history = false }: { onCount?: (n: number) => vo
           {history ? "No purchases yet." : "Nothing to price — you’re all caught up."}
         </p>
       )}
-      {stops.map(([header, group]) => (
-        <Ticket
-          key={header}
-          shopName={header}
-          website={history ? null : group[0].website}
-          iconUrl={history ? null : group[0].iconUrl}
-        >
-          {group.map((row) => (
-            <BillRow
-              key={row.id}
-              row={row}
-              alts={products.filter((p) => p.ingredientId === row.ingredientId)}
-              // pending: a priced row leaves the list (drop). history: keep it, but
-              // reload so a save/delete is reflected.
-              onSaved={history ? reload : () => drop(row.id)}
-              onSwapped={reload}
-              subtitle={history ? row.shopName : undefined}
-            />
+
+      {history
+        ? dateGroups.map(([date, byShop]) => (
+            <section key={date} className="stack">
+              <h2 className="eb">{date}</h2>
+              {byShop.map(([shopName, group]) => (
+                <Ticket key={shopName} shopName={shopName} website={group[0].website} iconUrl={group[0].iconUrl}>
+                  {group.map(renderRow)}
+                </Ticket>
+              ))}
+            </section>
+          ))
+        : stops.map(([shopName, group]) => (
+            <Ticket key={shopName} shopName={shopName} website={group[0].website} iconUrl={group[0].iconUrl}>
+              {group.map(renderRow)}
+            </Ticket>
           ))}
-        </Ticket>
-      ))}
+
+      {history && !exhausted && rows !== null && <div ref={sentinelRef} aria-hidden style={{ height: 1 }} />}
     </>
   );
 }
@@ -109,14 +158,14 @@ function BillRow({
   row,
   alts,
   onSaved,
+  onRemoved,
   onSwapped,
-  subtitle,
 }: {
   row: Pending;
   alts: Product[];
   onSaved: () => void;
+  onRemoved: () => void;
   onSwapped: () => void;
-  subtitle?: string;
 }) {
   const [dollars, setDollars] = useState(
     row.hintCents != null ? centsToDollars(row.hintCents).toFixed(2) : "",
@@ -168,7 +217,7 @@ function BillRow({
     setError(null);
     const res = await fetch(`/api/purchases/${row.id}`, { method: "DELETE" });
     setBusy(false);
-    if (res.ok) onSaved();
+    if (res.ok) onRemoved();
     else setError("Couldn't remove.");
   }
 
@@ -185,7 +234,6 @@ function BillRow({
         ) : (
           <div className="tk-name">{row.productName}</div>
         )}
-        {subtitle && <div className="eb" style={{ opacity: 0.6, marginTop: 2 }}>{subtitle}</div>}
 
         <div className="bill-fields">
           <label className="eb" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
