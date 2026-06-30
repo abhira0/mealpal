@@ -4,7 +4,7 @@ import { makeTestDb, type TestDb } from "@/test/db";
 import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
 import { createProduct } from "@/lib/products";
-import { recordPurchase, listPendingPurchases, updatePurchase, deletePurchase, learnedShelfLife, addExtra, listExtras, deleteExtra } from "@/lib/shopping";
+import { recordPurchase, listPendingPurchases, listPurchaseHistory, updatePurchase, deletePurchase, learnedShelfLife, addExtra, listExtras, deleteExtra } from "@/lib/shopping";
 import { currentStock } from "@/lib/stock";
 
 let db: TestDb;
@@ -110,6 +110,20 @@ describe("pending purchases (bill flow)", () => {
     const row = db.select().from(schema.purchases).where(eq(schema.purchases.id, pid)).all()[0];
     expect(row.cents).toBe(1499);
     expect(row.expiresAt).toBe("2026-07-01");
+  });
+});
+
+describe("listPurchaseHistory", () => {
+  it("lists every purchase newest-first, priced or not, prefilled with the paid price", () => {
+    const oldId = recordPurchase(db, hid, { productId, quantity: 1, cents: 1299 }).id;
+    db.update(schema.purchases).set({ purchasedAt: new Date("2026-06-01T00:00:00Z") })
+      .where(eq(schema.purchases.id, oldId)).run();
+    const newId = recordPurchase(db, hid, { productId, quantity: 2 }).id; // unpriced
+
+    const hist = listPurchaseHistory(db, hid);
+    expect(hist.map((r) => r.id)).toEqual([newId, oldId]); // newest first
+    expect(hist.find((r) => r.id === oldId)?.hintCents).toBe(1299); // actual paid price
+    expect(hist.find((r) => r.id === newId)?.hintCents).toBeNull(); // unpriced still shows
   });
 });
 

@@ -17,17 +17,20 @@ type Pending = {
   quantity: number;
   expiresAt: string | null;
   hintCents: number | null;
+  purchasedAt?: string;
 };
 
 type Product = { id: number; name: string; ingredientId: number };
 
-export function Bill({ onCount }: { onCount?: (n: number) => void }) {
+// history mode lists every purchase (priced or not) for review/editing, instead
+// of just the unpriced ones awaiting a price on the bill screen.
+export function Bill({ onCount, history = false }: { onCount?: (n: number) => void; history?: boolean }) {
   const [rows, setRows] = useState<Pending[] | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   function reload() {
-    return fetch("/api/purchases")
+    return fetch(history ? "/api/purchases?all=1" : "/api/purchases")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((j) => {
         setRows(j as Pending[]);
@@ -54,38 +57,46 @@ export function Bill({ onCount }: { onCount?: (n: number) => void }) {
     });
   }
 
-  // group by stop, same shape the run renders
+  // bill groups by stop (the run's shape); history groups by purchase date.
   const stops = useMemo(() => {
     const m = new Map<string, Pending[]>();
     for (const r of rows ?? []) {
-      const g = m.get(r.shopName);
+      const key = history
+        ? r.purchasedAt ? new Date(r.purchasedAt).toLocaleDateString() : "Undated"
+        : r.shopName;
+      const g = m.get(key);
       if (g) g.push(r);
-      else m.set(r.shopName, [r]);
+      else m.set(key, [r]);
     }
     return [...m.entries()];
-  }, [rows]);
+  }, [rows, history]);
 
   return (
     <>
       {error && <p className="notice">{error}</p>}
       {rows === null && !error && <p className="loading">Loading…</p>}
       {rows && rows.length === 0 && (
-        <p className="empty">Nothing to price — you&apos;re all caught up.</p>
+        <p className="empty">
+          {history ? "No purchases yet." : "Nothing to price — you’re all caught up."}
+        </p>
       )}
-      {stops.map(([shopName, group]) => (
+      {stops.map(([header, group]) => (
         <Ticket
-          key={shopName}
-          shopName={shopName}
-          website={group[0].website}
-          iconUrl={group[0].iconUrl}
+          key={header}
+          shopName={header}
+          website={history ? null : group[0].website}
+          iconUrl={history ? null : group[0].iconUrl}
         >
           {group.map((row) => (
             <BillRow
               key={row.id}
               row={row}
               alts={products.filter((p) => p.ingredientId === row.ingredientId)}
-              onSaved={() => drop(row.id)}
+              // pending: a priced row leaves the list (drop). history: keep it, but
+              // reload so a save/delete is reflected.
+              onSaved={history ? reload : () => drop(row.id)}
               onSwapped={reload}
+              subtitle={history ? row.shopName : undefined}
             />
           ))}
         </Ticket>
@@ -99,11 +110,13 @@ function BillRow({
   alts,
   onSaved,
   onSwapped,
+  subtitle,
 }: {
   row: Pending;
   alts: Product[];
   onSaved: () => void;
   onSwapped: () => void;
+  subtitle?: string;
 }) {
   const [dollars, setDollars] = useState(
     row.hintCents != null ? centsToDollars(row.hintCents).toFixed(2) : "",
@@ -172,6 +185,7 @@ function BillRow({
         ) : (
           <div className="tk-name">{row.productName}</div>
         )}
+        {subtitle && <div className="eb" style={{ opacity: 0.6, marginTop: 2 }}>{subtitle}</div>}
 
         <div className="bill-fields">
           <label className="eb" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>

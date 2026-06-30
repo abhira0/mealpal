@@ -47,6 +47,30 @@ export function listPendingPurchases(db: Db, householdId: number) {
     .all();
 }
 
+/** Full purchase history, newest first. Same shape as pending, but seeded with
+ *  the price actually paid (so the bill row prefills it) and every row, priced or not. */
+export function listPurchaseHistory(db: Db, householdId: number) {
+  return db.select({
+    id: schema.purchases.id,
+    productId: schema.purchases.productId,
+    ingredientId: schema.products.ingredientId,
+    productName: schema.products.name,
+    shopName: schema.shops.name,
+    website: schema.shops.website,
+    iconUrl: schema.shops.iconUrl,
+    quantity: schema.purchases.quantity,
+    expiresAt: schema.purchases.expiresAt,
+    hintCents: schema.purchases.cents, // what was actually paid, prefilled for editing
+    purchasedAt: schema.purchases.purchasedAt,
+  })
+    .from(schema.purchases)
+    .innerJoin(schema.products, eq(schema.products.id, schema.purchases.productId))
+    .innerJoin(schema.shops, eq(schema.shops.id, schema.products.shopId))
+    .where(eq(schema.purchases.householdId, householdId))
+    .orderBy(desc(schema.purchases.purchasedAt))
+    .all();
+}
+
 /**
  * Fill in / correct a purchase. Changing quantity re-syncs the linked restock
  * movement's delta so inventory stays consistent. Household-scoped.
