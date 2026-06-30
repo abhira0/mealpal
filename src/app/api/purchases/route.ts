@@ -8,9 +8,12 @@ import { dollarsToCents } from "@/lib/money";
 export async function GET(req: Request) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const all = new URL(req.url).searchParams.get("all");
+  const sp = new URL(req.url).searchParams;
   const hid = session.user.householdId;
-  return NextResponse.json(all ? listPurchaseHistory(db, hid) : listPendingPurchases(db, hid));
+  if (!sp.get("all")) return NextResponse.json(listPendingPurchases(db, hid));
+  const limit = Number(sp.get("limit")) || undefined;
+  const offset = Number(sp.get("offset")) || undefined;
+  return NextResponse.json(listPurchaseHistory(db, hid, { limit, offset }));
 }
 
 // Record a purchase. Price is optional: omit cents/dollars to mark it bought

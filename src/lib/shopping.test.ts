@@ -125,6 +125,20 @@ describe("listPurchaseHistory", () => {
     expect(hist.find((r) => r.id === oldId)?.hintCents).toBe(1299); // actual paid price
     expect(hist.find((r) => r.id === newId)?.hintCents).toBeNull(); // unpriced still shows
   });
+
+  it("paginates with limit/offset, newest first", () => {
+    const ids: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      const id = recordPurchase(db, hid, { productId, quantity: 1 }).id;
+      db.update(schema.purchases).set({ purchasedAt: new Date(2026, 0, i + 1) })
+        .where(eq(schema.purchases.id, id)).run();
+      ids.push(id); // ids[4] is newest
+    }
+    const page1 = listPurchaseHistory(db, hid, { limit: 2, offset: 0 });
+    const page2 = listPurchaseHistory(db, hid, { limit: 2, offset: 2 });
+    expect(page1.map((r) => r.id)).toEqual([ids[4], ids[3]]);
+    expect(page2.map((r) => r.id)).toEqual([ids[2], ids[1]]);
+  });
 });
 
 describe("manual extras", () => {
