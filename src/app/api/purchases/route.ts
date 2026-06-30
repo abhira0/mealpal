@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { listPendingPurchases, recordPurchase } from "@/lib/shopping";
+import { listPendingPurchases, listPurchaseHistory, recordPurchase } from "@/lib/shopping";
 import { dollarsToCents } from "@/lib/money";
 
-// Pending (not-yet-priced) purchases for the "enter the bill" screen.
-export async function GET() {
+// Pending (not-yet-priced) purchases for the bill screen; ?all=1 for the full history tab.
+export async function GET(req: Request) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  return NextResponse.json(listPendingPurchases(db, session.user.householdId));
+  const all = new URL(req.url).searchParams.get("all");
+  const hid = session.user.householdId;
+  return NextResponse.json(all ? listPurchaseHistory(db, hid) : listPendingPurchases(db, hid));
 }
 
 // Record a purchase. Price is optional: omit cents/dollars to mark it bought

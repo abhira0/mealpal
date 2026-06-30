@@ -30,7 +30,7 @@ export default function ShopPage() {
   // lineKey -> purchase id; lives here so checks survive the Bill tab round-trip.
   const [struck, setStruck] = useState<Map<string, number | null>>(new Map());
   const [horizon, setHorizon] = useState(14);
-  const [tab, setTab] = useState<"run" | "bill">("run");
+  const [tab, setTab] = useState<"run" | "bill" | "history">("run");
   const [error, setError] = useState<string | null>(null);
 
   const loadShopping = useCallback(() => {
@@ -124,10 +124,15 @@ export default function ShopPage() {
           <button role="tab" onClick={() => setTab("bill")} aria-pressed={tab === "bill"}>
             Bill{pendingCount > 0 && <> · {pendingCount}</>}
           </button>
+          <button role="tab" onClick={() => setTab("history")} aria-pressed={tab === "history"}>
+            History
+          </button>
         </div>
 
         {tab === "bill" ? (
           <Bill onCount={setPendingCount} />
+        ) : tab === "history" ? (
+          <Bill history />
         ) : (
           <>
             <div className="filter">
