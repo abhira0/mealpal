@@ -22,4 +22,4 @@ ssh "$REMOTE" "mkdir -p $DIR/data && { [ -f $DIR/data/mealpal.db ] && echo 'remo
 scp .env.local "$REMOTE:$DIR/.env"
 
 ssh "$REMOTE" "cd $DIR && docker compose up -d --build"
-echo "up -> http://192.168.0.17:3000"
+echo "up -> http://192.168.0.17:29999"
