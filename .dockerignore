@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+data
+*.db-wal
+*.db-shm
+# keep mealpal.db so `next build` has a real db; runtime uses the /data mount.
+# exclude .env.local — it hardcodes DATABASE_URL=./mealpal.db and would override the mount.
+.env.local
+Dockerfile
+docker-compose.yml
+deploy.sh

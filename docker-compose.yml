@@ -1,0 +1,13 @@
+services:
+  web:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: /data/mealpal.db
+      AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_TRUST_HOST: "true"   # next-auth v5: accessed by IP, not behind a trusted proxy
+      NODE_ENV: production
+    volumes:
+      - ./data:/data           # persists the sqlite db + WAL sidecars on the host
+    restart: unless-stopped
