@@ -2,7 +2,7 @@ services:
   web:
     build: .
     ports:
-      - "3000:3000"
+      - "29999:3000"
     environment:
       DATABASE_URL: /data/mealpal.db
       AUTH_SECRET: ${AUTH_SECRET}
