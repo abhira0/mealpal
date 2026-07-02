@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { Dropdown } from "@/components/Dropdown";
+import { Sheet } from "@/components/Sheet";
 
 type Product = { id: number; name: string };
 type Shop = { id: number; name: string };
@@ -49,17 +50,13 @@ export function AddExtra({
     onAdded();
   }
 
-  if (!open) {
-    return (
+  return (
+    <>
       <button type="button" className="btn-add" onClick={() => setOpen(true)}>
         <Plus size={16} style={{ verticalAlign: "-3px" }} /> Add an item
       </button>
-    );
-  }
-
-  return (
-    <div className="ticket">
-      <div className="ticket-body stack" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <Sheet open={open} title="Add an item" onClose={() => { setOpen(false); setError(null); }}>
+      <div className="sh-body">
         <div className="unit-radio">
           <button type="button" onClick={() => setMode("custom")} aria-pressed={mode === "custom"}>
             One-off
@@ -69,44 +66,48 @@ export function AddExtra({
           </button>
         </div>
 
-        {mode === "product" ? (
-          <Dropdown
-            label="Product to add"
-            placeholder="Choose a product…"
-            value={productId ? Number(productId) : null}
-            options={products.map((p) => ({ id: p.id, label: p.name }))}
-            onChange={(id) => setProductId(String(id))}
-          />
-        ) : (
-          <>
-            <input
-              className="input"
-              placeholder="e.g. Paper towels"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              aria-label="Item name"
-            />
-            <Dropdown
-              label="Stop (optional)"
-              placeholder="No stop"
-              value={shopId ? Number(shopId) : null}
-              options={shops.map((s) => ({ id: s.id, label: s.name }))}
-              onChange={(id) => setShopId(String(id))}
-            />
-          </>
-        )}
+        <div className="addp-grid">
+          {mode === "product" ? (
+            <>
+              <span className="eb">Product</span>
+              <Dropdown
+                label="Product to add"
+                placeholder="Choose a product…"
+                value={productId ? Number(productId) : null}
+                options={products.map((p) => ({ id: p.id, label: p.name }))}
+                onChange={(id) => setProductId(String(id))}
+              />
+            </>
+          ) : (
+            <>
+              <label className="eb" htmlFor="addx-name">Item</label>
+              <input
+                id="addx-name"
+                className="input"
+                placeholder="e.g. Paper towels"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+              <span className="eb">Stop</span>
+              <Dropdown
+                label="Stop (optional)"
+                placeholder="No stop"
+                value={shopId ? Number(shopId) : null}
+                options={shops.map((s) => ({ id: s.id, label: s.name }))}
+                onChange={(id) => setShopId(String(id))}
+              />
+            </>
+          )}
 
-        <label className="eb" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          qty
+          <label className="eb" htmlFor="addx-qty">Qty</label>
           <input
+            id="addx-qty"
             className="input mono"
             inputMode="numeric"
             value={quantity}
             onChange={(e) => setQuantity(e.target.value.replace(/[^0-9]/g, ""))}
-            aria-label="Quantity"
-            style={{ width: 64 }}
           />
-        </label>
+        </div>
 
         {error && <div className="eb" style={{ color: "var(--paprika)" }}>{error}</div>}
 
@@ -119,6 +120,7 @@ export function AddExtra({
           </button>
         </div>
       </div>
-    </div>
+      </Sheet>
+    </>
   );
 }

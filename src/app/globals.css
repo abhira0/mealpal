@@ -93,6 +93,8 @@ button{font-family:inherit}
 /* 16px min on text inputs so iOS doesn't auto-zoom the page on focus. */
 .input{font-family:var(--body);font-size:16px;line-height:1.2;color:var(--ink);background:var(--paper-raised);border:1px solid var(--line);border-radius:8px;padding:12px 13px;width:100%;min-height:44px}
 .input::placeholder{color:#a9a496}
+.addp-grid{display:grid;grid-template-columns:max-content 1fr;gap:12px;align-items:center}
+.addp-grid>.eb{justify-self:end;text-align:right}
 /* iOS sizes native date/time inputs by their content and ignores width:100%, so they overflow right. Strip the native appearance to make them honor the box. */
 .input[type=date],.input[type=time]{-webkit-appearance:none;appearance:none;min-width:0}
 /* iOS renders empty date inputs blank with no format hint; show one. */
