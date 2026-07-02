@@ -23,6 +23,7 @@ type MealEvent = {
   amount: number | null;
   status: string;
   ruleId: number | null;
+  variantName: string | null;
 };
 type AddKind = "recipe" | "product" | "ingredient";
 
@@ -83,7 +84,6 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
-  const [variantName, setVariantName] = useState<Map<number, string>>(new Map());
   const [events, setEvents] = useState<MealEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -116,18 +116,7 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
   const loadEvents = useCallback(async () => {
     const res = await fetch(`/api/events?from=${from}&to=${to}`);
     if (!res.ok) return;
-    const evs = (await res.json()) as MealEvent[];
-    setEvents(evs);
-    // resolve variant names for any direct product-variant items shown
-    const pids = [...new Set(evs.filter((e) => e.variantId != null && e.productId != null).map((e) => e.productId!))];
-    if (pids.length) {
-      const lists = await Promise.all(
-        pids.map((pid) => fetch(`/api/products/${pid}/variants`).then((r) => (r.ok ? r.json() : []))),
-      );
-      const m = new Map<number, string>();
-      for (const list of lists) for (const v of list as { id: number; name: string }[]) m.set(v.id, v.name);
-      setVariantName(m);
-    }
+    setEvents((await res.json()) as MealEvent[]);
   }, [from, to]);
 
   // Slots, recipes, products, ingredients don't depend on the date range — fetch once.
@@ -174,7 +163,7 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
   // A meal event's display title, whichever kind it is.
   function eventTitle(ev: MealEvent): string {
     if (ev.recipeId != null) return recipeName.get(ev.recipeId) ?? "Recipe";
-    if (ev.variantId != null) return variantName.get(ev.variantId) ?? productName.get(ev.productId!) ?? "Item";
+    if (ev.variantId != null) return ev.variantName ?? productName.get(ev.productId!) ?? "Item";
     if (ev.productId != null) return productName.get(ev.productId) ?? "Item";
     if (ev.ingredientId != null) return ingredientName.get(ev.ingredientId) ?? "Item";
     return "Item";

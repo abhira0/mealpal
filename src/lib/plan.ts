@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, lte } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lte } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
 import { consumptionLinesForEvent, recordCookedForEvent } from "@/lib/consumption";
@@ -52,13 +52,29 @@ export function addEvent(db: Db, householdId: number, input: EventInput) {
 }
 
 export function listEvents(db: Db, householdId: number, from: string, to: string) {
-  return db.select().from(schema.mealEvents)
+  const events = db.select().from(schema.mealEvents)
     .where(and(
       eq(schema.mealEvents.householdId, householdId),
       gte(schema.mealEvents.date, from),
       lte(schema.mealEvents.date, to),
     ))
     .orderBy(asc(schema.mealEvents.date)).all();
+  // attach pack-variant names so clients don't need a fetch per product
+  const ids = [...new Set(events.flatMap((e) => (e.variantId != null ? [e.variantId] : [])))];
+  const names = ids.length
+    ? new Map(
+        db.select({ id: schema.productVariants.id, name: schema.productVariants.name })
+          .from(schema.productVariants)
+          .where(and(
+            eq(schema.productVariants.householdId, householdId),
+            inArray(schema.productVariants.id, ids),
+          )).all().map((v) => [v.id, v.name]),
+      )
+    : new Map<number, string>();
+  return events.map((e) => ({
+    ...e,
+    variantName: e.variantId != null ? names.get(e.variantId) ?? null : null,
+  }));
 }
 
 /**
@@ -88,11 +104,12 @@ export function plannedConsumption(
 }
 
 /**
- * First date each ingredient's running stock hits zero, walking planned meals
- * forward from `from`. Real consumption — no shelf-life clamp. Ingredients that
- * never run dry within [from, to] are omitted. When `expiry` (ingredientId →
- * YYYY-MM-DD) is given, stock left after that date is spoiled: meals dated past
- * it start from zero, so run-out lands on the first use after expiry.
+ * First date each ingredient's running stock is used up (hits zero or below),
+ * walking planned meals forward from `from`. Real consumption — no shelf-life
+ * clamp. Ingredients that never run dry within [from, to] are omitted. When
+ * `expiry` (ingredientId → YYYY-MM-DD) is given, stock left after that date is
+ * spoiled: meals dated past it start from zero, so run-out lands on the first
+ * use after expiry.
  */
 export function runOutDates(
   db: Db, householdId: number, from: string, to: string, stock: Map<number, number>,
@@ -110,7 +127,8 @@ export function runOutDates(
         : remaining.get(line.ingredientId) ?? 0;
       const left = have - line.amount;
       remaining.set(line.ingredientId, left);
-      if (left < 0) out.set(line.ingredientId, ev.date);
+      // <= 0: "out" is the day the last of it gets used, not the first unmet meal
+      if (left <= 0) out.set(line.ingredientId, ev.date);
     }
   }
   return out;
