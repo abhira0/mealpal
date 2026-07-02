@@ -5,19 +5,23 @@ import { Plus } from "lucide-react";
 import { Dropdown } from "@/components/Dropdown";
 
 type Product = { id: number; name: string };
+type Shop = { id: number; name: string };
 
 // Backfill a purchase straight into the history tab: pick a tracked product,
 // set quantity, an optional total price + expiry, and the date it was bought.
 export function AddPurchase({
   products,
+  shops = [],
   onAdded,
 }: {
   products: Product[];
+  shops?: Shop[];
   onAdded: () => void;
 }) {
   const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD, local
   const [open, setOpen] = useState(false);
   const [productId, setProductId] = useState("");
+  const [shopId, setShopId] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [dollars, setDollars] = useState("");
   const [purchasedAt, setPurchasedAt] = useState(today);
@@ -26,7 +30,7 @@ export function AddPurchase({
   const [error, setError] = useState<string | null>(null);
 
   function reset() {
-    setProductId(""); setQuantity("1"); setDollars("");
+    setProductId(""); setShopId(""); setQuantity("1"); setDollars("");
     setPurchasedAt(today); setExpiresAt("");
   }
 
@@ -45,6 +49,7 @@ export function AddPurchase({
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         productId: Number(productId),
+        shopId: shopId ? Number(shopId) : null,
         quantity: qty,
         // Store per-unit cents (total / qty), matching how the bill row saves.
         cents: dollars ? Math.round(Math.round(amount * 100) / qty) : null,
@@ -77,6 +82,16 @@ export function AddPurchase({
           options={products.map((p) => ({ id: p.id, label: p.name }))}
           onChange={(id) => setProductId(String(id))}
         />
+
+        {shops.length > 1 && (
+          <Dropdown
+            label="Shop"
+            placeholder="Product's usual shop"
+            value={shopId ? Number(shopId) : null}
+            options={shops.map((s) => ({ id: s.id, label: s.name }))}
+            onChange={(id) => setShopId(String(id))}
+          />
+        )}
 
         <div className="bill-fields">
           <label className="eb" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>

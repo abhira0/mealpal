@@ -6,7 +6,7 @@ type Db = BetterSQLite3Database<typeof schema>;
 
 // cents null = bought but not yet priced; fill it in later on the bill screen.
 // purchasedAt omitted = now; set it to backfill a past purchase from the history tab.
-export interface PurchaseInput { productId: number; quantity: number; cents?: number | null; expiresAt?: string | null; purchasedAt?: Date | null; }
+export interface PurchaseInput { productId: number; quantity: number; cents?: number | null; expiresAt?: string | null; purchasedAt?: Date | null; shopId?: number | null; }
 
 /** Record a purchase: insert purchase row and restock inventory. The purchase IS the price history. */
 export function recordPurchase(db: Db, householdId: number, input: PurchaseInput) {
@@ -15,7 +15,7 @@ export function recordPurchase(db: Db, householdId: number, input: PurchaseInput
       .where(and(eq(schema.products.id, input.productId), eq(schema.products.householdId, householdId))).all();
     if (!product) throw new Error("product not found in household");
     const [purchase] = tx.insert(schema.purchases)
-      .values({ householdId, productId: input.productId, quantity: input.quantity, cents: input.cents ?? null, expiresAt: input.expiresAt ?? null, ...(input.purchasedAt ? { purchasedAt: input.purchasedAt } : {}) })
+      .values({ householdId, productId: input.productId, quantity: input.quantity, cents: input.cents ?? null, expiresAt: input.expiresAt ?? null, shopId: input.shopId ?? null, ...(input.purchasedAt ? { purchasedAt: input.purchasedAt } : {}) })
       .returning().all();
     tx.insert(schema.stockMovements).values({
       householdId, ingredientId: product.ingredientId, productId: product.id,

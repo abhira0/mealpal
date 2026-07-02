@@ -42,7 +42,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "purchasedAt can't be in the future" }, { status: 400 });
     purchasedAt = localNoon(b.purchasedAt);
   }
+  // Optional shop override; otherwise the purchase inherits the product's usual shop.
+  let shopId: number | null = null;
+  if (b?.shopId !== undefined && b.shopId !== null && b.shopId !== "") {
+    shopId = Number(b.shopId);
+    if (!Number.isInteger(shopId) || shopId < 1)
+      return NextResponse.json({ error: "invalid shopId" }, { status: 400 });
+  }
   return NextResponse.json(
-    recordPurchase(db, session.user.householdId, { productId, quantity, cents: cents === null ? null : Math.round(cents), expiresAt, purchasedAt }),
+    recordPurchase(db, session.user.householdId, { productId, quantity, cents: cents === null ? null : Math.round(cents), expiresAt, purchasedAt, shopId }),
     { status: 201 });
 }
