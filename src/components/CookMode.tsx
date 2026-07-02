@@ -44,6 +44,15 @@ export function CookMode({
     };
   }, []);
 
+  // lock background scroll while the overlay is up
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -80,6 +89,7 @@ export function CookMode({
       <div className="cook-step">
         <span className="cook-num">Step {i + 1} of {steps.length}</span>
         {clip ? (
+          <>
           <div className="cook-clip">
             <iframe
               key={`${i}-${replay}`}
@@ -88,14 +98,15 @@ export function CookMode({
               allow="autoplay; encrypted-media; fullscreen"
               allowFullScreen
             />
-            <button
-              type="button"
-              className="btn cook-replay"
-              onClick={() => setReplay((n) => n + 1)}
-            >
-              ↻ Replay clip
-            </button>
           </div>
+          <button
+            type="button"
+            className="btn cook-replay"
+            onClick={() => setReplay((n) => n + 1)}
+          >
+            ↻ Replay clip
+          </button>
+          </>
         ) : null}
         <p className="cook-text">{step.text}</p>
       </div>
