@@ -126,7 +126,7 @@ export function ProductDetail({ id }: { id: string }) {
         title={product.name}
       />
 
-      <div className="content stack-sm">
+      <div className="content stack-sm detail-view">
         {error && <p className="notice">{error}</p>}
 
         <span className="section-label">Details</span>

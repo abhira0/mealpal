@@ -180,7 +180,7 @@ export function IngredientDetail({ id }: { id: string }) {
         title={detail.name}
       />
 
-      <div className="content stack-sm">
+      <div className="content stack-sm detail-view">
         {error && <p className="notice">{error}</p>}
 
         <span className="section-label">Details</span>
