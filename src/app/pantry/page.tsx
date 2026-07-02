@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { StockAdjust } from "@/components/StockAdjust";
 import { Sheet } from "@/components/Sheet";
+import { EditableValue, mmdd } from "@/components/Bill";
 import { formatQty } from "@/lib/units";
 
 type Ingredient = {
@@ -61,6 +62,17 @@ export default function PantryPage() {
     } else if (exp) {
       setExpiry((prev) => ({ ...prev, [ingId]: exp }));
     }
+  }
+
+  // Record a stock movement (delta) and/or an expiry from the inline chips.
+  async function saveStock(ingId: number, productId: number | null, delta: number, exp: string | null) {
+    const res = await fetch("/api/stock", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ingredientId: ingId, productId, delta, expiresAt: exp }),
+    });
+    if (res.ok) applyDelta(ingId, productId, delta, exp);
+    else setError("Couldn't save.");
   }
 
   const editProducts = editing
@@ -198,16 +210,26 @@ export default function PantryPage() {
                   {p.imageUrl && <img src={p.imageUrl} alt="" className="pantry-prod-img" />}
                   <div className="pantry-prod-info">
                     <span className="body" style={{ color: "var(--sage)" }}>{p.name}</span>
-                    <div className="pantry-prod-row2">
-                      <StockAdjust
-                        ingredientId={editing.id}
-                        productId={p.id}
-                        unit={editing.canonicalUnit}
-                        current={pq}
-                        tone={pq <= 0 ? "low" : "default"}
-                        onAdjusted={(delta, e) => applyDelta(editing.id, p.id, delta, e)}
+                    <div className="hrow-chips">
+                      <EditableValue
+                        k="×"
+                        cls="qty"
+                        display={formatQty(pq, editing.canonicalUnit)}
+                        value={String(pq)}
+                        inputMode="decimal"
+                        onCommit={(next) => {
+                          const t = Number(next);
+                          if (Number.isFinite(t) && t !== pq) saveStock(editing.id, p.id, t - pq, null);
+                        }}
                       />
-                      {pe && <p className="meta">expires · {pe}</p>}
+                      <EditableValue
+                        k="exp"
+                        cls="date"
+                        type="date"
+                        display={mmdd(pe ?? "")}
+                        value={pe ?? ""}
+                        onCommit={(next) => saveStock(editing.id, p.id, 0, next || null)}
+                      />
                     </div>
                   </div>
                 </div>
