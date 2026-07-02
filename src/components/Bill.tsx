@@ -6,6 +6,7 @@ import { Trash2 } from "lucide-react";
 import { Ticket } from "@/components/ShopTicket";
 import { Dropdown } from "@/components/Dropdown";
 import { AddPurchase } from "@/components/AddPurchase";
+import { Favicon } from "@/components/Favicon";
 import { centsToDollars } from "@/lib/money";
 
 type Pending = {
@@ -218,6 +219,7 @@ function BillRow({
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pickProduct, setPickProduct] = useState(false); // history: name → swap dropdown
 
   async function save() {
     // History rows may be left unpriced (e.g. you're only fixing the date), so an
@@ -331,18 +333,29 @@ function BillRow({
     const money = dollars === "" ? "—" : dollars;
     return (
       <div className="hrow">
-        <Link href={`/manage/products/${row.productId}`} className="hrow-name">
-          {row.productName}
-        </Link>
+        <div className="hrow-head">
+          {pickProduct && alts.length > 1 ? (
+            <Dropdown
+              label="What did you buy?"
+              value={row.productId}
+              options={alts.map((p) => ({ id: p.id, label: p.name }))}
+              onChange={(id) => { setPickProduct(false); swap(Number(id)); }}
+            />
+          ) : (
+            <button type="button" className="hrow-name" onClick={() => setPickProduct(true)} disabled={alts.length <= 1}>
+              {row.productName}
+            </button>
+          )}
+          <button type="button" className="hrow-trash" onClick={remove} disabled={busy} aria-label={`Remove ${row.productName}`}>
+            <Trash2 size={15} />
+          </button>
+        </div>
         <div className="hrow-chips">
           <EditableValue k="$" cls="money" display={money} value={dollars} inputMode="decimal" onCommit={commitPrice} />
           <EditableValue k="×" cls="qty" display={quantity} value={quantity} inputMode="numeric" onCommit={commitQty} />
           <EditableValue k="buy" cls="date" type="date" display={mmdd(purchasedAt)} value={purchasedAt} max={new Date().toLocaleDateString("en-CA")} onCommit={commitBought} />
           <EditableValue k="exp" cls="date" type="date" display={mmdd(expiresAt)} value={expiresAt} onCommit={commitExp} />
-          <ShopChip shopId={row.shopId} shopName={row.shopName} shops={shops} onChange={changeShop} />
-          <button type="button" className="hrow-trash" onClick={remove} disabled={busy} aria-label={`Remove ${row.productName}`}>
-            <Trash2 size={15} />
-          </button>
+          <ShopChip shopId={row.shopId} shopName={row.shopName} website={row.website} iconUrl={row.iconUrl} shops={shops} onChange={changeShop} />
         </div>
         {error && <div className="eb" style={{ color: "var(--paprika)", marginTop: 6 }}>{error}</div>}
       </div>
@@ -442,13 +455,13 @@ function BillRow({
 }
 
 // YYYY-MM-DD → MM/DD for the compact chip; "" → em dash.
-function mmdd(iso: string) {
+export function mmdd(iso: string) {
   const m = /^\d{4}-(\d{2})-(\d{2})$/.exec(iso);
   return m ? `${m[1]}/${m[2]}` : "—";
 }
 
 // A chip that reads as text and turns into an input on tap; commits on blur/Enter, cancels on Esc.
-function EditableValue({
+export function EditableValue({
   k, cls, display, value, type = "text", inputMode, max, onCommit,
 }: {
   k: string;
@@ -491,10 +504,12 @@ function EditableValue({
 
 // Shop as a tappable chip → the shared Dropdown; picking a shop regroups the row.
 function ShopChip({
-  shopId, shopName, shops, onChange,
+  shopId, shopName, website, iconUrl, shops, onChange,
 }: {
   shopId: number;
   shopName: string;
+  website?: string | null;
+  iconUrl?: string | null;
   shops: Shop[];
   onChange: (id: number) => void;
 }) {
@@ -509,8 +524,8 @@ function ShopChip({
     );
   }
   return (
-    <button type="button" className="val shop" onClick={() => setOpen(true)} disabled={shops.length <= 1}>
-      <span className="k">shop</span>{shopName}
+    <button type="button" className="val shop" onClick={() => setOpen(true)} disabled={shops.length <= 1} aria-label={`Shop: ${shopName}`}>
+      <Favicon name={shopName} website={website} iconUrl={iconUrl} size={16} />
     </button>
   );
 }
