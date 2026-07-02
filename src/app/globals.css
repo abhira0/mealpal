@@ -273,12 +273,16 @@ input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:#a9a496;posi
   .nav a{flex-direction:row;align-items:center;gap:10px;font-size:11px;letter-spacing:.06em;text-align:left;padding:10px 12px;border-radius:8px;width:100%}
   .nav a.on{background:var(--enamel-dark)}
 
-  /* row/card lists flow into two columns; every non-row child spans both.
-     gap intentionally not set — .stack/.stack-sm gaps carry over. */
-  .content:has(> .row),.content:has(> .account-row),
+  /* row/card lists flow into two columns; every non-list child spans both.
+     button.card = tappable list items (pantry); section.card detail blocks
+     stay single-flow. gap intentionally not set — .stack/.stack-sm gaps
+     carry over. */
+  .content:has(> .row),.content:has(> .account-row),.content:has(> button.card),
   .content :is(.stack,.stack-sm):has(> .row),
   .content :is(.stack,.stack-sm):has(> .account-row){display:grid;grid-template-columns:1fr 1fr;align-items:start}
-  .content:has(> .row) > :not(.row),.content:has(> .account-row) > :not(.account-row),
+  .content:has(> .row) > :not(.row),
+  .content:has(> .account-row) > :not(.account-row),
+  .content:has(> button.card) > :not(button.card),
   .content :is(.stack,.stack-sm):has(> .row) > :not(.row),
   .content :is(.stack,.stack-sm):has(> .account-row) > :not(.account-row){grid-column:1/-1}
 
