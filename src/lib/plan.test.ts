@@ -60,6 +60,15 @@ describe("meal plan", () => {
     expect(out.get(flourId)).toBe("2026-07-03");
   });
 
+  it("dates the meal that uses the last of the stock, not the first unmet one", () => {
+    // 1000g on hand; the 2nd's meal drains it to exactly zero → out on the 2nd.
+    addEvent(db, hid, { date: "2026-07-01", slotId, recipeId, servings: 2 });
+    addEvent(db, hid, { date: "2026-07-02", slotId, recipeId, servings: 2 });
+    addEvent(db, hid, { date: "2026-07-03", slotId, recipeId, servings: 2 });
+    const out = runOutDates(db, hid, "2026-07-01", "2026-07-31", new Map([[flourId, 1000]]));
+    expect(out.get(flourId)).toBe("2026-07-02");
+  });
+
   it("expiry zeroes remaining stock: run-out is the first meal after the expiry date", () => {
     // 2000g on hand — enough for all four meals — but it expires on the 2nd.
     addEvent(db, hid, { date: "2026-07-01", slotId, recipeId, servings: 2 });
@@ -102,6 +111,15 @@ describe("direct items in a planner slot", () => {
     expect(plannedConsumption(db, hid, "2026-07-01", "2026-07-01").get(flourId)).toBe(200);
     cookEvent(db, hid, ev.id);
     expect(currentStock(db, hid, flourId)).toBe(800); // 1000 - 200
+  });
+
+  it("listEvents carries the variant name so clients don't refetch it", () => {
+    const variantId = createVariant(db, hid, productId, { name: "Mega Omega", servingSize: 43, calories: 4 })!.id;
+    addEvent(db, hid, { date: "2026-07-02", slotId, productId, variantId, servings: 1 });
+    addEvent(db, hid, { date: "2026-07-02", slotId, recipeId, servings: 2 });
+    const events = listEvents(db, hid, "2026-07-02", "2026-07-02");
+    expect(events.find((e) => e.variantId === variantId)?.variantName).toBe("Mega Omega");
+    expect(events.find((e) => e.recipeId != null)?.variantName).toBeNull();
   });
 
   it("a direct product item resolves amount from the variant's serving size and deducts that product", () => {

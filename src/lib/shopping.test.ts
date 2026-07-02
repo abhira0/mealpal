@@ -4,7 +4,7 @@ import { makeTestDb, type TestDb } from "@/test/db";
 import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
 import { createProduct } from "@/lib/products";
-import { recordPurchase, listPendingPurchases, listPurchaseHistory, updatePurchase, deletePurchase, learnedShelfLife, addExtra, listExtras, deleteExtra } from "@/lib/shopping";
+import { recordPurchase, listPendingPurchases, listPurchaseHistory, updatePurchase, deletePurchase, learnedShelfLife, addExtra, listExtras, deleteExtra, urgency } from "@/lib/shopping";
 import { currentStock } from "@/lib/stock";
 
 let db: TestDb;
@@ -161,5 +161,27 @@ describe("manual extras", () => {
     expect(deleteExtra(db, hid, e.id)).toBe(true);
     expect(listExtras(db, hid)).toHaveLength(0);
     expect(deleteExtra(db, hid, e.id)).toBe(false); // already gone
+  });
+});
+
+describe("urgency", () => {
+  it("labels an expiry-driven run-out with the expiry date, not the run-out", () => {
+    // run-out lands on the first meal AFTER expiry (07-04); the chip should count to expiry (07-03)
+    expect(urgency("2026-07-04", "2026-07-03", "2026-07-01")).toEqual({ label: "expires in 2d", tone: "run" });
+  });
+
+  it("labels a depletion-driven run-out as 'out in Nd' even when an expiry exists later", () => {
+    expect(urgency("2026-07-06", "2026-07-10", "2026-07-01")).toEqual({ label: "out in 5d", tone: "low" });
+  });
+
+  it("uses relative words for today and tomorrow only", () => {
+    expect(urgency("2026-07-02", "2026-07-01", "2026-07-01")).toEqual({ label: "expires today", tone: "run" });
+    expect(urgency("2026-07-02", undefined, "2026-07-01")).toEqual({ label: "out tomorrow", tone: "run" });
+    expect(urgency("2026-07-03", undefined, "2026-07-01")).toEqual({ label: "out in 2d", tone: "run" });
+  });
+
+  it("keeps 'out today' and null when there is no run-out", () => {
+    expect(urgency("2026-07-01", undefined, "2026-07-01")).toEqual({ label: "out today", tone: "run" });
+    expect(urgency(undefined, "2026-07-03", "2026-07-01")).toBeNull();
   });
 });
