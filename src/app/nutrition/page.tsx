@@ -20,10 +20,8 @@ export default function NutritionPage() {
   // after mount. (Same reasoning as PlanEditor.) Avoids a hydration mismatch.
   const [date, setDate] = useState("");
   const [data, setData] = useState<AnalysisData | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
   const [openCard, setOpenCard] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
-  const reqKey = `${mode}:${date}:${reloadKey}`;
+  const reqKey = `${mode}:${date}`;
 
   useEffect(() => { setDate(todayISO()); }, []);
 
@@ -79,8 +77,7 @@ export default function NutritionPage() {
         ) : noMeals ? (
           <p style={{ opacity: 0.6 }}>No meals planned this week.</p>
         ) : tab === "overview" ? (
-          <OverviewBody data={data} mode={mode} openCard={openCard} setOpenCard={setOpenCard}
-            editing={editing} setEditing={setEditing} reload={() => setReloadKey((k) => k + 1)} />
+          <OverviewBody data={data} mode={mode} openCard={openCard} setOpenCard={setOpenCard} />
         ) : (
           <BreakdownBody data={data} mode={mode} date={date} />
         )}
@@ -197,11 +194,10 @@ function MissingNotice({ missing }: { missing: string[] }) {
 }
 
 // Overview lens: the dashboard — calorie ring, macro split, macros vs goal,
-// scorecards, and the goals editor.
-function OverviewBody({ data, mode, openCard, setOpenCard, editing, setEditing, reload }: {
+// and scorecards. Goals are edited on /manage.
+function OverviewBody({ data, mode, openCard, setOpenCard }: {
   data: AnalysisData; mode: "day" | "week";
   openCard: string | null; setOpenCard: (k: string | null) => void;
-  editing: boolean; setEditing: (b: boolean) => void; reload: () => void;
 }) {
   const n = data.nutrients;
   const goals = data.goals;
@@ -243,8 +239,6 @@ function OverviewBody({ data, mode, openCard, setOpenCard, editing, setEditing, 
       )}
 
       <MissingNotice missing={data.missing} />
-
-      <GoalsEditor goals={data.goals} editing={editing} setEditing={setEditing} reload={reload} />
     </>
   );
 }
@@ -481,50 +475,5 @@ function WeekTrend({ perDay }: { perDay: NonNullable<AnalysisData["perDay"]> }) 
       <p className="section-label">Calories from each macro, by day</p>
       <EChart option={option as never} height={200} />
     </>
-  );
-}
-
-function GoalsEditor({ goals, editing, setEditing, reload }: {
-  goals: Goals | undefined; editing: boolean; setEditing: (b: boolean) => void;
-  reload: () => void;
-}) {
-  const [form, setForm] = useState<Goals | null>(null);
-
-  if (!editing || !form) {
-    return (
-      <button type="button" className="btn-link" style={{ alignSelf: "flex-start" }}
-        disabled={!goals}
-        onClick={() => { if (goals) { setForm(goals); setEditing(true); } }}>Edit goals</button>
-    );
-  }
-
-  const field = (key: keyof Goals, label: string) => (
-    <label className="field">
-      <span className="field-label">{label}</span>
-      <input className="input" type="number" min={0} value={form[key]}
-        onChange={(e) => setForm({ ...form, [key]: Number(e.target.value) })} />
-    </label>
-  );
-
-  const save = async () => {
-    await fetch("/api/nutrition/goals", {
-      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form),
-    });
-    setEditing(false);
-    reload();
-  };
-
-  return (
-    <section className="stack" style={{ borderTop: "1px solid var(--line)", paddingTop: 12 }}>
-      <p className="section-label">Daily goals</p>
-      {field("calorieGoal", "Calories")}
-      {field("proteinG", "Protein (g)")}
-      {field("carbsG", "Carbs (g)")}
-      {field("fatG", "Fat (g)")}
-      <div className="filter">
-        <button type="button" onClick={save}>Save</button>
-        <button type="button" onClick={() => setEditing(false)}>Cancel</button>
-      </div>
-    </section>
   );
 }

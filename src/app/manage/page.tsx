@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { SignOutButton } from "@/components/SignOutButton";
 import { ENTITIES, type EntitySlug } from "@/app/manage/entities";
+import { GoalsEditor } from "@/app/manage/GoalsEditor";
 import { BookOpen, Camera, ChevronRight, Egg, Store, Tag, Utensils, type LucideIcon } from "lucide-react";
 
 // Resolve the app's own origin so server-side fetches to /api hit this app.
@@ -84,6 +85,11 @@ export default async function ManagePage() {
               <ChevronRight className="arrow" size={16} aria-hidden="true" />
             </Link>
           ))}
+        </section>
+
+        <section className="stack-sm">
+          <p className="section-label">Daily goals</p>
+          <GoalsEditor />
         </section>
 
         <section className="stack-sm">
