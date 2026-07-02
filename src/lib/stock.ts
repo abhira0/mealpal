@@ -118,38 +118,42 @@ export function replaceManualExpiry(
   db: Db, householdId: number, ingredientId: number,
   productId: number | null, expiresAt: string | null,
 ) {
-  const scope = and(
-    eq(schema.stockMovements.householdId, householdId),
-    eq(schema.stockMovements.ingredientId, ingredientId),
-    eq(schema.stockMovements.reason, "manual"),
-    productId == null
-      ? isNull(schema.stockMovements.productId)
-      : eq(schema.stockMovements.productId, productId),
-  );
-  const manual = db.select().from(schema.stockMovements).where(scope).all();
+  // Several retire/update/insert writes must land together, or a crash mid-way
+  // leaves the target with zero or two "current" manual dates.
+  db.transaction((tx) => {
+    const scope = and(
+      eq(schema.stockMovements.householdId, householdId),
+      eq(schema.stockMovements.ingredientId, ingredientId),
+      eq(schema.stockMovements.reason, "manual"),
+      productId == null
+        ? isNull(schema.stockMovements.productId)
+        : eq(schema.stockMovements.productId, productId),
+    );
+    const manual = tx.select().from(schema.stockMovements).where(scope).all();
 
-  // Retire a movement's stale date: drop bare carriers, keep real stock but clear its date.
-  const retire = (m: (typeof manual)[number]) => {
-    if (m.expiresAt == null) return;
-    if (m.delta === 0) db.delete(schema.stockMovements).where(eq(schema.stockMovements.id, m.id)).run();
-    else db.update(schema.stockMovements).set({ expiresAt: null }).where(eq(schema.stockMovements.id, m.id)).run();
-  };
+    // Retire a movement's stale date: drop bare carriers, keep real stock but clear its date.
+    const retire = (m: (typeof manual)[number]) => {
+      if (m.expiresAt == null) return;
+      if (m.delta === 0) tx.delete(schema.stockMovements).where(eq(schema.stockMovements.id, m.id)).run();
+      else tx.update(schema.stockMovements).set({ expiresAt: null }).where(eq(schema.stockMovements.id, m.id)).run();
+    };
 
-  if (expiresAt == null) {
-    for (const m of manual) retire(m);
-    return;
-  }
+    if (expiresAt == null) {
+      for (const m of manual) retire(m);
+      return;
+    }
 
-  // Carrier = the real on-hand batch (largest |delta|), else any manual row.
-  const carrier = manual.slice().sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))[0];
-  if (!carrier) {
-    db.insert(schema.stockMovements)
-      .values({ householdId, ingredientId, productId: productId ?? null, delta: 0, reason: "manual", expiresAt })
-      .run();
-    return;
-  }
-  db.update(schema.stockMovements).set({ expiresAt }).where(eq(schema.stockMovements.id, carrier.id)).run();
-  for (const m of manual) if (m.id !== carrier.id) retire(m);
+    // Carrier = the real on-hand batch (largest |delta|), else any manual row.
+    const carrier = manual.slice().sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))[0];
+    if (!carrier) {
+      tx.insert(schema.stockMovements)
+        .values({ householdId, ingredientId, productId: productId ?? null, delta: 0, reason: "manual", expiresAt })
+        .run();
+      return;
+    }
+    tx.update(schema.stockMovements).set({ expiresAt }).where(eq(schema.stockMovements.id, carrier.id)).run();
+    for (const m of manual) if (m.id !== carrier.id) retire(m);
+  });
 }
 
 /** Manual correction (spills, recounts) or backfill. Positive or negative. */
