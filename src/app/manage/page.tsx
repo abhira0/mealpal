@@ -4,8 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { SignOutButton } from "@/components/SignOutButton";
 import { ENTITIES, type EntitySlug } from "@/app/manage/entities";
-import { GoalsEditor } from "@/app/manage/GoalsEditor";
-import { BookOpen, Camera, ChevronRight, Egg, Store, Tag, Utensils, type LucideIcon } from "lucide-react";
+import { BookOpen, Camera, ChevronRight, Egg, Store, Tag, Target, Utensils, type LucideIcon } from "lucide-react";
 
 // Resolve the app's own origin so server-side fetches to /api hit this app.
 async function origin(): Promise<string> {
@@ -85,11 +84,13 @@ export default async function ManagePage() {
               <ChevronRight className="arrow" size={16} aria-hidden="true" />
             </Link>
           ))}
-        </section>
-
-        <section className="stack-sm">
-          <p className="section-label">Daily goals</p>
-          <GoalsEditor />
+          <Link href="/manage/goals" className="account-row">
+            <span className="row-link">
+              <span className="icon-badge" aria-hidden="true"><Target size={18} /></span>
+              <span className="title">Daily goals</span>
+            </span>
+            <ChevronRight className="arrow" size={16} aria-hidden="true" />
+          </Link>
         </section>
 
         <section className="stack-sm">
