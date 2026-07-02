@@ -90,10 +90,13 @@ export function plannedConsumption(
 /**
  * First date each ingredient's running stock hits zero, walking planned meals
  * forward from `from`. Real consumption — no shelf-life clamp. Ingredients that
- * never run dry within [from, to] are omitted.
+ * never run dry within [from, to] are omitted. When `expiry` (ingredientId →
+ * YYYY-MM-DD) is given, stock left after that date is spoiled: meals dated past
+ * it start from zero, so run-out lands on the first use after expiry.
  */
 export function runOutDates(
   db: Db, householdId: number, from: string, to: string, stock: Map<number, number>,
+  expiry?: Map<number, string>,
 ): Map<number, string> {
   const events = listEvents(db, householdId, from, to).filter((e) => e.status === "planned");
   const remaining = new Map(stock); // mutate a copy as we burn it down
@@ -101,7 +104,11 @@ export function runOutDates(
   for (const ev of events) {
     for (const line of consumptionLinesForEvent(db, householdId, ev)) {
       if (out.has(line.ingredientId)) continue; // already dated
-      const left = (remaining.get(line.ingredientId) ?? 0) - line.amount;
+      const exp = expiry?.get(line.ingredientId);
+      const have = exp !== undefined && ev.date > exp
+        ? Math.min(remaining.get(line.ingredientId) ?? 0, 0) // ponytail: soonest expiry spoils the whole pile; per-batch FIFO if mixed batches matter
+        : remaining.get(line.ingredientId) ?? 0;
+      const left = have - line.amount;
       remaining.set(line.ingredientId, left);
       if (left < 0) out.set(line.ingredientId, ev.date);
     }

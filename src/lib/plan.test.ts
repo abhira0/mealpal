@@ -60,6 +60,17 @@ describe("meal plan", () => {
     expect(out.get(flourId)).toBe("2026-07-03");
   });
 
+  it("expiry zeroes remaining stock: run-out is the first meal after the expiry date", () => {
+    // 2000g on hand — enough for all four meals — but it expires on the 2nd.
+    addEvent(db, hid, { date: "2026-07-01", slotId, recipeId, servings: 2 });
+    addEvent(db, hid, { date: "2026-07-02", slotId, recipeId, servings: 2 });
+    addEvent(db, hid, { date: "2026-07-03", slotId, recipeId, servings: 2 });
+    addEvent(db, hid, { date: "2026-07-04", slotId, recipeId, servings: 2 });
+    const out = runOutDates(db, hid, "2026-07-01", "2026-07-31",
+      new Map([[flourId, 2000]]), new Map([[flourId, "2026-07-02"]]));
+    expect(out.get(flourId)).toBe("2026-07-03");
+  });
+
   it("cooking an event flips status and depletes stock once", () => {
     db.insert(schema.stockMovements)
       .values({ householdId: hid, ingredientId: flourId, delta: 2000, reason: "manual" }).run();

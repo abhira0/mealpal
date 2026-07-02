@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { stockByIngredient } from "@/lib/stock";
+import { expiryByIngredient, stockByIngredient } from "@/lib/stock";
 import { plannedConsumption, runOutDates } from "@/lib/plan";
 import { buyRecommendation, learnedShelfLife, listExtras } from "@/lib/shopping";
 
@@ -22,8 +22,17 @@ export async function GET(req: Request) {
   const to = new Date(Date.now() + horizon * 86_400_000).toISOString().slice(0, 10);
   const stock = stockByIngredient(db, hid);
   const target = plannedConsumption(db, hid, from, to, learnedShelfLife(db, hid));
-  const grouped = buyRecommendation(db, hid, stock, target);
-  const runOut = runOutDates(db, hid, from, to, stock);
+  // Stock past its expiry date is spoiled: only what the plan consumes before
+  // expiry counts, so replacements show up as soon as expiry (not depletion) demands.
+  const expiry = expiryByIngredient(db, hid);
+  const expiryDays = new Map([...expiry].map(([id, d]) =>
+    [id, Math.round((Date.parse(d) - Date.parse(from)) / 86_400_000)] as const));
+  const useBeforeExpiry = plannedConsumption(db, hid, from, to, expiryDays);
+  const usable = new Map(stock);
+  for (const [id] of expiryDays)
+    usable.set(id, Math.min(stock.get(id) ?? 0, useBeforeExpiry.get(id) ?? 0));
+  const grouped = buyRecommendation(db, hid, usable, target);
+  const runOut = runOutDates(db, hid, from, to, stock, expiry);
   for (const lines of grouped.values())
     for (const line of lines) (line as typeof line & { urgency?: unknown }).urgency = urgency(runOut.get(line.ingredientId), from);
 
