@@ -61,5 +61,12 @@ export async function POST(req: Request) {
   } else if (variants.length > 0) {
     return NextResponse.json({ error: "this product is assorted — pick a variant" }, { status: 400 });
   }
-  return NextResponse.json(addEvent(db, hid, { ...base, productId, variantId }), { status: 201 });
+  // optional: log a direct canonical-unit amount (e.g. grams) instead of servings
+  let amount: number | undefined;
+  if (set(b.amount)) {
+    amount = Number(b.amount);
+    if (!Number.isFinite(amount) || amount <= 0)
+      return NextResponse.json({ error: "amount must be a positive number" }, { status: 400 });
+  }
+  return NextResponse.json(addEvent(db, hid, { ...base, productId, variantId, amount }), { status: 201 });
 }

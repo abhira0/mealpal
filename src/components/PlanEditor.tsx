@@ -9,7 +9,7 @@ import { MealCard } from "@/components/MealCard";
 
 type Slot = { id: number; name: string; timeOfDay: string };
 type Recipe = { id: number; name: string; baseServings: number };
-type Product = { id: number; name: string };
+type Product = { id: number; name: string; servingSize: number | null; canonicalUnit: string };
 type Ingredient = { id: number; name: string; canonicalUnit: string };
 type MealEvent = {
   id: number;
@@ -97,7 +97,10 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
   // direct product item
   const [pickProduct, setPickProduct] = useState<number | null>(null);
   const [pickVariant, setPickVariant] = useState<number | null>(null);
-  const [variants, setVariants] = useState<{ id: number; name: string }[]>([]);
+  const [variants, setVariants] = useState<{ id: number; name: string; servingSize: number | null }[]>([]);
+  // servings and canonical-unit amount (e.g. grams) — kept in sync; either can be typed
+  const [pickProductServings, setPickProductServings] = useState("");
+  const [pickProductAmount, setPickProductAmount] = useState("");
   // direct ingredient item
   const [pickIngredient, setPickIngredient] = useState<number | null>(null);
   const [pickAmount, setPickAmount] = useState("");
@@ -225,6 +228,8 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
     setPickProduct(null);
     setPickVariant(null);
     setVariants([]);
+    setPickProductServings("");
+    setPickProductAmount("");
     setPickIngredient(ingredients[0]?.id ?? null);
     setPickAmount("");
     setRepeat(false);
@@ -240,8 +245,24 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
     setPickProduct(id);
     setPickVariant(null);
     setVariants([]);
+    setPickProductServings("");
+    setPickProductAmount("");
     const res = await fetch(`/api/products/${id}/variants`);
-    if (res.ok) setVariants((await res.json()) as { id: number; name: string }[]);
+    if (res.ok) setVariants((await res.json()) as { id: number; name: string; servingSize: number | null }[]);
+  }
+
+  const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
+
+  // One serving of the current product/variant, in the ingredient's canonical
+  // unit, and that unit's label. Variant overrides the parent product.
+  function servingInfo(): { perServing: number; unit: string } | null {
+    const p = pickProduct != null ? productById.get(pickProduct) : undefined;
+    if (!p) return null;
+    const variant = pickVariant != null ? variants.find((v) => v.id === pickVariant) : undefined;
+    const perServing = (variant?.servingSize && variant.servingSize > 0)
+      ? variant.servingSize
+      : (p.servingSize && p.servingSize > 0 ? p.servingSize : 1);
+    return { perServing, unit: p.canonicalUnit };
   }
 
   async function saveMeal() {
@@ -261,7 +282,16 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
       }
     } else if (kind === "product") {
       if (pickProduct == null || (variants.length > 0 && pickVariant == null)) return;
-      body = { date: selected, slotId: addSlot.id, productId: pickProduct, variantId: pickVariant, servings: pickServings };
+      // whichever field the user actually typed into wins; if neither, default to 1 serving
+      if (pickProductAmount !== "") {
+        const amount = Number(pickProductAmount);
+        if (!Number.isFinite(amount) || amount <= 0) return;
+        body = { date: selected, slotId: addSlot.id, productId: pickProduct, variantId: pickVariant, amount };
+      } else {
+        const servings = pickProductServings !== "" ? Number(pickProductServings) : 1;
+        if (!Number.isFinite(servings) || servings <= 0) return;
+        body = { date: selected, slotId: addSlot.id, productId: pickProduct, variantId: pickVariant, servings };
+      }
     } else {
       const amount = Number(pickAmount);
       if (pickIngredient == null || !Number.isFinite(amount) || amount <= 0) return;
@@ -560,15 +590,60 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
                 />
               </div>
             )}
-            <div className="servings-row">
-              <span className="field-label" style={{ marginBottom: 0 }}>Servings</span>
-              <Stepper value={pickServings} min={1} onChange={setPickServings} />
-            </div>
+            {(() => {
+              const info = servingInfo();
+              const round = (n: number) => (Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100));
+
+              // Each field only ever holds what the user typed into it. The
+              // sibling's conversion is shown passively as its placeholder,
+              // never written into its value — so typing never disturbs focus.
+              const typedServings = Number(pickProductServings);
+              const typedAmount = Number(pickProductAmount);
+              const servingsPlaceholder =
+                info && pickProductAmount !== "" && Number.isFinite(typedAmount) && typedAmount > 0
+                  ? round(typedAmount / info.perServing)
+                  : "1";
+              const amountPlaceholder =
+                info && pickProductServings !== "" && Number.isFinite(typedServings) && typedServings > 0
+                  ? round(typedServings * info.perServing)
+                  : info ? round(info.perServing) : "150";
+
+              return (
+                <div style={{ display: "flex", gap: 12 }}>
+                  <div className="field" style={{ flex: 1 }}>
+                    <span className="field-label">Servings</span>
+                    <input
+                      className="input mono"
+                      inputMode="decimal"
+                      value={pickProductServings}
+                      onChange={(e) => setPickProductServings(e.target.value.replace(/[^0-9.]/g, ""))}
+                      placeholder={servingsPlaceholder}
+                    />
+                  </div>
+                  <div className="field" style={{ flex: 1 }}>
+                    <span className="field-label">Amount{info ? ` (${info.unit})` : ""}</span>
+                    <input
+                      className="input mono"
+                      inputMode="decimal"
+                      value={pickProductAmount}
+                      onChange={(e) => setPickProductAmount(e.target.value.replace(/[^0-9.]/g, ""))}
+                      placeholder={info ? `${amountPlaceholder} ${info.unit}` : amountPlaceholder}
+                    />
+                  </div>
+                </div>
+              );
+            })()}
             <button
               type="button"
               className="btn block"
               onClick={saveMeal}
-              disabled={saving || pickProduct == null || (variants.length > 0 && pickVariant == null)}
+              disabled={
+                saving ||
+                pickProduct == null ||
+                (variants.length > 0 && pickVariant == null) ||
+                (pickProductAmount !== "" && !(Number(pickProductAmount) > 0)) ||
+                (pickProductServings !== "" && !(Number(pickProductServings) > 0))
+              }
             >
               {saving ? "Adding…" : "Add"}
             </button>

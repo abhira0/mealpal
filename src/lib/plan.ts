@@ -20,7 +20,7 @@ export interface EventInput {
 }
 
 export function addEvent(db: Db, householdId: number, input: EventInput) {
-  const servings = input.servings || 1;
+  let servings = input.servings || 1;
   let amount: number | null = null;
   if (input.productId != null) {
     // canonical units = servings × packet/serving size (variant overrides product)
@@ -32,7 +32,13 @@ export function addEvent(db: Db, householdId: number, input: EventInput) {
         .where(and(eq(schema.productVariants.id, input.variantId), eq(schema.productVariants.householdId, householdId))).all();
       if (v?.s && v.s > 0) perServing = v.s;
     }
-    amount = servings * perServing;
+    if (input.amount != null && input.amount > 0) {
+      // logged directly in canonical units — back-derive servings for display
+      amount = input.amount;
+      servings = amount / perServing;
+    } else {
+      amount = servings * perServing;
+    }
   } else if (input.ingredientId != null) {
     amount = input.amount ?? 0;
   }
