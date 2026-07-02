@@ -17,6 +17,9 @@ export function CookMode({
   onClose: () => void;
 }) {
   const [i, setI] = useState(0);
+  // bump to remount the clip iframe → reloads at the step's start (YouTube's own
+  // replay button ignores start/end and plays the whole video from 0)
+  const [replay, setReplay] = useState(0);
   // ponytail: Wake Lock is feature-detected; unsupported browsers just don't keep the screen on.
   const lockRef = useRef<WakeLockSentinel | null>(null);
 
@@ -79,12 +82,19 @@ export function CookMode({
         {clip ? (
           <div className="cook-clip">
             <iframe
-              key={i}
+              key={`${i}-${replay}`}
               src={clip}
               title={`Step ${i + 1} clip`}
               allow="autoplay; encrypted-media; fullscreen"
               allowFullScreen
             />
+            <button
+              type="button"
+              className="btn cook-replay"
+              onClick={() => setReplay((n) => n + 1)}
+            >
+              ↻ Replay clip
+            </button>
           </div>
         ) : null}
         <p className="cook-text">{step.text}</p>
