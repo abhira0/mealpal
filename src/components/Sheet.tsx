@@ -38,6 +38,10 @@ export function Sheet({ open, title, onClose, children }: SheetProps) {
     // Remember what had focus so we can restore it on close.
     triggerRef.current = document.activeElement as HTMLElement | null;
 
+    // Lock background scroll while the sheet is up.
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
     // Move focus into the sheet.
     const sheet = sheetRef.current;
     const first = sheet?.querySelector<HTMLElement>(FOCUSABLE);
@@ -73,6 +77,7 @@ export function Sheet({ open, title, onClose, children }: SheetProps) {
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = prevOverflow;
       // Restore focus to the trigger when the sheet closes/unmounts.
       triggerRef.current?.focus?.();
     };
