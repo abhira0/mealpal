@@ -223,11 +223,11 @@ input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:#a9a496;posi
 .hrow-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .hrow-name{font-family:var(--display);font-weight:800;font-size:15px;color:var(--ink);text-decoration:none;line-height:1.2;background:none;border:none;padding:0;text-align:left;cursor:pointer}
 .hrow-name:disabled{cursor:default}
-.hrow-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:5px}
-.val{font-family:var(--mono);font-weight:700;font-size:11px;background:var(--chip-bg);color:var(--ink);padding:4px 8px;border-radius:4px;border-left:3px solid var(--sage);white-space:nowrap;cursor:text;border-top:1px solid transparent;border-right:1px solid transparent;border-bottom:1px solid transparent;min-height:0}
-.val:hover{border-color:var(--line);border-left-color:var(--sage)}
-.val.money,.val.qty{border-left-color:var(--enamel)}
-.val .k{color:var(--sage);font-weight:400;margin-right:4px;text-transform:uppercase;letter-spacing:.04em}
+.hrow-chips{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-top:6px}
+/* editable value: underlined text (tap to edit) — the dashed rule + caret signal it's a field */
+.val{font-family:var(--mono);font-weight:700;font-size:12px;color:var(--ink);background:none;border:none;border-bottom:1px dashed var(--sage);border-radius:0;padding:2px 1px;white-space:nowrap;cursor:text;min-height:0}
+.val:hover{border-bottom-color:var(--enamel);border-bottom-style:solid;background:rgba(255,255,255,.4)}
+.val .k{color:var(--sage);font-weight:400;font-size:9px;margin-right:5px;text-transform:uppercase;letter-spacing:.06em}
 .val-edit{font-family:var(--mono);font-weight:700;font-size:11px;background:var(--paper-raised);border:1px solid var(--enamel);border-radius:4px;padding:3px 6px;height:28px;min-height:0}
 .val-edit.money{width:72px}.val-edit.qty{width:44px}.val-edit.date{width:130px}
 .hrow-trash{background:none;border:none;color:var(--paprika);cursor:pointer;display:inline-flex;align-items:center;padding:4px}

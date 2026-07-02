@@ -145,6 +145,7 @@ export function Bill({ onCount, history = false }: { onCount?: (n: number) => vo
         row={row}
         history={history}
         alts={altsByIngredient.get(row.ingredientId) ?? []}
+        products={products}
         shops={shops}
         // pending: a priced row leaves the list. history: keep it (BillRow holds the edit).
         onSaved={history ? () => {} : () => drop(row.id)}
@@ -159,7 +160,7 @@ export function Bill({ onCount, history = false }: { onCount?: (n: number) => vo
       {error && <p className="notice">{error}</p>}
       {rows === null && !error && <p className="loading">Loading…</p>}
 
-      {history && rows !== null && <AddPurchase products={products} onAdded={loadFirst} />}
+      {history && rows !== null && <AddPurchase products={products} shops={shops} onAdded={loadFirst} />}
 
       {rows && rows.length === 0 && (
         <p className="empty">
@@ -193,6 +194,7 @@ function BillRow({
   row,
   history = false,
   alts,
+  products,
   shops,
   onSaved,
   onRemoved,
@@ -201,6 +203,7 @@ function BillRow({
   row: Pending;
   history?: boolean;
   alts: Product[];
+  products: Product[];
   shops: Shop[];
   onSaved: () => void;
   onRemoved: () => void;
@@ -334,15 +337,15 @@ function BillRow({
     return (
       <div className="hrow">
         <div className="hrow-head">
-          {pickProduct && alts.length > 1 ? (
+          {pickProduct && products.length > 1 ? (
             <Dropdown
               label="What did you buy?"
               value={row.productId}
-              options={alts.map((p) => ({ id: p.id, label: p.name }))}
+              options={products.map((p) => ({ id: p.id, label: p.name }))}
               onChange={(id) => { setPickProduct(false); swap(Number(id)); }}
             />
           ) : (
-            <button type="button" className="hrow-name" onClick={() => setPickProduct(true)} disabled={alts.length <= 1}>
+            <button type="button" className="hrow-name" onClick={() => setPickProduct(true)} disabled={products.length <= 1}>
               {row.productName}
             </button>
           )}
