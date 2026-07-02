@@ -172,7 +172,13 @@ export function IngredientDetail({ id }: { id: string }) {
 
   return (
     <>
-      <PageHeader back="/manage/ingredients" title={detail.name} />
+      <PageHeader
+        crumbs={[
+          { label: "Manage", href: "/manage" },
+          { label: "Ingredients", href: "/manage/ingredients" },
+        ]}
+        title={detail.name}
+      />
 
       <div className="content stack-sm">
         {error && <p className="notice">{error}</p>}

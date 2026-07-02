@@ -409,7 +409,10 @@ export function EntityForm({
     <>
       {!embedded && (
         <PageHeader
-          back={`/manage/${slug}`}
+          crumbs={[
+            { label: "Manage", href: "/manage" },
+            { label: config.label, href: `/manage/${slug}` },
+          ]}
           title={`${editing ? "Edit" : "New"} ${config.singular.toLowerCase()}`}
         />
       )}

@@ -38,7 +38,13 @@ export function SlotDetail({ id }: { id: string }) {
 
   return (
     <>
-      <PageHeader back="/manage/slots" title={slot.name} />
+      <PageHeader
+        crumbs={[
+          { label: "Manage", href: "/manage" },
+          { label: "Meal slots", href: "/manage/slots" },
+        ]}
+        title={slot.name}
+      />
 
       <div className="content stack-sm">
         {error && <p className="notice">{error}</p>}

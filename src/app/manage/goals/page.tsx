@@ -9,7 +9,7 @@ export default async function GoalsPage() {
 
   return (
     <>
-      <PageHeader back="/manage" title="Daily goals" />
+      <PageHeader crumbs={[{ label: "Manage", href: "/manage" }]} title="Daily goals" />
 
       <div className="content stack">
         <GoalsEditor />

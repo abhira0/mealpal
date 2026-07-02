@@ -118,7 +118,13 @@ export function ProductDetail({ id }: { id: string }) {
 
   return (
     <>
-      <PageHeader back="/manage/products" title={product.name} />
+      <PageHeader
+        crumbs={[
+          { label: "Manage", href: "/manage" },
+          { label: "Products", href: "/manage/products" },
+        ]}
+        title={product.name}
+      />
 
       <div className="content stack-sm">
         {error && <p className="notice">{error}</p>}

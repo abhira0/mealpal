@@ -66,7 +66,13 @@ export function ShopDetail({ id }: { id: string }) {
 
   return (
     <>
-      <PageHeader back="/manage/shops" title={shop.name} />
+      <PageHeader
+        crumbs={[
+          { label: "Manage", href: "/manage" },
+          { label: "Shops", href: "/manage/shops" },
+        ]}
+        title={shop.name}
+      />
 
       <div className="content stack-sm">
         {error && <p className="notice">{error}</p>}

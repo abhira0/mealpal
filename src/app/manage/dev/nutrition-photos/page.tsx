@@ -44,7 +44,7 @@ export default function NutritionPhotosPage() {
 
   return (
     <>
-      <PageHeader back="/manage" title="Nutrition photos" />
+      <PageHeader crumbs={[{ label: "Manage", href: "/manage" }]} title="Nutrition photos" />
 
       <div className="content stack">
         <p className="section-label">
