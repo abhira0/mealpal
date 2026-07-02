@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { Ticket } from "@/components/ShopTicket";
@@ -89,6 +90,17 @@ export function Bill({ onCount, history = false }: { onCount?: (n: number) => vo
     });
   }
 
+  // swap alternatives per ingredient, indexed once instead of filtered per row
+  const altsByIngredient = useMemo(() => {
+    const m = new Map<number, Product[]>();
+    for (const p of products) {
+      const g = m.get(p.ingredientId);
+      if (g) g.push(p);
+      else m.set(p.ingredientId, [p]);
+    }
+    return m;
+  }, [products]);
+
   // pending: flat by stop. history: by purchase date, then by stop within the date.
   const stops = useMemo(() => {
     const m = new Map<string, Pending[]>();
@@ -119,7 +131,7 @@ export function Bill({ onCount, history = false }: { onCount?: (n: number) => vo
         key={row.id}
         row={row}
         history={history}
-        alts={products.filter((p) => p.ingredientId === row.ingredientId)}
+        alts={altsByIngredient.get(row.ingredientId) ?? []}
         // pending: a priced row leaves the list. history: keep it (BillRow holds the edit).
         onSaved={history ? () => {} : () => drop(row.id)}
         onRemoved={() => drop(row.id)}
@@ -257,7 +269,9 @@ function BillRow({
             onChange={(id) => swap(Number(id))}
           />
         ) : (
-          <div className="tk-name">{row.productName}</div>
+          <div className="tk-name">
+            <Link href={`/manage/products/${row.productId}`}>{row.productName}</Link>
+          </div>
         )}
 
         <div className="bill-fields">
@@ -291,6 +305,7 @@ function BillRow({
                 className="input"
                 type="date"
                 value={purchasedAt}
+                max={new Date().toLocaleDateString("en-CA")}
                 onChange={(e) => setPurchasedAt(e.target.value)}
                 aria-label={`Purchase date of ${row.productName}`}
               />

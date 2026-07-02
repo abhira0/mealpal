@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { BackLink } from "@/components/BackLink";
 import { Favicon } from "@/components/Favicon";
 import { Sheet } from "@/components/Sheet";
 import { EntityForm } from "@/components/EntityForm";
@@ -66,7 +67,7 @@ export function ShopDetail({ id }: { id: string }) {
   return (
     <>
       <header className="chrome">
-        <Link href="/manage/shops" className="chrome-back">← Shops</Link>
+        <BackLink href="/manage/shops">← Shops</BackLink>
         <h1>{shop.name}</h1>
       </header>
 
@@ -100,16 +101,21 @@ export function ShopDetail({ id }: { id: string }) {
           ) : (
             products.map((p) => (
               <div key={p.id} className="ing-row" style={{ opacity: p.available ? 1 : 0.5 }}>
-                <Favicon name={p.name} iconUrl={p.imageUrl} size={48} />
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span className="nm" style={{ display: "block" }}>
-                    {p.name}
-                    {!p.available && <span className="chip run" style={{ marginLeft: 8 }}>unavailable</span>}
+                <Link
+                  href={`/manage/products/${p.id}`}
+                  style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}
+                >
+                  <Favicon name={p.name} iconUrl={p.imageUrl} size={48} />
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span className="nm" style={{ display: "block" }}>
+                      {p.name}
+                      {!p.available && <span className="chip run" style={{ marginLeft: 8 }}>unavailable</span>}
+                    </span>
+                    <span className="meta" style={{ display: "block" }}>
+                      {ingredients[p.ingredientId] ?? "—"} · pack {p.packSize}
+                    </span>
                   </span>
-                  <span className="meta" style={{ display: "block" }}>
-                    {ingredients[p.ingredientId] ?? "—"} · pack {p.packSize}
-                  </span>
-                </span>
+                </Link>
                 <span className="chip price">{money(p.effectiveCents)}</span>
               </div>
             ))

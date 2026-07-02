@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { BackLink } from "@/components/BackLink";
 import { QuantityChip } from "@/components/QuantityChip";
 import { Stepper } from "@/components/Stepper";
 import { RecipeSheet } from "@/components/RecipeSheet";
@@ -54,9 +54,7 @@ function roundScaled(n: number): string {
 function Chrome({ children }: { children: React.ReactNode }) {
   return (
     <header className="chrome">
-      <Link href="/recipes" className="chrome-back">
-        ← Recipes
-      </Link>
+      <BackLink href="/recipes">← Recipes</BackLink>
       {children}
     </header>
   );

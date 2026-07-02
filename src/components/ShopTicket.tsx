@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { QuantityChip } from "@/components/QuantityChip";
 import { Favicon } from "@/components/Favicon";
 import { centsToDollars } from "@/lib/money";
@@ -173,9 +174,11 @@ function ShopLineRow({
       <div className="tk-main">
         <div className="tk-name">{line.ingredientName}</div>
         <div className="tk-meta">
-          {line.extraId != null
-            ? line.product ? line.product.name : "Added manually"
-            : line.product ? line.product.name : "No product on file"}
+          {line.product ? (
+            <Link href={`/manage/products/${line.product.id}`} style={{ textDecoration: "underline" }}>
+              {line.product.name}
+            </Link>
+          ) : line.extraId != null ? "Added manually" : "No product on file"}
           {priceCents != null && <> · ~${centsToDollars(priceCents).toFixed(2)}</>}
         </div>
         <div className="tk-chips">

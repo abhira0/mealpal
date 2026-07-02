@@ -20,6 +20,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ChevronRight, GripVertical } from "lucide-react";
+import { BackLink } from "@/components/BackLink";
 import { Favicon } from "@/components/Favicon";
 import { Sheet } from "@/components/Sheet";
 import { EntityForm } from "@/components/EntityForm";
@@ -86,18 +87,23 @@ function Row({ p, unit, draggable }: { p: Product; unit: string; draggable: bool
           <GripVertical size={18} />
         </button>
       )}
-      <Favicon name={p.name} iconUrl={p.imageUrl} size={48} />
+      <Link
+        href={`/manage/products/${p.id}`}
+        style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}
+      >
+        <Favicon name={p.name} iconUrl={p.imageUrl} size={48} />
 
-      <span style={{ flex: 1, minWidth: 0 }}>
-        <span className="nm" style={{ display: "block" }}>
-          {p.name}
-          {!p.available && <span className="chip run" style={{ marginLeft: 8 }}>unavailable</span>}
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span className="nm" style={{ display: "block" }}>
+            {p.name}
+            {!p.available && <span className="chip run" style={{ marginLeft: 8 }}>unavailable</span>}
+          </span>
+          <span className="meta" style={{ display: "block" }}>
+            {p.shopName} · {p.packSize}{unit} · {p.effectiveCents != null ? money(p.effectiveCents) : "—"}
+          </span>
+          <span className="meta" style={{ display: "block" }}>{history(p)}</span>
         </span>
-        <span className="meta" style={{ display: "block" }}>
-          {p.shopName} · {p.packSize}{unit} · {p.effectiveCents != null ? money(p.effectiveCents) : "—"}
-        </span>
-        <span className="meta" style={{ display: "block" }}>{history(p)}</span>
-      </span>
+      </Link>
       <span className="chip price">{unitCost(p.costPerUnit, unit)}</span>
     </div>
   );
@@ -167,7 +173,7 @@ export function IngredientDetail({ id }: { id: string }) {
   return (
     <>
       <header className="chrome">
-        <Link href="/manage/ingredients" className="chrome-back">← Ingredients</Link>
+        <BackLink href="/manage/ingredients">← Ingredients</BackLink>
         <h1>{detail.name}</h1>
       </header>
 
