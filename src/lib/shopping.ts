@@ -5,7 +5,8 @@ import { schema } from "@/db";
 type Db = BetterSQLite3Database<typeof schema>;
 
 // cents null = bought but not yet priced; fill it in later on the bill screen.
-export interface PurchaseInput { productId: number; quantity: number; cents?: number | null; expiresAt?: string | null; }
+// purchasedAt omitted = now; set it to backfill a past purchase from the history tab.
+export interface PurchaseInput { productId: number; quantity: number; cents?: number | null; expiresAt?: string | null; purchasedAt?: Date | null; }
 
 /** Record a purchase: insert purchase row and restock inventory. The purchase IS the price history. */
 export function recordPurchase(db: Db, householdId: number, input: PurchaseInput) {
@@ -14,7 +15,7 @@ export function recordPurchase(db: Db, householdId: number, input: PurchaseInput
       .where(and(eq(schema.products.id, input.productId), eq(schema.products.householdId, householdId))).all();
     if (!product) throw new Error("product not found in household");
     const [purchase] = tx.insert(schema.purchases)
-      .values({ householdId, productId: input.productId, quantity: input.quantity, cents: input.cents ?? null, expiresAt: input.expiresAt ?? null })
+      .values({ householdId, productId: input.productId, quantity: input.quantity, cents: input.cents ?? null, expiresAt: input.expiresAt ?? null, ...(input.purchasedAt ? { purchasedAt: input.purchasedAt } : {}) })
       .returning().all();
     tx.insert(schema.stockMovements).values({
       householdId, ingredientId: product.ingredientId, productId: product.id,
@@ -81,7 +82,7 @@ export function listPurchaseHistory(db: Db, householdId: number, opts: { limit?:
  */
 export function updatePurchase(
   db: Db, householdId: number, id: number,
-  patch: { cents?: number | null; expiresAt?: string | null; quantity?: number; productId?: number },
+  patch: { cents?: number | null; expiresAt?: string | null; quantity?: number; productId?: number; purchasedAt?: Date },
 ) {
   return db.transaction((tx) => {
     const [purchase] = tx.select().from(schema.purchases)
@@ -107,6 +108,7 @@ export function updatePurchase(
         ...(patch.expiresAt !== undefined ? { expiresAt: patch.expiresAt } : {}),
         ...(patch.quantity !== undefined ? { quantity: patch.quantity } : {}),
         ...(patch.productId !== undefined ? { productId: patch.productId } : {}),
+        ...(patch.purchasedAt !== undefined ? { purchasedAt: patch.purchasedAt } : {}),
       })
       .where(and(eq(schema.purchases.id, id), eq(schema.purchases.householdId, householdId)))
       .returning().all();

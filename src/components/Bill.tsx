@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { Ticket } from "@/components/ShopTicket";
 import { Dropdown } from "@/components/Dropdown";
+import { AddPurchase } from "@/components/AddPurchase";
 import { centsToDollars } from "@/lib/money";
 
 type Pending = {
@@ -25,6 +26,10 @@ type Product = { id: number; name: string; ingredientId: number };
 // history mode lists every purchase (priced or not) for review/editing, instead
 // of just the unpriced ones awaiting a price on the bill screen.
 const PAGE = 50; // history page size for infinite scroll
+
+// A stop's bill total: per-unit price × qty, summed. Unpriced rows count as 0.
+const groupTotal = (group: Pending[]) =>
+  group.reduce((sum, r) => sum + (r.hintCents ?? 0) * r.quantity, 0);
 
 export function Bill({ onCount, history = false }: { onCount?: (n: number) => void; history?: boolean }) {
   const [rows, setRows] = useState<Pending[] | null>(null);
@@ -113,6 +118,7 @@ export function Bill({ onCount, history = false }: { onCount?: (n: number) => vo
       <BillRow
         key={row.id}
         row={row}
+        history={history}
         alts={products.filter((p) => p.ingredientId === row.ingredientId)}
         // pending: a priced row leaves the list. history: keep it (BillRow holds the edit).
         onSaved={history ? () => {} : () => drop(row.id)}
@@ -126,6 +132,9 @@ export function Bill({ onCount, history = false }: { onCount?: (n: number) => vo
     <>
       {error && <p className="notice">{error}</p>}
       {rows === null && !error && <p className="loading">Loading…</p>}
+
+      {history && rows !== null && <AddPurchase products={products} onAdded={loadFirst} />}
+
       {rows && rows.length === 0 && (
         <p className="empty">
           {history ? "No purchases yet." : "Nothing to price — you’re all caught up."}
@@ -137,7 +146,7 @@ export function Bill({ onCount, history = false }: { onCount?: (n: number) => vo
             <section key={date} className="stack">
               <h2 className="eb">{date}</h2>
               {byShop.map(([shopName, group]) => (
-                <Ticket key={shopName} shopName={shopName} website={group[0].website} iconUrl={group[0].iconUrl}>
+                <Ticket key={shopName} shopName={shopName} website={group[0].website} iconUrl={group[0].iconUrl} total={groupTotal(group)}>
                   {group.map(renderRow)}
                 </Ticket>
               ))}
@@ -156,12 +165,14 @@ export function Bill({ onCount, history = false }: { onCount?: (n: number) => vo
 
 function BillRow({
   row,
+  history = false,
   alts,
   onSaved,
   onRemoved,
   onSwapped,
 }: {
   row: Pending;
+  history?: boolean;
   alts: Product[];
   onSaved: () => void;
   onRemoved: () => void;
@@ -174,12 +185,19 @@ function BillRow({
   );
   const [expiresAt, setExpiresAt] = useState(row.expiresAt ?? "");
   const [quantity, setQuantity] = useState(String(row.quantity));
+  // YYYY-MM-DD (local) for the date input; only editable in the history view.
+  const [purchasedAt, setPurchasedAt] = useState(
+    row.purchasedAt ? new Date(row.purchasedAt).toLocaleDateString("en-CA") : "",
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function save() {
+    // History rows may be left unpriced (e.g. you're only fixing the date), so an
+    // empty field means "no price yet". The pending bill still requires a price.
+    const hasPrice = dollars !== "";
     const amount = Number(dollars);
-    if (!Number.isFinite(amount) || amount < 0) {
+    if (hasPrice ? !Number.isFinite(amount) || amount < 0 : !history) {
       setError("Enter a price.");
       return;
     }
@@ -192,9 +210,11 @@ function BillRow({
       body: JSON.stringify({
         // amount is the total paid; store per-unit cents. ponytail: rounds to the
         // cent, so total/qty that isn't exact loses a cent or two — fine for groceries.
-        cents: Math.round(Math.round(amount * 100) / qty),
+        cents: hasPrice ? Math.round(Math.round(amount * 100) / qty) : null,
         expiresAt: expiresAt || null,
         quantity: qty,
+        // only history rows expose the date field; skip it otherwise.
+        ...(history && purchasedAt ? { purchasedAt } : {}),
       }),
     });
     setBusy(false);
@@ -264,6 +284,18 @@ function BillRow({
               style={{ width: 56 }}
             />
           </label>
+          {history && (
+            <label className="eb" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              bought
+              <input
+                className="input"
+                type="date"
+                value={purchasedAt}
+                onChange={(e) => setPurchasedAt(e.target.value)}
+                aria-label={`Purchase date of ${row.productName}`}
+              />
+            </label>
+          )}
           <label className="eb" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
             exp
             <input

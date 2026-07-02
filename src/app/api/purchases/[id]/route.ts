@@ -4,14 +4,14 @@ import { db } from "@/db";
 import { updatePurchase, deletePurchase } from "@/lib/shopping";
 import { dollarsToCents } from "@/lib/money";
 
-// Fill in / correct a purchase: price, expiry, quantity. Household-scoped.
+// Fill in / correct a purchase: price, expiry, quantity, purchase date. Household-scoped.
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const b = await req.json().catch(() => null);
 
-  const patch: { cents?: number | null; expiresAt?: string | null; quantity?: number; productId?: number } = {};
+  const patch: { cents?: number | null; expiresAt?: string | null; quantity?: number; productId?: number; purchasedAt?: Date } = {};
 
   if (b?.productId !== undefined) {
     const p = Number(b.productId);
@@ -36,6 +36,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const q = Number(b.quantity);
     if (!Number.isInteger(q) || q < 1) return NextResponse.json({ error: "quantity must be a positive integer" }, { status: 400 });
     patch.quantity = q;
+  }
+
+  if (b?.purchasedAt !== undefined) {
+    // date-only YYYY-MM-DD, anchored at local noon so it doesn't roll a day in
+    // negative-offset timezones. Reject anything malformed.
+    if (typeof b.purchasedAt !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(b.purchasedAt))
+      return NextResponse.json({ error: "invalid purchasedAt" }, { status: 400 });
+    patch.purchasedAt = new Date(`${b.purchasedAt}T12:00:00`);
   }
 
   const row = updatePurchase(db, session.user.householdId, Number(id), patch);

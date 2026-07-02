@@ -33,7 +33,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "cents must be a non-negative number" }, { status: 400 });
 
   const expiresAt = typeof b?.expiresAt === "string" && /^\d{4}-\d{2}-\d{2}$/.test(b.expiresAt) ? b.expiresAt : null;
+  // Optional backfill date (history tab). Anchor at local noon so the date-only
+  // value doesn't roll to the previous day in negative-offset timezones.
+  const purchasedAt =
+    typeof b?.purchasedAt === "string" && /^\d{4}-\d{2}-\d{2}$/.test(b.purchasedAt)
+      ? new Date(`${b.purchasedAt}T12:00:00`)
+      : null;
   return NextResponse.json(
-    recordPurchase(db, session.user.householdId, { productId, quantity, cents: cents === null ? null : Math.round(cents), expiresAt }),
+    recordPurchase(db, session.user.householdId, { productId, quantity, cents: cents === null ? null : Math.round(cents), expiresAt, purchasedAt }),
     { status: 201 });
 }
