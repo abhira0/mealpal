@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
 
@@ -101,6 +101,55 @@ export function expiryByProduct(db: Db, householdId: number): Map<number, string
     if (!prev || r.soonest < prev) out.set(r.productId, r.soonest); // YYYY-MM-DD sorts lexically
   }
   return out;
+}
+
+/**
+ * Set the manual (on-hand) expiry for a product — or an ingredient's unattributed
+ * pool when productId is null — REPLACING any prior manual date in place instead
+ * of appending a new dated movement (the old append-only behaviour made min()
+ * keep returning the earliest stale date, so edits never showed). The date is
+ * pinned to the target's largest existing manual movement (the real on-hand
+ * batch); if there's none, a single zero-delta carrier is recorded. Every other
+ * manual date for the same target is retired so exactly one survives — bare
+ * zero-delta carriers are deleted, real movements just lose the stale date.
+ * Purchases keep their own dates; the pantry still shows min() across all of them.
+ */
+export function replaceManualExpiry(
+  db: Db, householdId: number, ingredientId: number,
+  productId: number | null, expiresAt: string | null,
+) {
+  const scope = and(
+    eq(schema.stockMovements.householdId, householdId),
+    eq(schema.stockMovements.ingredientId, ingredientId),
+    eq(schema.stockMovements.reason, "manual"),
+    productId == null
+      ? isNull(schema.stockMovements.productId)
+      : eq(schema.stockMovements.productId, productId),
+  );
+  const manual = db.select().from(schema.stockMovements).where(scope).all();
+
+  // Retire a movement's stale date: drop bare carriers, keep real stock but clear its date.
+  const retire = (m: (typeof manual)[number]) => {
+    if (m.expiresAt == null) return;
+    if (m.delta === 0) db.delete(schema.stockMovements).where(eq(schema.stockMovements.id, m.id)).run();
+    else db.update(schema.stockMovements).set({ expiresAt: null }).where(eq(schema.stockMovements.id, m.id)).run();
+  };
+
+  if (expiresAt == null) {
+    for (const m of manual) retire(m);
+    return;
+  }
+
+  // Carrier = the real on-hand batch (largest |delta|), else any manual row.
+  const carrier = manual.slice().sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))[0];
+  if (!carrier) {
+    db.insert(schema.stockMovements)
+      .values({ householdId, ingredientId, productId: productId ?? null, delta: 0, reason: "manual", expiresAt })
+      .run();
+    return;
+  }
+  db.update(schema.stockMovements).set({ expiresAt }).where(eq(schema.stockMovements.id, carrier.id)).run();
+  for (const m of manual) if (m.id !== carrier.id) retire(m);
 }
 
 /** Manual correction (spills, recounts) or backfill. Positive or negative. */

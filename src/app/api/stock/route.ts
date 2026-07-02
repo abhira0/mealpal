@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { stockByIngredient, stockByProduct, expiryByIngredient, expiryByProduct, adjustStock } from "@/lib/stock";
+import { stockByIngredient, stockByProduct, expiryByIngredient, expiryByProduct, adjustStock, replaceManualExpiry } from "@/lib/stock";
 
 export async function GET() {
   const session = await auth();
@@ -25,6 +25,11 @@ export async function POST(req: Request) {
   const expiresAt = typeof b?.expiresAt === "string" && /^\d{4}-\d{2}-\d{2}$/.test(b.expiresAt) ? b.expiresAt : null;
   if (!ingredientId || !Number.isFinite(delta))
     return NextResponse.json({ error: "ingredientId and numeric delta required" }, { status: 400 });
-  return NextResponse.json(
-    adjustStock(db, session.user.householdId, ingredientId, delta, expiresAt, productId), { status: 201 });
+  const hid = session.user.householdId;
+  // A real quantity change records a movement (no date — the pantry keeps ONE
+  // editable manual expiry, set below). An expiry edit REPLACES that date in
+  // place rather than piling on a new dated row that min() would ignore.
+  if (delta !== 0) adjustStock(db, hid, ingredientId, delta, null, productId);
+  if (expiresAt) replaceManualExpiry(db, hid, ingredientId, productId, expiresAt);
+  return new NextResponse(null, { status: 201 });
 }
