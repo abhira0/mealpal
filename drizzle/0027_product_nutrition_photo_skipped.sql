@@ -1,0 +1,1 @@
+ALTER TABLE `products` ADD `nutrition_photo_skipped` integer DEFAULT false NOT NULL;

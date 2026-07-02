@@ -64,6 +64,7 @@ export function listAllProducts(db: Db, householdId: number) {
       url: schema.products.url,
       imageUrl: schema.products.imageUrl,
       nutritionPhoto: schema.products.nutritionPhoto,
+      nutritionPhotoSkipped: schema.products.nutritionPhotoSkipped,
       servingSize: schema.products.servingSize,
       calories: schema.products.calories,
       fatG: schema.products.fatG,
@@ -182,6 +183,8 @@ export interface ProductPatch {
   imageUrl?: string | null;
   // public-folder path to the label photo (set by the nutrition upload route)
   nutritionPhoto?: string | null;
+  // true = intentionally skip the label photo for this product
+  nutritionPhotoSkipped?: boolean;
   // one serving in canonical units; per-serving label = per-unit value × this.
   servingSize?: number | null;
   // nutrition per canonical unit; filled from the label photo. null = unknown.

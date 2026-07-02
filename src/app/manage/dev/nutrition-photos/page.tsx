@@ -8,8 +8,16 @@ type Product = {
   id: number;
   name: string;
   nutritionPhoto: string | null;
+  nutritionPhotoSkipped: boolean;
   calories: number | null;
 };
+
+// Sort rank: not uploaded (0) → skipped (1) → uploaded (2).
+function rank(p: Product): number {
+  if (p.nutritionPhoto) return 2;
+  if (p.nutritionPhotoSkipped) return 1;
+  return 0;
+}
 
 export default function NutritionPhotosPage() {
   const [products, setProducts] = useState<Product[] | null>(null);
@@ -24,10 +32,15 @@ export default function NutritionPhotosPage() {
 
   const withPhoto = products?.filter((p) => p.nutritionPhoto).length ?? 0;
 
-  // Filter by name, then push uploaded (has photo) ones to the bottom.
+  // Merge a change from a row's NutritionPhoto back into state so the list re-sorts.
+  function patch(id: number, fields: Partial<Product>) {
+    setProducts((prev) => prev?.map((p) => (p.id === id ? { ...p, ...fields } : p)) ?? prev);
+  }
+
+  // Filter by name, then order: not uploaded → skipped → uploaded.
   const shown = products
     ?.filter((p) => p.name.toLowerCase().includes(query.toLowerCase()))
-    .sort((a, b) => Number(!!a.nutritionPhoto) - Number(!!b.nutritionPhoto));
+    .sort((a, b) => rank(a) - rank(b));
 
   return (
     <>
@@ -59,9 +72,17 @@ export default function NutritionPhotosPage() {
             <section className="card stack" key={p.id}>
               <div className="card-row">
                 <span className="title row-main">{p.name}</span>
-                <span className="slot">{p.calories != null ? "✓ filled" : p.nutritionPhoto ? "photo only" : "—"}</span>
+                <span className="slot">
+                  {p.calories != null ? "✓ filled" : p.nutritionPhoto ? "photo only" : p.nutritionPhotoSkipped ? "skipped" : "—"}
+                </span>
               </div>
-              <NutritionPhoto productId={p.id} photo={p.nutritionPhoto} />
+              <NutritionPhoto
+                productId={p.id}
+                photo={p.nutritionPhoto}
+                skipped={p.nutritionPhotoSkipped}
+                onChange={(photo) => patch(p.id, { nutritionPhoto: photo })}
+                onSkipChange={(skipped) => patch(p.id, { nutritionPhotoSkipped: skipped })}
+              />
             </section>
           ))
         )}

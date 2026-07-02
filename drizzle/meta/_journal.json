@@ -190,6 +190,13 @@
       "when": 1782689253996,
       "tag": "0026_meal_events_direct_items",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "6",
+      "when": 1782689253997,
+      "tag": "0027_product_nutrition_photo_skipped",
+      "breakpoints": true
     }
   ]
 }

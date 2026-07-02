@@ -59,6 +59,9 @@ export const products = sqliteTable("products", {
   imageUrl: text("image_url"),
   // public-folder path to the uploaded nutrition-facts label photo, e.g. "/nutrition/3.jpg"
   nutritionPhoto: text("nutrition_photo"),
+  // true = intentionally skip the label photo for this product (no photo wanted),
+  // as opposed to nutritionPhoto = null which just means "not captured yet".
+  nutritionPhotoSkipped: integer("nutrition_photo_skipped", { mode: "boolean" }).notNull().default(false),
   // one serving, in the ingredient's canonical unit (e.g. 30 g). null = unknown.
   servingSize: real("serving_size"),
   // nutrition values PER CANONICAL UNIT (e.g. kcal per gram), read off the label

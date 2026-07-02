@@ -30,17 +30,36 @@ function toJpegBlob(file: File): Promise<Blob> {
 export function NutritionPhoto({
   productId,
   photo,
+  skipped = false,
   onChange,
+  onSkipChange,
 }: {
   productId: number;
   photo: string | null;
+  skipped?: boolean;
   onChange?: (photo: string | null) => void;
+  onSkipChange?: (skipped: boolean) => void;
 }) {
   const [current, setCurrent] = useState(photo);
+  const [isSkipped, setIsSkipped] = useState(skipped);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // bump to cache-bust the <img> after a replace (same path, new bytes)
   const [v, setV] = useState(0);
+
+  // Flip the "skip this product's photo" flag via a plain product PATCH.
+  async function setSkip(next: boolean) {
+    setBusy(true);
+    setError(null);
+    const res = await fetch(`/api/products/${productId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nutritionPhotoSkipped: next }),
+    });
+    setBusy(false);
+    if (res.ok) { setIsSkipped(next); onSkipChange?.(next); }
+    else setError("Couldn't update skip");
+  }
 
   async function upload(file: File) {
     setBusy(true);
@@ -55,6 +74,8 @@ export function NutritionPhoto({
       setCurrent(nutritionPhoto);
       setV((n) => n + 1);
       onChange?.(nutritionPhoto);
+      // Uploading a real photo supersedes a prior skip.
+      if (isSkipped) await setSkip(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -74,7 +95,9 @@ export function NutritionPhoto({
   const inputId = `nutrition-photo-${productId}`;
   return (
     <div className="stack-sm">
-      {current ? (
+      {!current && isSkipped ? (
+        <p style={{ margin: 0, opacity: 0.6 }}>Photo skipped for this product.</p>
+      ) : current ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={`${current}?v=${v}`}
@@ -100,6 +123,11 @@ export function NutritionPhoto({
         {current && (
           <button type="button" className="btn-link danger" style={{ width: "auto" }} disabled={busy} onClick={remove}>
             Remove
+          </button>
+        )}
+        {!current && (
+          <button type="button" className="btn-link" style={{ width: "auto" }} disabled={busy} onClick={() => setSkip(!isSkipped)}>
+            {isSkipped ? "Unskip" : "Skip"}
           </button>
         )}
       </div>

@@ -465,7 +465,11 @@ export function EntityForm({
         {editing && slug === "products" && row && (
           <section className="card stack" style={{ marginTop: 16 }}>
             <h2 style={{ margin: 0, fontSize: 16 }}>Nutrition facts</h2>
-            <NutritionPhoto productId={Number(row.id)} photo={(row.nutritionPhoto as string | null) ?? null} />
+            <NutritionPhoto
+              productId={Number(row.id)}
+              photo={(row.nutritionPhoto as string | null) ?? null}
+              skipped={Boolean(row.nutritionPhotoSkipped)}
+            />
             <NutritionFactsEditor
               productId={Number(row.id)}
               unit={String(
