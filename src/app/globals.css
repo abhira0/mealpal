@@ -263,17 +263,16 @@ input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:#a9a496;posi
 .step-insert:hover{color:var(--enamel);border-color:var(--enamel)}
 
 /* ---------- desktop (≥900px): sidebar + wider content ----------
-   The whole layer is gated on :has() support: the content offset relies on
-   body:has(.nav), so a browser without :has() must skip the sidebar restyle
-   too or the nav would overlay content. No-:has() browsers get mobile layout. */
+   Body becomes a flex row: an order:-1 sticky sidebar plus fluid content. This
+   needs no :has(), so it works in every browser (no @supports gate needed) and
+   /login — which renders no .nav — is just a single flex child that stays
+   centered. The 2-col list grids below still use :has(); browsers without it
+   simply fall back to a single column, which is a fine degradation. */
 @media (min-width:900px){
-@supports selector(body:has(a)){
-  :root{--sidebar-w:200px}
-  /* body padding clears the fixed sidebar; :has(.nav) keeps /login centered */
-  body:has(.nav){padding-left:var(--sidebar-w)}
-  .app{max-width:840px;padding-bottom:32px}
+  body{display:flex;min-height:100dvh}
+  .app{flex:1;min-width:0;max-width:840px;margin:0 auto;padding-bottom:32px}
   .content{padding:24px}
-  .nav{top:0;bottom:0;left:0;right:auto;width:var(--sidebar-w);max-width:none;margin:0;flex-direction:column;justify-content:flex-start;gap:2px;padding:18px 12px}
+  .nav{order:-1;flex:none;position:sticky;inset:0 auto auto 0;height:100dvh;width:200px;max-width:none;margin:0;flex-direction:column;justify-content:flex-start;gap:2px;padding:18px 12px}
   .nav-brand{display:block;font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:-.02em;color:var(--paper);padding:4px 12px 14px}
   .nav a{flex-direction:row;align-items:center;gap:10px;font-size:11px;letter-spacing:.06em;text-align:left;padding:10px 12px;border-radius:8px;width:100%}
   .nav a.on{background:var(--enamel-dark)}
@@ -296,7 +295,6 @@ input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:#a9a496;posi
   /* bottom sheets become centered modal dialogs */
   .sheet{top:50%;bottom:auto;left:50%;right:auto;transform:translate(-50%,-50%);width:560px;border-radius:18px}
   .sheet .grab{display:none}
-}
 }
 
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
