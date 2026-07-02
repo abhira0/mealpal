@@ -74,7 +74,14 @@ button{font-family:inherit}
 .chip{font-family:var(--mono);font-weight:700;font-size:11px;background:var(--chip-bg);color:var(--ink);padding:4px 8px;border-radius:4px;border-left:3px solid var(--sage);white-space:nowrap;display:inline-block}
 .chip.low{background:var(--low-bg);color:var(--low-ink);border-left-color:var(--turmeric)}
 .chip.run{background:var(--run-bg);color:var(--run-ink);border-left-color:var(--paprika)}
-.chip.price{border-left-color:var(--enamel)}
+.chip.price,.chip.qty{border-left-color:var(--enamel)}
+
+/* ---------- pantry rows ---------- */
+.pantry-row{display:flex;align-items:center;gap:12px;width:100%;text-align:left;cursor:pointer}
+.pantry-row .p-main{flex:1;min-width:0}
+.pantry-row .p-right{flex:none;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.pantry-row.out{opacity:.5}
+.pantry-row.out .chip.qty{color:var(--sage)}
 
 /* ---------- form fields ---------- */
 .field{display:block}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { StockAdjust } from "@/components/StockAdjust";
 import { Sheet } from "@/components/Sheet";
 import { formatQty } from "@/lib/units";
@@ -96,22 +96,28 @@ export default function PantryPage() {
             .map((e) => ({ ...e, days: daysUntil(e.exp!) }))
             .filter((e) => e.days <= EXPIRY_WARN_DAYS)
             .sort((a, b) => a.days - b.days);
-          const row = (ing: Ingredient) => {
+          // Shared row: name (+ optional expiry line) left, status + qty chips right.
+          const row = (
+            ing: Ingredient,
+            opts: { statusChip?: ReactNode; showExp?: boolean; dim?: boolean } = {},
+          ) => {
             const qty = stock[String(ing.id)] ?? 0;
             const exp = expiry[String(ing.id)];
             return (
               <button
                 key={ing.id}
                 type="button"
-                className="card"
-                style={{ textAlign: "left", width: "100%", cursor: "pointer" }}
+                className={`card pantry-row${opts.dim ? " out" : ""}`}
                 onClick={() => setEditing(ing)}
               >
-                <div className="card-row">
-                  <span style={{ fontWeight: 600, fontSize: 16 }}>{ing.name}</span>
-                  <span className="meta">{formatQty(qty, ing.canonicalUnit)}</span>
+                <div className="p-main">
+                  <span className="title">{ing.name}</span>
+                  {opts.showExp && exp && <p className="meta">expires · {exp}</p>}
                 </div>
-                {exp && <p className="meta">soonest expiry · {exp}</p>}
+                <div className="p-right">
+                  {opts.statusChip}
+                  <span className="chip qty">{formatQty(qty, ing.canonicalUnit)}</span>
+                </div>
               </button>
             );
           };
@@ -119,30 +125,29 @@ export default function PantryPage() {
             <>
               {expiring.length > 0 && (
                 <>
-                  <p className="eb" style={{ color: "var(--paprika)" }}>Use soon</p>
-                  {expiring.map(({ ing, exp, days }) => (
-                    <button
-                      key={`exp-${ing.id}`}
-                      type="button"
-                      className="card"
-                      style={{ textAlign: "left", width: "100%", cursor: "pointer" }}
-                      onClick={() => setEditing(ing)}
-                    >
-                      <div className="card-row">
-                        <span style={{ fontWeight: 600, fontSize: 16 }}>{ing.name}</span>
+                  <p className="section-label">Use soon · {expiring.length}</p>
+                  {expiring.map(({ ing, days }) =>
+                    row(ing, {
+                      showExp: true,
+                      statusChip: (
                         <span className={`chip ${days <= 3 ? "run" : "low"}`}>
-                          {days <= 0 ? "expired" : `${days}d left`}
+                          {days <= 0 ? "expired" : `${days}d`}
                         </span>
-                      </div>
-                      <p className="meta">expires · {exp}</p>
-                    </button>
-                  ))}
+                      ),
+                    }),
+                  )}
                 </>
               )}
-              {present.length > 0 && <p className="eb" style={{ marginTop: expiring.length > 0 ? 16 : 0 }}>In stock</p>}
-              {present.map(row)}
-              {out.length > 0 && <p className="eb" style={{ marginTop: 16 }}>Out of stock</p>}
-              {out.map(row)}
+              {present.length > 0 && (
+                <p className="section-label">In stock · {present.length}</p>
+              )}
+              {present.map((ing) => row(ing, { showExp: true }))}
+              {out.length > 0 && (
+                <p className="section-label">Out of stock · {out.length}</p>
+              )}
+              {out.map((ing) =>
+                row(ing, { dim: true, statusChip: <span className="chip">out</span> }),
+              )}
             </>
           );
         })()}
