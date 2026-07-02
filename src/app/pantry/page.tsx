@@ -33,6 +33,7 @@ export default function PantryPage() {
   const [prodExpiry, setProdExpiry] = useState<ExpiryMap>({});
   const [editing, setEditing] = useState<Ingredient | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     Promise.all([
@@ -85,10 +86,24 @@ export default function PantryPage() {
           <p className="empty">No ingredients yet.</p>
         )}
 
+        {ingredients && ingredients.length > 0 && (
+          <input
+            type="search"
+            className="input"
+            placeholder="Search pantry…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        )}
+
         {(() => {
           if (!ingredients) return null;
-          const present = ingredients.filter((i) => (stock[String(i.id)] ?? 0) > 0);
-          const out = ingredients.filter((i) => (stock[String(i.id)] ?? 0) <= 0);
+          const q = query.trim().toLowerCase();
+          const matches = q
+            ? ingredients.filter((i) => i.name.toLowerCase().includes(q))
+            : ingredients;
+          const present = matches.filter((i) => (stock[String(i.id)] ?? 0) > 0);
+          const out = matches.filter((i) => (stock[String(i.id)] ?? 0) <= 0);
           // In-stock items whose soonest expiry is within the warning window.
           const expiring = present
             .map((i) => ({ ing: i, exp: expiry[String(i.id)], days: 0 }))
@@ -96,6 +111,9 @@ export default function PantryPage() {
             .map((e) => ({ ...e, days: daysUntil(e.exp!) }))
             .filter((e) => e.days <= EXPIRY_WARN_DAYS)
             .sort((a, b) => a.days - b.days);
+          // In-stock minus the ones already surfaced under "Use soon".
+          const expiringIds = new Set(expiring.map((e) => e.ing.id));
+          const inStock = present.filter((i) => !expiringIds.has(i.id));
           // Shared row: name (+ optional expiry line) left, status + qty chips right.
           const row = (
             ing: Ingredient,
@@ -138,10 +156,10 @@ export default function PantryPage() {
                   )}
                 </>
               )}
-              {present.length > 0 && (
-                <p className="section-label">In stock · {present.length}</p>
+              {inStock.length > 0 && (
+                <p className="section-label">In stock · {inStock.length}</p>
               )}
-              {present.map((ing) => row(ing, { showExp: true }))}
+              {inStock.map((ing) => row(ing, { showExp: true }))}
               {out.length > 0 && (
                 <p className="section-label">Out of stock · {out.length}</p>
               )}
