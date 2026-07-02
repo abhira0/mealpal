@@ -194,22 +194,22 @@ export default function PantryPage() {
               const pq = byProduct[String(p.id)] ?? 0;
               const pe = prodExpiry[String(p.id)];
               return (
-                <div key={p.id} style={{ marginBottom: 14 }}>
-                  <div className="card-row">
-                    <span className="body" style={{ color: "var(--sage)", display: "flex", alignItems: "center", gap: 10 }}>
-                      {p.imageUrl && <img src={p.imageUrl} alt="" className="pantry-thumb" />}
-                      {p.name}
-                    </span>
-                    <StockAdjust
-                      ingredientId={editing.id}
-                      productId={p.id}
-                      unit={editing.canonicalUnit}
-                      current={pq}
-                      tone={pq <= 0 ? "low" : "default"}
-                      onAdjusted={(delta, e) => applyDelta(editing.id, p.id, delta, e)}
-                    />
+                <div key={p.id} className="pantry-prod">
+                  {p.imageUrl && <img src={p.imageUrl} alt="" className="pantry-prod-img" />}
+                  <div className="pantry-prod-info">
+                    <span className="body" style={{ color: "var(--sage)" }}>{p.name}</span>
+                    <div className="pantry-prod-row2">
+                      <StockAdjust
+                        ingredientId={editing.id}
+                        productId={p.id}
+                        unit={editing.canonicalUnit}
+                        current={pq}
+                        tone={pq <= 0 ? "low" : "default"}
+                        onAdjusted={(delta, e) => applyDelta(editing.id, p.id, delta, e)}
+                      />
+                      {pe && <p className="meta">expires · {pe}</p>}
+                    </div>
                   </div>
-                  {pe && <p className="meta">expires · {pe}</p>}
                 </div>
               );
             })}
