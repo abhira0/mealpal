@@ -46,7 +46,7 @@ export default function NutritionPhotosPage() {
     <>
       <PageHeader crumbs={[{ label: "Manage", href: "/manage" }]} title="Nutrition photos" />
 
-      <div className="content stack">
+      <div className="content stack photo-grid">
         <p className="section-label">
           Snap each product&apos;s nutrition-facts label. Fill the numbers later.
           {products ? ` (${withPhoto}/${products.length} have photos)` : ""}

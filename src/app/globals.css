@@ -255,6 +255,7 @@ input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:#a9a496;posi
 .cook-num{font-family:var(--mono);font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--sage)}
 .cook-clip{width:min(100%,640px);aspect-ratio:16/9;margin:0 auto;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
 .cook-clip iframe{width:100%;height:100%;border:none}
+.cook-replay{align-self:center}
 .cook-text{font-family:var(--display);font-weight:700;font-size:clamp(20px,4.5vw,34px);line-height:1.25;margin:0}
 .cook-dots{display:flex;gap:8px;justify-content:center}
 .cook-dots span{width:8px;height:8px;border-radius:50%;background:var(--line)}
@@ -287,11 +288,13 @@ input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:#a9a496;posi
 @media (min-width:900px){
   body{display:flex;min-height:100dvh}
   /* Full width by default so the feed/list pages (Today, Pantry, Shop,
-     Nutrition, Recipes, Manage) fill the space beside the sidebar. Form and
-     single-record detail views — the ones built from a `card stack` block or a
-     <form> — keep a readable, centered measure so inputs/text don't stretch. */
+     Nutrition, Recipes, Manage) fill the space beside the sidebar. Only edit
+     forms (<form>) and single-record detail views (which mark themselves with
+     .detail-view) keep a readable, centered measure so inputs/text don't
+     stretch. Keying on an explicit class beats sniffing shared card classes,
+     which repeat on list pages too (e.g. the nutrition-photos grid). */
   .app{flex:1;min-width:0;max-width:none;margin:0 auto;padding-bottom:32px}
-  .app:has(.card.stack),.app:has(form){max-width:960px}
+  .app:has(form),.app:has(.detail-view){max-width:960px}
   .content{padding:24px}
   .nav{order:-1;flex:none;position:sticky;inset:0 auto auto 0;height:100dvh;width:200px;max-width:none;margin:0;flex-direction:column;justify-content:flex-start;gap:2px;padding:18px 12px}
   .nav-brand{display:block;font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:-.02em;color:var(--paper);padding:4px 12px 14px}
@@ -313,6 +316,11 @@ input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:#a9a496;posi
   .content :is(.stack,.stack-sm):has(> .row) > :not(.row),
   .content :is(.stack,.stack-sm):has(> .account-row) > :not(.account-row),
   .content :is(.stack,.stack-sm):has(> button.card) > :not(button.card){grid-column:1/-1}
+
+  /* nutrition-photos: a grid of per-product photo cards (section.card), with
+     the intro label + search spanning the full row. */
+  .photo-grid:has(> section.card){display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));align-items:start}
+  .photo-grid > :not(section.card){grid-column:1/-1}
 
   /* bottom sheets become centered modal dialogs */
   .sheet{top:50%;bottom:auto;left:50%;right:auto;transform:translate(-50%,-50%);width:560px;border-radius:18px}
