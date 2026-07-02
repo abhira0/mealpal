@@ -23,6 +23,15 @@ export function Sheet({ open, title, onClose, children }: SheetProps) {
   const triggerRef = useRef<HTMLElement | null>(null);
   const titleId = useId();
 
+  // Keep the latest onClose in a ref so it doesn't have to be an effect
+  // dependency — callers often pass an inline arrow (a new identity every
+  // render), which would otherwise re-run focus-management below on every
+  // keystroke inside the sheet and steal focus from whatever field is active.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     if (!open) return;
 
@@ -37,7 +46,7 @@ export function Sheet({ open, title, onClose, children }: SheetProps) {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key === "Tab" && sheet) {
@@ -67,7 +76,7 @@ export function Sheet({ open, title, onClose, children }: SheetProps) {
       // Restore focus to the trigger when the sheet closes/unmounts.
       triggerRef.current?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
