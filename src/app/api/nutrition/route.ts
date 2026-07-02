@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { dayNutrition } from "@/lib/nutrition";
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+import { DATE_RE } from "@/lib/dates";
 
 // GET /api/nutrition?date=YYYY-MM-DD — per-meal nutrition + day total.
 export async function GET(req: Request) {

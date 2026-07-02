@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import { listPendingPurchases, listPurchaseHistory, recordPurchase } from "@/lib/shopping";
 import { dollarsToCents } from "@/lib/money";
+import { DATE_RE, localNoon, todayISO } from "@/lib/dates";
 
 // Pending (not-yet-priced) purchases for the bill screen; ?all=1 for the full history tab.
 export async function GET(req: Request) {
@@ -32,13 +33,15 @@ export async function POST(req: Request) {
   if (cents !== null && (!Number.isFinite(cents) || cents < 0))
     return NextResponse.json({ error: "cents must be a non-negative number" }, { status: 400 });
 
-  const expiresAt = typeof b?.expiresAt === "string" && /^\d{4}-\d{2}-\d{2}$/.test(b.expiresAt) ? b.expiresAt : null;
-  // Optional backfill date (history tab). Anchor at local noon so the date-only
-  // value doesn't roll to the previous day in negative-offset timezones.
-  const purchasedAt =
-    typeof b?.purchasedAt === "string" && /^\d{4}-\d{2}-\d{2}$/.test(b.purchasedAt)
-      ? new Date(`${b.purchasedAt}T12:00:00`)
-      : null;
+  const expiresAt = typeof b?.expiresAt === "string" && DATE_RE.test(b.expiresAt) ? b.expiresAt : null;
+  // Optional backfill date (history tab). Never in the future — a typo'd year
+  // would skew learned shelf life and history ordering.
+  let purchasedAt: Date | null = null;
+  if (typeof b?.purchasedAt === "string" && DATE_RE.test(b.purchasedAt)) {
+    if (b.purchasedAt > todayISO())
+      return NextResponse.json({ error: "purchasedAt can't be in the future" }, { status: 400 });
+    purchasedAt = localNoon(b.purchasedAt);
+  }
   return NextResponse.json(
     recordPurchase(db, session.user.householdId, { productId, quantity, cents: cents === null ? null : Math.round(cents), expiresAt, purchasedAt }),
     { status: 201 });

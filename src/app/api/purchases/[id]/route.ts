@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import { updatePurchase, deletePurchase } from "@/lib/shopping";
 import { dollarsToCents } from "@/lib/money";
+import { DATE_RE, localNoon, todayISO } from "@/lib/dates";
 
 // Fill in / correct a purchase: price, expiry, quantity, purchase date. Household-scoped.
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -30,7 +31,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   if (b?.expiresAt !== undefined)
-    patch.expiresAt = typeof b.expiresAt === "string" && /^\d{4}-\d{2}-\d{2}$/.test(b.expiresAt) ? b.expiresAt : null;
+    patch.expiresAt = typeof b.expiresAt === "string" && DATE_RE.test(b.expiresAt) ? b.expiresAt : null;
 
   if (b?.quantity !== undefined) {
     const q = Number(b.quantity);
@@ -39,11 +40,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   if (b?.purchasedAt !== undefined) {
-    // date-only YYYY-MM-DD, anchored at local noon so it doesn't roll a day in
-    // negative-offset timezones. Reject anything malformed.
-    if (typeof b.purchasedAt !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(b.purchasedAt))
+    // date-only YYYY-MM-DD; reject anything malformed or in the future (a
+    // typo'd year would skew learned shelf life and history ordering).
+    if (typeof b.purchasedAt !== "string" || !DATE_RE.test(b.purchasedAt))
       return NextResponse.json({ error: "invalid purchasedAt" }, { status: 400 });
-    patch.purchasedAt = new Date(`${b.purchasedAt}T12:00:00`);
+    if (b.purchasedAt > todayISO())
+      return NextResponse.json({ error: "purchasedAt can't be in the future" }, { status: 400 });
+    patch.purchasedAt = localNoon(b.purchasedAt);
   }
 
   const row = updatePurchase(db, session.user.householdId, Number(id), patch);

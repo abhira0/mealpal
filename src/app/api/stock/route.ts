@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { stockByIngredient, stockByProduct, expiryByIngredient, expiryByProduct, adjustStock, replaceManualExpiry } from "@/lib/stock";
+import { DATE_RE } from "@/lib/dates";
 
 export async function GET() {
   const session = await auth();
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
   const ingredientId = Number(b?.ingredientId);
   const delta = Number(b?.delta);
   const productId = b?.productId != null ? Number(b.productId) : null;
-  const expiresAt = typeof b?.expiresAt === "string" && /^\d{4}-\d{2}-\d{2}$/.test(b.expiresAt) ? b.expiresAt : null;
+  const expiresAt = typeof b?.expiresAt === "string" && DATE_RE.test(b.expiresAt) ? b.expiresAt : null;
   if (!ingredientId || !Number.isFinite(delta))
     return NextResponse.json({ error: "ingredientId and numeric delta required" }, { status: 400 });
   const hid = session.user.householdId;
