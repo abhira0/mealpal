@@ -73,7 +73,9 @@ export function listPurchaseHistory(db: Db, householdId: number, opts: { limit?:
     // purchase's shop override wins; otherwise the product's usual shop
     .innerJoin(schema.shops, eq(schema.shops.id, sql`coalesce(${schema.purchases.shopId}, ${schema.products.shopId})`))
     .where(eq(schema.purchases.householdId, householdId))
-    .orderBy(desc(schema.purchases.purchasedAt))
+    // id tiebreaker: purchasedAt ties (backfills share local noon) would make
+    // limit/offset page boundaries nondeterministic.
+    .orderBy(desc(schema.purchases.purchasedAt), desc(schema.purchases.id))
     .$dynamic();
   if (opts.limit != null) q.limit(opts.limit);
   if (opts.offset != null) q.offset(opts.offset);
