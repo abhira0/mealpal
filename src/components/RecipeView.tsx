@@ -54,7 +54,7 @@ function roundScaled(n: number): string {
 function Chrome({ children }: { children: React.ReactNode }) {
   return (
     <header className="chrome">
-      <BackLink href="/recipes">← Recipes</BackLink>
+      <BackLink href="/recipes" />
       {children}
     </header>
   );

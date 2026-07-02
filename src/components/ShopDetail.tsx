@@ -67,7 +67,7 @@ export function ShopDetail({ id }: { id: string }) {
   return (
     <>
       <header className="chrome">
-        <BackLink href="/manage/shops">← Shops</BackLink>
+        <BackLink href="/manage/shops" />
         <h1>{shop.name}</h1>
       </header>
 

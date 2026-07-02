@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BackLink } from "@/components/BackLink";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { ENTITIES, type ColumnDef, type EntitySlug, type ListConfig } from "@/app/manage/entities";
@@ -113,7 +114,7 @@ export function EntityList(props: {
   return (
     <>
       <header className="chrome">
-        <Link href="/manage" className="chrome-back">← Catalog</Link>
+        <BackLink href="/manage" />
         <h1>{config.label}</h1>
       </header>
 

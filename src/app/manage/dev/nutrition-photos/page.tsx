@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { BackLink } from "@/components/BackLink";
 import { useEffect, useState } from "react";
 import { NutritionPhoto } from "@/components/NutritionPhoto";
 
@@ -45,7 +45,7 @@ export default function NutritionPhotosPage() {
   return (
     <>
       <header className="chrome">
-        <Link href="/manage" className="chrome-back">← Manage</Link>
+        <BackLink href="/manage" />
         <h1>Nutrition photos</h1>
       </header>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { BackLink } from "@/components/BackLink";
 import { useCallback, useEffect, useState } from "react";
 import { Sheet } from "@/components/Sheet";
 import { EntityForm } from "@/components/EntityForm";
@@ -39,7 +39,7 @@ export function SlotDetail({ id }: { id: string }) {
   return (
     <>
       <header className="chrome">
-        <Link href="/manage/slots" className="chrome-back">← Meal slots</Link>
+        <BackLink href="/manage/slots" />
         <h1>{slot.name}</h1>
       </header>
 

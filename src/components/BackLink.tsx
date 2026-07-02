@@ -7,7 +7,9 @@ import { useRouter } from "next/navigation";
 // fallback for deep links / new tabs with no history to go back to.
 // ponytail: history.length is a heuristic — a tab that arrived from another
 // site backs out of the app; add a sessionStorage nav counter if that bites.
-export function BackLink({ href, children }: { href: string; children: React.ReactNode }) {
+// Label is always "Back" — the destination varies with history, so naming a
+// page (e.g. "← Products") would be wrong whenever you arrived from elsewhere.
+export function BackLink({ href }: { href: string }) {
   const router = useRouter();
   return (
     <Link
@@ -20,7 +22,7 @@ export function BackLink({ href, children }: { href: string; children: React.Rea
         }
       }}
     >
-      {children}
+      ← Back
     </Link>
   );
 }

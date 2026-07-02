@@ -173,7 +173,7 @@ export function IngredientDetail({ id }: { id: string }) {
   return (
     <>
       <header className="chrome">
-        <BackLink href="/manage/ingredients">← Ingredients</BackLink>
+        <BackLink href="/manage/ingredients" />
         <h1>{detail.name}</h1>
       </header>
 

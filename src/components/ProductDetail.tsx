@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { BackLink } from "@/components/BackLink";
 import { useCallback, useEffect, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { Favicon } from "@/components/Favicon";
@@ -119,7 +119,7 @@ export function ProductDetail({ id }: { id: string }) {
   return (
     <>
       <header className="chrome">
-        <Link href="/manage/products" className="chrome-back">← Products</Link>
+        <BackLink href="/manage/products" />
         <h1>{product.name}</h1>
       </header>
 
