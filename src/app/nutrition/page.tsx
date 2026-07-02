@@ -15,14 +15,20 @@ function todayISO(): string {
 export default function NutritionPage() {
   const [tab, setTab] = useState<"overview" | "breakdown">("overview");
   const [mode, setMode] = useState<"day" | "week">("day");
-  const [date, setDate] = useState(todayISO);
+  // Start empty so the server and first client render agree on the date input's
+  // value; the server can't know the browser's timezone, so we fill in "today"
+  // after mount. (Same reasoning as PlanEditor.) Avoids a hydration mismatch.
+  const [date, setDate] = useState("");
   const [data, setData] = useState<AnalysisData | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [openCard, setOpenCard] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const reqKey = `${mode}:${date}:${reloadKey}`;
 
+  useEffect(() => { setDate(todayISO()); }, []);
+
   useEffect(() => {
+    if (!date) return;
     let cancelled = false;
     fetch(`/api/nutrition/analysis?mode=${mode}&date=${date}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
