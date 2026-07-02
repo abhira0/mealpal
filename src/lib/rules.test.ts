@@ -68,6 +68,17 @@ describe("rule materialization", () => {
     expect(wed[0].ruleId).toBeNull();
   });
 
+  it("a second rule for a different recipe in the same slot still materializes", () => {
+    const recipe2 = createRecipe(db, hid, {
+      name: "Oats", baseServings: 1, notes: null, ingredients: [], steps: [], media: [],
+    }).id;
+    createRule(db, hid, "2026-06-01", { slotId, recipeId, servings: 1, ...base, unit: "day" });
+    createRule(db, hid, "2026-06-01", { slotId, recipeId: recipe2, servings: 1, ...base, unit: "day", untilDate: "2026-06-03" });
+    const days = listEvents(db, hid, "2026-06-01", "2026-06-03");
+    expect(days.filter((e) => e.recipeId === recipe2)).toHaveLength(3);
+    expect(days).toHaveLength(6); // both rules coexist per day
+  });
+
   it("deleting a generated meal tombstones the day so top-up won't re-add it", () => {
     createRule(db, hid, "2026-06-01", { slotId, recipeId, servings: 1, ...base, daysOfWeek: "0101010" });
     const wed = listEvents(db, hid, "2026-06-03", "2026-06-03")[0];

@@ -78,12 +78,15 @@ export function materialize(db: Db, rule: typeof schema.mealRules.$inferSelect, 
         .filter((s) => s.slotId === rule.slotId)
         .map((s) => s.date),
     );
+    // A day is taken only by this rule's own rows (idempotency) or a manual
+    // row of the same recipe; other meals in the slot coexist.
     const taken = new Set(
       db.select().from(schema.mealEvents)
         .where(and(
           eq(schema.mealEvents.householdId, rule.householdId),
           eq(schema.mealEvents.slotId, rule.slotId),
         )).all()
+        .filter((e) => e.ruleId === rule.id || e.recipeId === rule.recipeId)
         .map((e) => e.date),
     );
     for (const date of dates) {
