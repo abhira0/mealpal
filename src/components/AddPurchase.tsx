@@ -108,6 +108,7 @@ export function AddPurchase({
               className="input"
               type="date"
               value={purchasedAt}
+              max={today}
               onChange={(e) => setPurchasedAt(e.target.value)}
               aria-label="Purchase date"
             />
