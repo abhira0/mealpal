@@ -281,34 +281,35 @@ input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:#a9a496;posi
    Body becomes a flex row: an order:-1 sticky sidebar plus fluid content. This
    needs no :has(), so it works in every browser (no @supports gate needed) and
    /login — which renders no .nav — is just a single flex child that stays
-   centered. The 2-col list grids below still use :has(); browsers without it
-   simply fall back to a single column, which is a fine degradation. */
+   centered. The list grids and the form/detail width cap below use :has();
+   browsers without it just get full-width single-column content, a fine
+   degradation. */
 @media (min-width:900px){
   body{display:flex;min-height:100dvh}
-  /* Default: a readable measure for form/detail/timeline pages (recipe, edit
-     forms, Today), centered. List pages break out to fill the width below. */
-  .app{flex:1;min-width:0;max-width:960px;margin:0 auto;padding-bottom:32px}
-  /* A page that renders a list uses the full available width so its cards can
-     flow into as many columns as fit. :has() failure just leaves the readable
-     cap in place, which is a fine fallback. */
-  .app:has(.row),.app:has(.account-row),.app:has(button.card){max-width:none}
+  /* Full width by default so the feed/list pages (Today, Pantry, Shop,
+     Nutrition, Recipes, Manage) fill the space beside the sidebar. Form and
+     single-record detail views — the ones built from a `card stack` block or a
+     <form> — keep a readable, centered measure so inputs/text don't stretch. */
+  .app{flex:1;min-width:0;max-width:none;margin:0 auto;padding-bottom:32px}
+  .app:has(.card.stack),.app:has(form){max-width:960px}
   .content{padding:24px}
   .nav{order:-1;flex:none;position:sticky;inset:0 auto auto 0;height:100dvh;width:200px;max-width:none;margin:0;flex-direction:column;justify-content:flex-start;gap:2px;padding:18px 12px}
   .nav-brand{display:block;font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:-.02em;color:var(--paper);padding:4px 12px 14px}
   .nav a{flex-direction:row;align-items:center;gap:10px;font-size:11px;letter-spacing:.06em;text-align:left;padding:10px 12px;border-radius:8px;width:100%}
   .nav a.on{background:var(--enamel-dark)}
 
-  /* row/card lists flow into as many columns as fit (min 300px each); every
-     non-list child spans the full row. button.card = tappable list items
-     (pantry); section.card detail blocks stay single-flow. gap intentionally
-     not set — .stack/.stack-sm gaps carry over. */
-  .content:has(> .row),.content:has(> .account-row),.content:has(> button.card),
+  /* row/card/ticket lists flow into as many columns as fit (min 300px each);
+     every non-list child spans the full row. button.card = tappable list items
+     (pantry), .ticket = shop receipts. gap intentionally not set — .stack /
+     .stack-sm gaps carry over. */
+  .content:has(> .row),.content:has(> .account-row),.content:has(> button.card),.content:has(> .ticket),
   .content :is(.stack,.stack-sm):has(> .row),
   .content :is(.stack,.stack-sm):has(> .account-row),
   .content :is(.stack,.stack-sm):has(> button.card){display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));align-items:start}
   .content:has(> .row) > :not(.row),
   .content:has(> .account-row) > :not(.account-row),
   .content:has(> button.card) > :not(button.card),
+  .content:has(> .ticket) > :not(.ticket),
   .content :is(.stack,.stack-sm):has(> .row) > :not(.row),
   .content :is(.stack,.stack-sm):has(> .account-row) > :not(.account-row),
   .content :is(.stack,.stack-sm):has(> button.card) > :not(button.card){grid-column:1/-1}
