@@ -62,7 +62,12 @@ export function Bill({ onCount, history = false }: { onCount?: (n: number) => vo
     fetch(`/api/purchases?all=1&offset=${rows.length}&limit=${PAGE}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((j: Pending[]) => {
-        setRows((prev) => [...(prev ?? []), ...j]);
+        // dedupe: editing a buy date reorders rows server-side, so an offset page
+        // can re-serve a row we already have.
+        setRows((prev) => {
+          const seen = new Set((prev ?? []).map((r) => r.id));
+          return [...(prev ?? []), ...j.filter((r) => !seen.has(r.id))];
+        });
         if (j.length < PAGE) setExhausted(true);
       })
       .catch(() => setError("Couldn't load more."))
@@ -275,6 +280,43 @@ function BillRow({
     else setError("Couldn't change shop.");
   }
 
+  // History: each chip commits its own field on blur/Enter (no batch Save button).
+  async function patch(body: Record<string, unknown>) {
+    setBusy(true);
+    setError(null);
+    const res = await fetch(`/api/purchases/${row.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    setBusy(false);
+    if (!res.ok) setError("Couldn't save.");
+    return res.ok;
+  }
+  // total paid → per-unit cents (same rounding as the batch save). "" clears the price.
+  const perUnit = (totalStr: string, qty: number) =>
+    totalStr === "" ? null : Math.round(Math.round(Number(totalStr) * 100) / qty);
+  async function commitPrice(next: string) {
+    if (next !== "" && !(Number(next) >= 0)) { setError("Enter a price."); return; }
+    setDollars(next);
+    await patch({ cents: perUnit(next, Number(quantity) || 1) });
+  }
+  async function commitQty(next: string) {
+    const q = Number(next) || 1;
+    setQuantity(String(q));
+    // keep the total the user sees stable; re-derive per-unit from it.
+    await patch({ quantity: q, cents: perUnit(dollars, q) });
+  }
+  async function commitExp(next: string) {
+    setExpiresAt(next);
+    await patch({ expiresAt: next || null });
+  }
+  async function commitBought(next: string) {
+    if (!next) return; // date is required; ignore a cleared field
+    setPurchasedAt(next);
+    await patch({ purchasedAt: next });
+  }
+
   async function remove() {
     setBusy(true);
     setError(null);
@@ -282,6 +324,29 @@ function BillRow({
     setBusy(false);
     if (res.ok) onRemoved();
     else setError("Couldn't remove.");
+  }
+
+  // History: dense one-purchase-per-line — name + tap-to-edit chip values.
+  if (history) {
+    const money = dollars === "" ? "—" : dollars;
+    return (
+      <div className="hrow">
+        <Link href={`/manage/products/${row.productId}`} className="hrow-name">
+          {row.productName}
+        </Link>
+        <div className="hrow-chips">
+          <EditableValue k="$" cls="money" display={money} value={dollars} inputMode="decimal" onCommit={commitPrice} />
+          <EditableValue k="×" cls="qty" display={quantity} value={quantity} inputMode="numeric" onCommit={commitQty} />
+          <EditableValue k="buy" cls="date" type="date" display={mmdd(purchasedAt)} value={purchasedAt} max={new Date().toLocaleDateString("en-CA")} onCommit={commitBought} />
+          <EditableValue k="exp" cls="date" type="date" display={mmdd(expiresAt)} value={expiresAt} onCommit={commitExp} />
+          <ShopChip shopId={row.shopId} shopName={row.shopName} shops={shops} onChange={changeShop} />
+          <button type="button" className="hrow-trash" onClick={remove} disabled={busy} aria-label={`Remove ${row.productName}`}>
+            <Trash2 size={15} />
+          </button>
+        </div>
+        {error && <div className="eb" style={{ color: "var(--paprika)", marginTop: 6 }}>{error}</div>}
+      </div>
+    );
   }
 
   return (
@@ -373,5 +438,79 @@ function BillRow({
         {error && <div className="eb" style={{ color: "var(--paprika)", marginTop: 6 }}>{error}</div>}
       </div>
     </div>
+  );
+}
+
+// YYYY-MM-DD → MM/DD for the compact chip; "" → em dash.
+function mmdd(iso: string) {
+  const m = /^\d{4}-(\d{2})-(\d{2})$/.exec(iso);
+  return m ? `${m[1]}/${m[2]}` : "—";
+}
+
+// A chip that reads as text and turns into an input on tap; commits on blur/Enter, cancels on Esc.
+function EditableValue({
+  k, cls, display, value, type = "text", inputMode, max, onCommit,
+}: {
+  k: string;
+  cls: "money" | "qty" | "date";
+  display: string;         // what the chip shows when not editing
+  value: string;           // raw value seeded into the input
+  type?: string;
+  inputMode?: "decimal" | "numeric";
+  max?: string;
+  onCommit: (next: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  if (!editing) {
+    return (
+      <button type="button" className={`val ${cls}`} onClick={() => { setDraft(value); setEditing(true); }}>
+        <span className="k">{k}</span>{display}
+      </button>
+    );
+  }
+  const commit = () => { setEditing(false); if (draft !== value) onCommit(draft); };
+  return (
+    <input
+      className={`val-edit ${cls}`}
+      type={type}
+      inputMode={inputMode}
+      max={max}
+      value={draft}
+      autoFocus
+      aria-label={k}
+      onChange={(e) => setDraft(inputMode ? e.target.value.replace(inputMode === "decimal" ? /[^0-9.]/g : /[^0-9]/g, "") : e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") { e.preventDefault(); commit(); }
+        else if (e.key === "Escape") { e.preventDefault(); setEditing(false); }
+      }}
+    />
+  );
+}
+
+// Shop as a tappable chip → the shared Dropdown; picking a shop regroups the row.
+function ShopChip({
+  shopId, shopName, shops, onChange,
+}: {
+  shopId: number;
+  shopName: string;
+  shops: Shop[];
+  onChange: (id: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  if (open && shops.length > 1) {
+    return (
+      <Dropdown
+        value={shopId}
+        options={shops.map((s) => ({ id: s.id, label: s.name }))}
+        onChange={(id) => { setOpen(false); onChange(Number(id)); }}
+      />
+    );
+  }
+  return (
+    <button type="button" className="val shop" onClick={() => setOpen(true)} disabled={shops.length <= 1}>
+      <span className="k">shop</span>{shopName}
+    </button>
   );
 }
