@@ -258,6 +258,8 @@ export const purchases = sqliteTable("purchases", {
   cents: integer("cents"),
   // date-only YYYY-MM-DD; null = no expiry tracked
   expiresAt: text("expires_at"),
+  // where it was actually bought; null = fall back to the product's shop
+  shopId: integer("shop_id").references(() => shops.id),
   purchasedAt: integer("purchased_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 

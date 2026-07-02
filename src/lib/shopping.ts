@@ -32,6 +32,7 @@ export function listPendingPurchases(db: Db, householdId: number) {
     productId: schema.purchases.productId,
     ingredientId: schema.products.ingredientId,
     productName: schema.products.name,
+    shopId: sql<number>`coalesce(${schema.purchases.shopId}, ${schema.products.shopId})`,
     shopName: schema.shops.name,
     website: schema.shops.website,
     iconUrl: schema.shops.iconUrl,
@@ -42,7 +43,8 @@ export function listPendingPurchases(db: Db, householdId: number) {
   })
     .from(schema.purchases)
     .innerJoin(schema.products, eq(schema.products.id, schema.purchases.productId))
-    .innerJoin(schema.shops, eq(schema.shops.id, schema.products.shopId))
+    // purchase's shop override wins; otherwise the product's usual shop
+    .innerJoin(schema.shops, eq(schema.shops.id, sql`coalesce(${schema.purchases.shopId}, ${schema.products.shopId})`))
     .where(and(eq(schema.purchases.householdId, householdId), isNull(schema.purchases.cents)))
     .orderBy(desc(schema.purchases.purchasedAt))
     .all();
@@ -57,6 +59,7 @@ export function listPurchaseHistory(db: Db, householdId: number, opts: { limit?:
     productId: schema.purchases.productId,
     ingredientId: schema.products.ingredientId,
     productName: schema.products.name,
+    shopId: sql<number>`coalesce(${schema.purchases.shopId}, ${schema.products.shopId})`,
     shopName: schema.shops.name,
     website: schema.shops.website,
     iconUrl: schema.shops.iconUrl,
@@ -67,7 +70,8 @@ export function listPurchaseHistory(db: Db, householdId: number, opts: { limit?:
   })
     .from(schema.purchases)
     .innerJoin(schema.products, eq(schema.products.id, schema.purchases.productId))
-    .innerJoin(schema.shops, eq(schema.shops.id, schema.products.shopId))
+    // purchase's shop override wins; otherwise the product's usual shop
+    .innerJoin(schema.shops, eq(schema.shops.id, sql`coalesce(${schema.purchases.shopId}, ${schema.products.shopId})`))
     .where(eq(schema.purchases.householdId, householdId))
     .orderBy(desc(schema.purchases.purchasedAt))
     .$dynamic();
@@ -82,7 +86,7 @@ export function listPurchaseHistory(db: Db, householdId: number, opts: { limit?:
  */
 export function updatePurchase(
   db: Db, householdId: number, id: number,
-  patch: { cents?: number | null; expiresAt?: string | null; quantity?: number; productId?: number; purchasedAt?: Date },
+  patch: { cents?: number | null; expiresAt?: string | null; quantity?: number; productId?: number; shopId?: number | null; purchasedAt?: Date },
 ) {
   return db.transaction((tx) => {
     const [purchase] = tx.select().from(schema.purchases)
@@ -108,6 +112,7 @@ export function updatePurchase(
         ...(patch.expiresAt !== undefined ? { expiresAt: patch.expiresAt } : {}),
         ...(patch.quantity !== undefined ? { quantity: patch.quantity } : {}),
         ...(patch.productId !== undefined ? { productId: patch.productId } : {}),
+        ...(patch.shopId !== undefined ? { shopId: patch.shopId } : {}),
         ...(patch.purchasedAt !== undefined ? { purchasedAt: patch.purchasedAt } : {}),
       })
       .where(and(eq(schema.purchases.id, id), eq(schema.purchases.householdId, householdId)))
