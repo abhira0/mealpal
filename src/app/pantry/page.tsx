@@ -11,7 +11,7 @@ type Ingredient = {
   canonicalUnit: string;
 };
 
-type Product = { id: number; name: string; ingredientId: number };
+type Product = { id: number; name: string; ingredientId: number; imageUrl: string | null };
 
 type NumMap = Record<string, number>;
 type ExpiryMap = Record<string, string>;
@@ -111,9 +111,17 @@ export default function PantryPage() {
             .map((e) => ({ ...e, days: daysUntil(e.exp!) }))
             .filter((e) => e.days <= EXPIRY_WARN_DAYS)
             .sort((a, b) => a.days - b.days);
-          // In-stock minus the ones already surfaced under "Use soon".
+          // In-stock minus the ones already surfaced under "Use soon", soonest expiry first (undated last).
           const expiringIds = new Set(expiring.map((e) => e.ing.id));
-          const inStock = present.filter((i) => !expiringIds.has(i.id));
+          const inStock = present
+            .filter((i) => !expiringIds.has(i.id))
+            .sort((a, b) => {
+              const ea = expiry[String(a.id)];
+              const eb = expiry[String(b.id)];
+              if (!ea) return eb ? 1 : 0;
+              if (!eb) return -1;
+              return daysUntil(ea) - daysUntil(eb);
+            });
           // Shared row: name (+ optional expiry line) left, status + qty chips right.
           const row = (
             ing: Ingredient,
@@ -188,7 +196,10 @@ export default function PantryPage() {
               return (
                 <div key={p.id} style={{ marginBottom: 14 }}>
                   <div className="card-row">
-                    <span className="body" style={{ color: "var(--sage)" }}>{p.name}</span>
+                    <span className="body" style={{ color: "var(--sage)", display: "flex", alignItems: "center", gap: 10 }}>
+                      {p.imageUrl && <img src={p.imageUrl} alt="" className="pantry-thumb" />}
+                      {p.name}
+                    </span>
                     <StockAdjust
                       ingredientId={editing.id}
                       productId={p.id}

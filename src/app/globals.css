@@ -79,6 +79,7 @@ button{font-family:inherit}
 /* ---------- pantry rows ---------- */
 .pantry-row{display:flex;align-items:center;gap:12px;width:100%;text-align:left;cursor:pointer}
 .pantry-row .p-main{flex:1;min-width:0}
+.pantry-thumb{flex:none;width:40px;height:40px;border-radius:8px;object-fit:cover}
 .pantry-row .p-right{flex:none;display:flex;align-items:center;gap:8px;white-space:nowrap}
 .pantry-row.out{opacity:.5}
 .pantry-row.out .chip.qty{color:var(--sage)}
