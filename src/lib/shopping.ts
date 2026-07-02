@@ -167,6 +167,23 @@ export function learnedShelfLife(db: Db, householdId: number): Map<number, numbe
   return result;
 }
 
+/**
+ * Chip for a shopping line: how soon and why. When the run-out was forced by
+ * expiry (expiry precedes the run-out meal), count down to the expiry date —
+ * "expires in 2d" reads truer than "out in 3d" for a full-but-dying pack.
+ */
+export function urgency(runOut: string | undefined, expiresAt: string | undefined, from: string) {
+  if (!runOut) return null;
+  const days = (d: string) => Math.round((Date.parse(d) - Date.parse(from)) / 86_400_000);
+  const rel = (d: number) => (d <= 0 ? "today" : d === 1 ? "tomorrow" : `in ${d}d`);
+  if (expiresAt && expiresAt < runOut) {
+    const d = days(expiresAt);
+    return { label: `expires ${rel(d)}`, tone: d <= 3 ? ("run" as const) : ("low" as const) };
+  }
+  const daysOut = days(runOut);
+  return { label: `out ${rel(daysOut)}`, tone: daysOut <= 3 ? ("run" as const) : ("low" as const) };
+}
+
 /** Add a manual line: a tracked product OR a one-off free-text title. */
 export function addExtra(
   db: Db, householdId: number,

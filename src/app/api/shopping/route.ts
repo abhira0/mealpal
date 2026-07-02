@@ -3,14 +3,7 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import { expiryByIngredient, stockByIngredient } from "@/lib/stock";
 import { plannedConsumption, runOutDates } from "@/lib/plan";
-import { buyRecommendation, learnedShelfLife, listExtras } from "@/lib/shopping";
-
-function urgency(runOut: string | undefined, from: string) {
-  if (!runOut) return null;
-  const daysOut = Math.round((Date.parse(runOut) - Date.parse(from)) / 86_400_000);
-  if (daysOut <= 0) return { label: "out now", tone: "run" as const };
-  return { label: `out in ${daysOut}d`, tone: daysOut <= 3 ? ("run" as const) : ("low" as const) };
-}
+import { buyRecommendation, learnedShelfLife, listExtras, urgency } from "@/lib/shopping";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -24,7 +17,9 @@ export async function GET(req: Request) {
   const target = plannedConsumption(db, hid, from, to, learnedShelfLife(db, hid));
   // Stock past its expiry date is spoiled: only what the plan consumes before
   // expiry counts, so replacements show up as soon as expiry (not depletion) demands.
-  const expiry = expiryByIngredient(db, hid);
+  // Past dates are dropped — expiryByIngredient mins over ALL purchases ever, and a
+  // long-consumed pack's old date must not zero out the fresh stock on hand.
+  const expiry = new Map([...expiryByIngredient(db, hid)].filter(([, d]) => d >= from));
   const expiryDays = new Map([...expiry].map(([id, d]) =>
     [id, Math.round((Date.parse(d) - Date.parse(from)) / 86_400_000)] as const));
   const useBeforeExpiry = plannedConsumption(db, hid, from, to, expiryDays);
@@ -34,7 +29,7 @@ export async function GET(req: Request) {
   const grouped = buyRecommendation(db, hid, usable, target);
   const runOut = runOutDates(db, hid, from, to, stock, expiry);
   for (const lines of grouped.values())
-    for (const line of lines) (line as typeof line & { urgency?: unknown }).urgency = urgency(runOut.get(line.ingredientId), from);
+    for (const line of lines) (line as typeof line & { urgency?: unknown }).urgency = urgency(runOut.get(line.ingredientId), expiry.get(line.ingredientId), from);
 
   // Fold in manually-added lines. extraId marks them so the UI deletes (not "buys") them.
   for (const e of listExtras(db, hid)) {
