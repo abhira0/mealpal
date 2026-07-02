@@ -78,6 +78,9 @@ export function BottomNav() {
 
   return (
     <nav className="nav" aria-label="Primary">
+      <span className="nav-brand" aria-hidden="true">
+        MealPal
+      </span>
       {TABS.map((tab) => {
         const active =
           tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
