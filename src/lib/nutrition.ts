@@ -84,27 +84,37 @@ export interface DayNutrition {
  * - Planned meals are estimated: scale the recipe and use each ingredient's
  *   preferred available product that has nutrition filled in.
  */
-export function dayNutrition(db: Db, householdId: number, date: string): DayNutrition {
+// Household lookup tables dayNutrition needs; hoist out when calling in a loop.
+function dayLookups(db: Db, householdId: number) {
+  return {
+    slots: new Map(
+      db.select().from(schema.mealSlots).where(eq(schema.mealSlots.householdId, householdId)).all()
+        .map((s) => [s.id, s.name]),
+    ),
+    ingredientName: new Map(
+      db.select().from(schema.ingredients).where(eq(schema.ingredients.householdId, householdId)).all()
+        .map((i) => [i.id, i.name]),
+    ),
+    productById: new Map(
+      db.select().from(schema.products).where(eq(schema.products.householdId, householdId)).all()
+        .map((p) => [p.id, p]),
+    ),
+    variantById: new Map(
+      db.select().from(schema.productVariants).where(eq(schema.productVariants.householdId, householdId)).all()
+        .map((v) => [v.id, v]),
+    ),
+  };
+}
+
+export function dayNutrition(
+  db: Db, householdId: number, date: string,
+  lookups: ReturnType<typeof dayLookups> = dayLookups(db, householdId),
+): DayNutrition {
   const events = db.select().from(schema.mealEvents)
     .where(and(eq(schema.mealEvents.householdId, householdId), eq(schema.mealEvents.date, date)))
     .all();
 
-  const slots = new Map(
-    db.select().from(schema.mealSlots).where(eq(schema.mealSlots.householdId, householdId)).all()
-      .map((s) => [s.id, s.name]),
-  );
-  const ingredientName = new Map(
-    db.select().from(schema.ingredients).where(eq(schema.ingredients.householdId, householdId)).all()
-      .map((i) => [i.id, i.name]),
-  );
-  const productById = new Map(
-    db.select().from(schema.products).where(eq(schema.products.householdId, householdId)).all()
-      .map((p) => [p.id, p]),
-  );
-  const variantById = new Map(
-    db.select().from(schema.productVariants).where(eq(schema.productVariants.householdId, householdId)).all()
-      .map((v) => [v.id, v]),
-  );
+  const { slots, ingredientName, productById, variantById } = lookups;
 
   const meals: MealNutrition[] = [];
   for (const ev of events) {
@@ -510,9 +520,10 @@ export function weekNutrition(db: Db, householdId: number, monday: string): Week
   const sum = zeroNutrients();
   const missing = new Set<string>();
   let daysWithMeals = 0;
+  const lookups = dayLookups(db, householdId); // shared across the 7 days
   for (let i = 0; i < 7; i++) {
     const date = isoAddDays(monday, i);
-    const day = dayNutrition(db, householdId, date);
+    const day = dayNutrition(db, householdId, date, lookups);
     const hasMeals = day.meals.length > 0;
     if (hasMeals) {
       daysWithMeals++;
