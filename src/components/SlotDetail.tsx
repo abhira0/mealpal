@@ -1,6 +1,6 @@
 "use client";
 
-import { BackLink } from "@/components/BackLink";
+import { PageHeader } from "@/components/PageHeader";
 import { useCallback, useEffect, useState } from "react";
 import { Sheet } from "@/components/Sheet";
 import { EntityForm } from "@/components/EntityForm";
@@ -38,10 +38,7 @@ export function SlotDetail({ id }: { id: string }) {
 
   return (
     <>
-      <header className="chrome">
-        <BackLink href="/manage/slots" />
-        <h1>{slot.name}</h1>
-      </header>
+      <PageHeader back="/manage/slots" title={slot.name} />
 
       <div className="content stack-sm">
         {error && <p className="notice">{error}</p>}

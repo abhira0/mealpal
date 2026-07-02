@@ -1,6 +1,6 @@
 "use client";
 
-import { BackLink } from "@/components/BackLink";
+import { PageHeader } from "@/components/PageHeader";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Dropdown } from "@/components/Dropdown";
@@ -408,12 +408,10 @@ export function EntityForm({
   return (
     <>
       {!embedded && (
-        <header className="chrome">
-          <BackLink href={`/manage/${slug}`} />
-          <h1>
-            {editing ? "Edit" : "New"} {config.singular.toLowerCase()}
-          </h1>
-        </header>
+        <PageHeader
+          back={`/manage/${slug}`}
+          title={`${editing ? "Edit" : "New"} ${config.singular.toLowerCase()}`}
+        />
       )}
 
       <div className={embedded ? "stack" : "content"}>

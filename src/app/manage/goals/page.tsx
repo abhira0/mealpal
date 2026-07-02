@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
+import { PageHeader } from "@/components/PageHeader";
 import { auth } from "@/auth";
 import { GoalsEditor } from "@/app/manage/GoalsEditor";
 
@@ -9,10 +9,7 @@ export default async function GoalsPage() {
 
   return (
     <>
-      <header className="chrome">
-        <Link href="/manage" className="chrome-back">← Catalog</Link>
-        <h1>Daily goals</h1>
-      </header>
+      <PageHeader back="/manage" title="Daily goals" />
 
       <div className="content stack">
         <GoalsEditor />

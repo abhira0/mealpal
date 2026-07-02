@@ -1,6 +1,6 @@
 "use client";
 
-import { BackLink } from "@/components/BackLink";
+import { PageHeader } from "@/components/PageHeader";
 import { useEffect, useState } from "react";
 import { NutritionPhoto } from "@/components/NutritionPhoto";
 
@@ -44,10 +44,7 @@ export default function NutritionPhotosPage() {
 
   return (
     <>
-      <header className="chrome">
-        <BackLink href="/manage" />
-        <h1>Nutrition photos</h1>
-      </header>
+      <PageHeader back="/manage" title="Nutrition photos" />
 
       <div className="content stack">
         <p className="section-label">

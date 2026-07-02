@@ -20,7 +20,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ChevronRight, GripVertical } from "lucide-react";
-import { BackLink } from "@/components/BackLink";
+import { PageHeader } from "@/components/PageHeader";
 import { Favicon } from "@/components/Favicon";
 import { Sheet } from "@/components/Sheet";
 import { EntityForm } from "@/components/EntityForm";
@@ -172,10 +172,7 @@ export function IngredientDetail({ id }: { id: string }) {
 
   return (
     <>
-      <header className="chrome">
-        <BackLink href="/manage/ingredients" />
-        <h1>{detail.name}</h1>
-      </header>
+      <PageHeader back="/manage/ingredients" title={detail.name} />
 
       <div className="content stack-sm">
         {error && <p className="notice">{error}</p>}

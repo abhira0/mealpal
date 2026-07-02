@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { SignOutButton } from "@/components/SignOutButton";
+import { PageHeader } from "@/components/PageHeader";
 import { ENTITIES, type EntitySlug } from "@/app/manage/entities";
 import { BookOpen, Camera, ChevronRight, Egg, Store, Tag, Target, Utensils, type LucideIcon } from "lucide-react";
 
@@ -54,10 +55,7 @@ export default async function ManagePage() {
 
   return (
     <>
-      <header className="chrome">
-        <p className="eb">Manage</p>
-        <h1>Your kitchen data</h1>
-      </header>
+      <PageHeader eyebrow="Manage" title="Your kitchen data" />
 
       <div className="content stack">
         <section className="stack-sm">

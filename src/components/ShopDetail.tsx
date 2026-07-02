@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { BackLink } from "@/components/BackLink";
+import { PageHeader } from "@/components/PageHeader";
 import { Favicon } from "@/components/Favicon";
 import { Sheet } from "@/components/Sheet";
 import { EntityForm } from "@/components/EntityForm";
@@ -66,10 +66,7 @@ export function ShopDetail({ id }: { id: string }) {
 
   return (
     <>
-      <header className="chrome">
-        <BackLink href="/manage/shops" />
-        <h1>{shop.name}</h1>
-      </header>
+      <PageHeader back="/manage/shops" title={shop.name} />
 
       <div className="content stack-sm">
         {error && <p className="notice">{error}</p>}

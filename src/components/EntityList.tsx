@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BackLink } from "@/components/BackLink";
+import { PageHeader } from "@/components/PageHeader";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { ENTITIES, type ColumnDef, type EntitySlug, type ListConfig } from "@/app/manage/entities";
@@ -113,10 +113,7 @@ export function EntityList(props: {
 
   return (
     <>
-      <header className="chrome">
-        <BackLink href="/manage" />
-        <h1>{config.label}</h1>
-      </header>
+      <PageHeader back="/manage" title={config.label} />
 
       <div className="content stack-sm">
         {error && <p className="notice">{error}</p>}

@@ -1,6 +1,6 @@
 "use client";
 
-import { BackLink } from "@/components/BackLink";
+import { PageHeader } from "@/components/PageHeader";
 import { useCallback, useEffect, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { Favicon } from "@/components/Favicon";
@@ -118,10 +118,7 @@ export function ProductDetail({ id }: { id: string }) {
 
   return (
     <>
-      <header className="chrome">
-        <BackLink href="/manage/products" />
-        <h1>{product.name}</h1>
-      </header>
+      <PageHeader back="/manage/products" title={product.name} />
 
       <div className="content stack-sm">
         {error && <p className="notice">{error}</p>}
