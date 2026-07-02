@@ -51,6 +51,23 @@ describe("deletePurchase", () => {
   });
 });
 
+describe("updatePurchase shop override", () => {
+  it("overrides the shop the purchase groups under; null falls back to the product's shop", () => {
+    const target = db.insert(schema.shops).values({ householdId: hid, name: "Target" }).returning().all()[0].id;
+    const pid = recordPurchase(db, hid, { productId, quantity: 1 }).id;
+    // default: product's shop (Costco)
+    expect(listPendingPurchases(db, hid)[0].shopName).toBe("Costco");
+    expect(listPendingPurchases(db, hid)[0].shopId).toBe(shopId);
+
+    updatePurchase(db, hid, pid, { shopId: target });
+    expect(listPendingPurchases(db, hid)[0].shopName).toBe("Target");
+    expect(listPendingPurchases(db, hid)[0].shopId).toBe(target);
+
+    updatePurchase(db, hid, pid, { shopId: null });
+    expect(listPendingPurchases(db, hid)[0].shopName).toBe("Costco");
+  });
+});
+
 describe("updatePurchase product swap", () => {
   it("re-points the restock to the substitute product (wanted one was out)", () => {
     const altId = createProduct(db, hid, {

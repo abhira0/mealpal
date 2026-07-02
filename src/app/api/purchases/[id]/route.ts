@@ -12,12 +12,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const b = await req.json().catch(() => null);
 
-  const patch: { cents?: number | null; expiresAt?: string | null; quantity?: number; productId?: number; purchasedAt?: Date } = {};
+  const patch: { cents?: number | null; expiresAt?: string | null; quantity?: number; productId?: number; shopId?: number | null; purchasedAt?: Date } = {};
 
   if (b?.productId !== undefined) {
     const p = Number(b.productId);
     if (!Number.isInteger(p) || p < 1) return NextResponse.json({ error: "invalid productId" }, { status: 400 });
     patch.productId = p;
+  }
+
+  // null clears the override (fall back to the product's shop); a positive int overrides it.
+  if (b?.shopId !== undefined) {
+    if (b.shopId === null) patch.shopId = null;
+    else {
+      const s = Number(b.shopId);
+      if (!Number.isInteger(s) || s < 1) return NextResponse.json({ error: "invalid shopId" }, { status: 400 });
+      patch.shopId = s;
+    }
   }
 
   if (b?.cents !== undefined || b?.dollars !== undefined) {

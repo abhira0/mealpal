@@ -13,6 +13,7 @@ type Pending = {
   productId: number;
   ingredientId: number;
   productName: string;
+  shopId: number;
   shopName: string;
   website: string | null;
   iconUrl: string | null;
@@ -23,6 +24,7 @@ type Pending = {
 };
 
 type Product = { id: number; name: string; ingredientId: number };
+type Shop = { id: number; name: string };
 
 // history mode lists every purchase (priced or not) for review/editing, instead
 // of just the unpriced ones awaiting a price on the bill screen.
@@ -35,6 +37,7 @@ const groupTotal = (group: Pending[]) =>
 export function Bill({ onCount, history = false }: { onCount?: (n: number) => void; history?: boolean }) {
   const [rows, setRows] = useState<Pending[] | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
+  const [shops, setShops] = useState<Shop[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [exhausted, setExhausted] = useState(false); // history: no more pages
   const busyRef = useRef(false);
@@ -71,6 +74,10 @@ export function Bill({ onCount, history = false }: { onCount?: (n: number) => vo
     fetch("/api/products")
       .then((r) => (r.ok ? r.json() : []))
       .then((ps: Product[]) => setProducts(ps))
+      .catch(() => {});
+    fetch("/api/shops")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((ss: Shop[]) => setShops(ss))
       .catch(() => {});
   }, [loadFirst]);
 
@@ -132,6 +139,7 @@ export function Bill({ onCount, history = false }: { onCount?: (n: number) => vo
         row={row}
         history={history}
         alts={altsByIngredient.get(row.ingredientId) ?? []}
+        shops={shops}
         // pending: a priced row leaves the list. history: keep it (BillRow holds the edit).
         onSaved={history ? () => {} : () => drop(row.id)}
         onRemoved={() => drop(row.id)}
@@ -179,6 +187,7 @@ function BillRow({
   row,
   history = false,
   alts,
+  shops,
   onSaved,
   onRemoved,
   onSwapped,
@@ -186,6 +195,7 @@ function BillRow({
   row: Pending;
   history?: boolean;
   alts: Product[];
+  shops: Shop[];
   onSaved: () => void;
   onRemoved: () => void;
   onSwapped: () => void;
@@ -247,6 +257,22 @@ function BillRow({
     setBusy(false);
     if (res.ok) onSwapped(); // may move to a different stop → reload regroups
     else setError("Couldn't switch product.");
+  }
+
+  // Where you actually bought it (e.g. a generic item grabbed at a specific shop).
+  // Changes the stop it groups under, so reload regroups like a product swap.
+  async function changeShop(shopId: number) {
+    if (shopId === row.shopId) return;
+    setBusy(true);
+    setError(null);
+    const res = await fetch(`/api/purchases/${row.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shopId }),
+    });
+    setBusy(false);
+    if (res.ok) onSwapped();
+    else setError("Couldn't change shop.");
   }
 
   async function remove() {
@@ -321,6 +347,16 @@ function BillRow({
               aria-label={`Expiry of ${row.productName}`}
             />
           </label>
+          {shops.length > 1 && (
+            <label className="eb" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              shop
+              <Dropdown
+                value={row.shopId}
+                options={shops.map((s) => ({ id: s.id, label: s.name }))}
+                onChange={(id) => changeShop(Number(id))}
+              />
+            </label>
+          )}
           <button type="button" className="btn" onClick={save} disabled={busy}>
             {busy ? "…" : "Save"}
           </button>
