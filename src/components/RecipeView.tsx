@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BackLink } from "@/components/BackLink";
+import { PageHeader } from "@/components/PageHeader";
 import { QuantityChip } from "@/components/QuantityChip";
 import { Stepper } from "@/components/Stepper";
 import { RecipeSheet } from "@/components/RecipeSheet";
@@ -51,12 +51,15 @@ function roundScaled(n: number): string {
   return String(r);
 }
 
-function Chrome({ children }: { children: React.ReactNode }) {
+function Chrome({ title }: { title: React.ReactNode }) {
   return (
-    <header className="chrome">
-      <BackLink href="/recipes" />
-      {children}
-    </header>
+    <PageHeader
+      crumbs={[
+        { label: "Manage", href: "/manage" },
+        { label: "Recipes", href: "/recipes" },
+      ]}
+      title={title}
+    />
   );
 }
 
@@ -95,17 +98,13 @@ export function RecipeView({ id }: { id: string }) {
 
   if (notFound) {
     return (
-      <Chrome>
-        <h1>Recipe not found</h1>
-      </Chrome>
+      <Chrome title="Recipe not found" />
     );
   }
 
   if (!recipe) {
     return (
-      <Chrome>
-        <h1>Loading…</h1>
-      </Chrome>
+      <Chrome title="Loading…" />
     );
   }
 
@@ -114,9 +113,7 @@ export function RecipeView({ id }: { id: string }) {
 
   return (
     <>
-      <Chrome>
-        <h1>{recipe.name}</h1>
-      </Chrome>
+      <Chrome title={recipe.name} />
 
       <div className="content stack">
         <Gallery media={recipe.media} active={activeMedia} onSelect={setActiveMedia} title={recipe.name} />
