@@ -211,6 +211,13 @@
       "when": 1782689253999,
       "tag": "0029_stock_movement_variant",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1782689254000,
+      "tag": "0030_meal_rules_direct_items",
+      "breakpoints": true
     }
   ]
 }

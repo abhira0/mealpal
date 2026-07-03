@@ -206,12 +206,19 @@ export const mealEvents = sqliteTable("meal_events", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-// A recurring rule: "this recipe in this slot, on these days, until then".
+// A recurring rule: "this item in this slot, on these days, until then". The
+// item is one kind, mirroring meal_events: a recipe (recipeId), a direct product
+// (productId, optional variantId, + amount/servings), or a direct ingredient
+// (ingredientId + amount).
 export const mealRules = sqliteTable("meal_rules", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   householdId: integer("household_id").notNull().references(() => households.id),
   slotId: integer("slot_id").notNull().references(() => mealSlots.id),
-  recipeId: integer("recipe_id").notNull().references(() => recipes.id),
+  recipeId: integer("recipe_id").references(() => recipes.id),
+  productId: integer("product_id").references(() => products.id),
+  variantId: integer("variant_id").references(() => productVariants.id),
+  ingredientId: integer("ingredient_id").references(() => ingredients.id),
+  amount: integer("amount"),
   servings: integer("servings").notNull().default(1),
   // recurrence: every `intervalN` `unit`s
   intervalN: integer("interval_n").notNull().default(1),
