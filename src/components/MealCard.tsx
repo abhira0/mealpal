@@ -53,27 +53,30 @@ export function MealCard({
   const [choices, setChoices] = useState<CookChoice[] | null>(null);
   const [picked, setPicked] = useState<Record<number, Pick>>({});
   const [cookErr, setCookErr] = useState<string | null>(null);
+  const [shortStock, setShortStock] = useState(false);
   const cooked = local === "cooked";
 
-  async function doCook(allocations?: Record<number, Pick>) {
+  async function doCook(allocations?: Record<number, Pick>, force = false) {
     if (cooking) return;
     setCooking(true);
     setCookErr(null);
     const res = await fetch(`/api/events/${eventId}/cook`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ allocations: allocations ?? {} }),
+      body: JSON.stringify({ allocations: allocations ?? {}, force }),
     });
     setCooking(false);
     if (res.ok) {
       setChoices(null);
+      setShortStock(false);
       setLocal("cooked");
       if (onCooked) onCooked();
       else router.refresh();
     } else {
-      // e.g. 409 when an ingredient has no stock — can't cook a meal you can't make.
+      // e.g. 409 when an ingredient has no stock — offer to cook anyway (stock goes negative).
       const j = await res.json().catch(() => ({}));
       setChoices(null);
+      setShortStock(res.status === 409 && Array.isArray(j.missing) && j.missing.length > 0);
       setCookErr(j.error ?? "Couldn't cook this meal.");
     }
   }
@@ -147,7 +150,14 @@ export function MealCard({
       </div>
 
       {cookErr && (
-        <p className="notice" style={{ marginTop: 8 }}>{cookErr}</p>
+        <div style={{ marginTop: 8 }}>
+          <p className="notice">{cookErr}</p>
+          {shortStock && (
+            <button type="button" className="btn-add" disabled={cooking} onClick={() => doCook(undefined, true)}>
+              {cooking ? "Cooking…" : "Cook anyway"}
+            </button>
+          )}
+        </div>
       )}
 
       <Sheet open={choices !== null} title="Which did you use?" onClose={() => setChoices(null)}>

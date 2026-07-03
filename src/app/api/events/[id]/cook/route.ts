@@ -25,8 +25,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         return [Number(k), { productId: Number(a.productId), variantId: a.variantId == null ? null : Number(a.variantId) }];
       }))
     : undefined;
-  // Block cooking unless every ingredient has stock on hand (trustworthy totals).
-  const missing = unstockedIngredients(db, session.user.householdId, Number(id));
+  // Block cooking unless every ingredient has stock on hand (trustworthy totals),
+  // unless the user chose to cook anyway (lets stock go negative).
+  const missing = body?.force ? [] : unstockedIngredients(db, session.user.householdId, Number(id));
   if (missing.length > 0) {
     return NextResponse.json(
       { error: `Not enough stock: ${missing.join(", ")}`, missing },
