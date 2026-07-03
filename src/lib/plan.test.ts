@@ -122,16 +122,19 @@ describe("direct items in a planner slot", () => {
     expect(events.find((e) => e.recipeId != null)?.variantName).toBeNull();
   });
 
-  it("a product planned without a variant gets the cook-time pick persisted", () => {
+  it("a product planned without a variant gets the cook-time pick + amount persisted", () => {
     const variantId = createVariant(db, hid, productId, { name: "Mega Omega", servingSize: 43, calories: 4 })!.id;
-    recordPurchase(db, hid, { productId, quantity: 1 });
+    recordPurchase(db, hid, { productId, quantity: 1 }); // +1000g
     const ev = addEvent(db, hid, { date: "2026-07-02", slotId, productId, servings: 1 }); // no variant
     expect(ev.variantId).toBeNull();
+    expect(ev.amount).toBe(1); // provisional: serving size unknown until a variant is picked
     // cook picker resolves the variant, keyed by the product's ingredient
     cookEvent(db, hid, ev.id, new Map([[flourId, { productId, variantId }]]));
     const cooked = listEvents(db, hid, "2026-07-02", "2026-07-02")[0];
     expect(cooked.status).toBe("cooked");
     expect(cooked.variantId).toBe(variantId); // persisted onto the event
+    expect(cooked.amount).toBe(43); // 1 serving × the variant's 43g, recomputed at cook
+    expect(currentStock(db, hid, flourId)).toBe(957); // 1000 - 43
   });
 
   it("a direct product item resolves amount from the variant's serving size and deducts that product", () => {

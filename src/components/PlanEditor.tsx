@@ -248,9 +248,14 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
     const p = pickProduct != null ? productById.get(pickProduct) : undefined;
     if (!p) return null;
     const variant = pickVariant != null ? variants.find((v) => v.id === pickVariant) : undefined;
+    // variant serving size wins; then the product's; else a representative variant's
+    // (assorted packs keep serving size on variants, so show it before one is picked).
+    const repVariant = variants.find((v) => v.servingSize && v.servingSize > 0);
     const perServing = (variant?.servingSize && variant.servingSize > 0)
       ? variant.servingSize
-      : (p.servingSize && p.servingSize > 0 ? p.servingSize : 1);
+      : (p.servingSize && p.servingSize > 0)
+        ? p.servingSize
+        : (repVariant?.servingSize && repVariant.servingSize > 0 ? repVariant.servingSize : 1);
     return { perServing, unit: p.canonicalUnit };
   }
 

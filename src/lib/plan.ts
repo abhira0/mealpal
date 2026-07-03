@@ -160,16 +160,27 @@ export function cookEvent(
   const [ev] = db.select().from(schema.mealEvents)
     .where(and(eq(schema.mealEvents.id, eventId), eq(schema.mealEvents.householdId, householdId))).all();
   if (!ev || ev.status === "cooked") return; // no-op if missing or already cooked
-  recordCookedForEvent(db, householdId, ev, allocations);
-  // Direct product planned without a variant → persist the cook-time pick, so
-  // nutrition (which reads the event's variantId for direct items) reflects it.
-  const patch: { status: string; variantId?: number } = { status: "cooked" };
+
+  // Direct product planned without a variant: resolve the cook-time variant and
+  // recompute the canonical amount from ITS serving size. The plan stored a
+  // 1-unit amount because the serving size lives on the variant, unknown then.
+  let effective = ev;
   if (ev.productId != null && ev.variantId == null && allocations) {
     const line = consumptionLinesForEvent(db, householdId, ev)[0];
     const chosen = line ? allocations.get(line.ingredientId)?.variantId ?? null : null;
-    if (chosen != null) patch.variantId = chosen;
+    if (chosen != null) {
+      const [v] = db.select({ s: schema.productVariants.servingSize }).from(schema.productVariants)
+        .where(and(eq(schema.productVariants.id, chosen), eq(schema.productVariants.householdId, householdId))).all();
+      const perServing = v?.s && v.s > 0 ? v.s : 1;
+      const amount = Math.round(ev.servings * perServing);
+      db.update(schema.mealEvents).set({ variantId: chosen, amount })
+        .where(eq(schema.mealEvents.id, ev.id)).run();
+      effective = { ...ev, variantId: chosen, amount };
+    }
   }
-  db.update(schema.mealEvents).set(patch)
+
+  recordCookedForEvent(db, householdId, effective, allocations);
+  db.update(schema.mealEvents).set({ status: "cooked" })
     .where(eq(schema.mealEvents.id, ev.id)).run();
 }
 
