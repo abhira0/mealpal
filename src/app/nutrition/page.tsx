@@ -286,7 +286,12 @@ function MacroBar({ label, cooked, planned, goal, unit, color }: {
   const remW = Math.max(0, pct(planned) - cookedW);
   return (
     <div style={{ margin: "8px 0" }}>
-      <div style={{ fontSize: 13, marginBottom: 3 }}><b>{label}</b></div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 3 }}>
+        <b>{label}</b>
+        <span className="mono" style={{ fontSize: 11, color: "var(--sage)" }}>
+          {Math.round(cooked)} cooked · {Math.round(planned)} planned / {goal}{unit}
+        </span>
+      </div>
       <div title={`${Math.round(cooked)} cooked · ${Math.round(planned)} planned / ${goal}${unit} goal`}
         style={{ display: "flex", height: 8, borderRadius: 99, background: "#e3ddcc", overflow: "hidden" }}>
         <div style={{ height: "100%", width: `${cookedW}%`, background: color }} />
