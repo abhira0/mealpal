@@ -9,7 +9,12 @@ export const RULE_HORIZON_DAYS = 56; // 8 weeks
 
 export interface RuleInput {
   slotId: number;
-  recipeId: number;
+  // exactly one item kind, mirroring meal_events
+  recipeId?: number | null;
+  productId?: number | null;
+  variantId?: number | null;
+  ingredientId?: number | null;
+  amount?: number | null;
   servings: number;
   intervalN: number;
   unit: "day" | "week";
@@ -79,22 +84,24 @@ export function materialize(db: Db, rule: typeof schema.mealRules.$inferSelect, 
         .map((s) => s.date),
     );
     // A day is taken only by this rule's own rows (idempotency) or a manual
-    // row of the same recipe; other meals in the slot coexist.
+    // row of the same recipe; other meals in the slot coexist. Direct-item rules
+    // (no recipe) dedup on their own ruleId only.
     const taken = new Set(
       db.select().from(schema.mealEvents)
         .where(and(
           eq(schema.mealEvents.householdId, rule.householdId),
           eq(schema.mealEvents.slotId, rule.slotId),
         )).all()
-        .filter((e) => e.ruleId === rule.id || e.recipeId === rule.recipeId)
+        .filter((e) => e.ruleId === rule.id || (rule.recipeId != null && e.recipeId === rule.recipeId))
         .map((e) => e.date),
     );
     for (const date of dates) {
       if (skips.has(date) || taken.has(date)) continue;
       db.insert(schema.mealEvents).values({
         householdId: rule.householdId, date, slotId: rule.slotId,
-        recipeId: rule.recipeId, servings: rule.servings, status: "planned",
-        ruleId: rule.id,
+        recipeId: rule.recipeId, productId: rule.productId, variantId: rule.variantId,
+        ingredientId: rule.ingredientId, amount: rule.amount,
+        servings: rule.servings, status: "planned", ruleId: rule.id,
       }).run();
     }
   }
@@ -104,12 +111,41 @@ export function materialize(db: Db, rule: typeof schema.mealRules.$inferSelect, 
   }
 }
 
+/**
+ * Resolve a rule's stored canonical amount + servings, mirroring addEvent so a
+ * materialized direct-item event matches a one-off one.
+ * ponytail: computed once at creation; later serving-size edits won't retro-apply
+ * to future generated days. Recompute in materialize if that ever matters.
+ */
+function resolveAmount(db: Db, householdId: number, input: RuleInput): { amount: number | null; servings: number } {
+  const servings = input.servings || 1;
+  if (input.productId != null) {
+    const [p] = db.select({ s: schema.products.servingSize }).from(schema.products)
+      .where(and(eq(schema.products.id, input.productId), eq(schema.products.householdId, householdId))).all();
+    let perServing = p?.s && p.s > 0 ? p.s : 1;
+    if (input.variantId != null) {
+      const [v] = db.select({ s: schema.productVariants.servingSize }).from(schema.productVariants)
+        .where(and(eq(schema.productVariants.id, input.variantId), eq(schema.productVariants.householdId, householdId))).all();
+      if (v?.s && v.s > 0) perServing = v.s;
+    }
+    if (input.amount != null && input.amount > 0) return { amount: input.amount, servings: input.amount / perServing };
+    return { amount: servings * perServing, servings };
+  }
+  if (input.ingredientId != null) return { amount: input.amount ?? 0, servings };
+  return { amount: null, servings }; // recipe
+}
+
 export function createRule(db: Db, householdId: number, today: string, input: RuleInput) {
+  const resolved = resolveAmount(db, householdId, input);
   const [rule] = db.insert(schema.mealRules).values({
     householdId,
     slotId: input.slotId,
-    recipeId: input.recipeId,
-    servings: input.servings,
+    recipeId: input.recipeId ?? null,
+    productId: input.productId ?? null,
+    variantId: input.variantId ?? null,
+    ingredientId: input.ingredientId ?? null,
+    amount: resolved.amount,
+    servings: resolved.servings,
     intervalN: input.intervalN,
     unit: input.unit,
     daysOfWeek: input.daysOfWeek,

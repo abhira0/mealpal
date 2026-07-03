@@ -256,36 +256,39 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
 
   async function saveMeal() {
     if (!addSlot || saving) return;
-    let body: Record<string, unknown> | null = null;
-    let url = "/api/events";
+
+    // The item being planned — one of recipe / product / ingredient.
+    let item: Record<string, unknown> | null = null;
     if (kind === "recipe") {
       if (pickRecipe == null) return;
-      if (repeat) {
-        url = "/api/rules";
-        body = {
-          startDate: selected, slotId: addSlot.id, recipeId: pickRecipe, servings: pickServings,
-          intervalN, unit, daysOfWeek: repeatDays.map((d) => (d ? "1" : "0")).join(""), untilDate: until || null,
-        };
-      } else {
-        body = { date: selected, slotId: addSlot.id, recipeId: pickRecipe, servings: pickServings };
-      }
+      item = { recipeId: pickRecipe, servings: pickServings };
     } else if (kind === "product") {
       if (pickProduct == null || (variants.length > 0 && pickVariant == null)) return;
       // whichever field the user actually typed into wins; if neither, default to 1 serving
       if (pickProductAmount !== "") {
         const amount = Number(pickProductAmount);
         if (!Number.isFinite(amount) || amount <= 0) return;
-        body = { date: selected, slotId: addSlot.id, productId: pickProduct, variantId: pickVariant, amount };
+        item = { productId: pickProduct, variantId: pickVariant, amount };
       } else {
         const servings = pickProductServings !== "" ? Number(pickProductServings) : 1;
         if (!Number.isFinite(servings) || servings <= 0) return;
-        body = { date: selected, slotId: addSlot.id, productId: pickProduct, variantId: pickVariant, servings };
+        item = { productId: pickProduct, variantId: pickVariant, servings };
       }
     } else {
       const amount = Number(pickAmount);
       if (pickIngredient == null || !Number.isFinite(amount) || amount <= 0) return;
-      body = { date: selected, slotId: addSlot.id, ingredientId: pickIngredient, amount };
+      item = { ingredientId: pickIngredient, amount };
     }
+
+    // Repeat → a recurring rule; otherwise a one-off event on the selected day.
+    const url = repeat ? "/api/rules" : "/api/events";
+    const body = repeat
+      ? {
+          ...item, slotId: addSlot.id, startDate: selected,
+          intervalN, unit, daysOfWeek: repeatDays.map((d) => (d ? "1" : "0")).join(""), untilDate: until || null,
+        }
+      : { date: selected, slotId: addSlot.id, ...item };
+
     setSaving(true);
     const res = await fetch(url, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
@@ -296,6 +299,69 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
       await loadEvents();
     }
   }
+
+  // Repeat toggle + recurrence controls, shared across all item kinds.
+  const repeatBlock = (
+    <>
+      <div className="servings-row">
+        <span className="field-label" style={{ marginBottom: 0 }}>Repeat</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={repeat}
+          className={repeat ? "btn" : "btn-add"}
+          onClick={() => setRepeat((v) => !v)}
+        >
+          {repeat ? "On" : "Off"}
+        </button>
+      </div>
+      {repeat && (
+        <>
+          {unit === "week" && (
+            <div className="week week--repeat" role="group" aria-label="Repeat on">
+              {DOW.map((label, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  aria-pressed={repeatDays[i]}
+                  className={repeatDays[i] ? "day on" : "day"}
+                  onClick={() => setRepeatDays((ds) => ds.map((d, j) => (j === i ? !d : d)))}
+                >
+                  <span className="dow">{label[0]}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="servings-row">
+            <span className="field-label" style={{ marginBottom: 0 }}>Every</span>
+            <Stepper value={intervalN} min={1} onChange={setIntervalN} />
+            <Dropdown
+              label="Unit"
+              value={unit}
+              options={[
+                { id: "week", label: intervalN > 1 ? "weeks" : "week" },
+                { id: "day", label: intervalN > 1 ? "days" : "day" },
+              ]}
+              onChange={(id) => setUnit(id === "day" ? "day" : "week")}
+            />
+          </div>
+          <div className="field">
+            <span className="field-label">Until (optional)</span>
+            <input
+              type="date"
+              className="input"
+              data-empty={until ? undefined : ""}
+              value={until}
+              min={selected}
+              onChange={(e) => setUntil(e.target.value)}
+            />
+          </div>
+        </>
+      )}
+    </>
+  );
+  // weekly repeat needs at least one day selected before we can save
+  const repeatInvalid = repeat && unit === "week" && !repeatDays.some(Boolean);
 
   if (!mounted) {
     return (
@@ -478,78 +544,13 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
             <Stepper value={pickServings} min={1} onChange={setPickServings} />
           </div>
 
-          <div className="servings-row">
-            <span className="field-label" style={{ marginBottom: 0 }}>
-              Repeat
-            </span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={repeat}
-              className={repeat ? "btn" : "btn-add"}
-              onClick={() => setRepeat((v) => !v)}
-            >
-              {repeat ? "On" : "Off"}
-            </button>
-          </div>
-
-          {repeat && (
-            <>
-              {unit === "week" && (
-                <div className="week week--repeat" role="group" aria-label="Repeat on">
-                  {DOW.map((label, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      aria-pressed={repeatDays[i]}
-                      className={repeatDays[i] ? "day on" : "day"}
-                      onClick={() =>
-                        setRepeatDays((ds) => ds.map((d, j) => (j === i ? !d : d)))
-                      }
-                    >
-                      <span className="dow">{label[0]}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="servings-row">
-                <span className="field-label" style={{ marginBottom: 0 }}>
-                  Every
-                </span>
-                <Stepper value={intervalN} min={1} onChange={setIntervalN} />
-                <Dropdown
-                  label="Unit"
-                  value={unit}
-                  options={[
-                    { id: "week", label: intervalN > 1 ? "weeks" : "week" },
-                    { id: "day", label: intervalN > 1 ? "days" : "day" },
-                  ]}
-                  onChange={(id) => setUnit(id === "day" ? "day" : "week")}
-                />
-              </div>
-              <div className="field">
-                <span className="field-label">Until (optional)</span>
-                <input
-                  type="date"
-                  className="input"
-                  data-empty={until ? undefined : ""}
-                  value={until}
-                  min={selected}
-                  onChange={(e) => setUntil(e.target.value)}
-                />
-              </div>
-            </>
-          )}
+          {repeatBlock}
 
           <button
             type="button"
             className="btn block"
             onClick={saveMeal}
-            disabled={
-              saving ||
-              pickRecipe == null ||
-              (repeat && unit === "week" && !repeatDays.some(Boolean))
-            }
+            disabled={saving || pickRecipe == null || repeatInvalid}
           >
             {saving ? "Adding…" : repeat ? "Add repeating meal" : "Add meal"}
           </button>
@@ -622,6 +623,7 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
                 </div>
               );
             })()}
+            {repeatBlock}
             <button
               type="button"
               className="btn block"
@@ -631,10 +633,11 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
                 pickProduct == null ||
                 (variants.length > 0 && pickVariant == null) ||
                 (pickProductAmount !== "" && !(Number(pickProductAmount) > 0)) ||
-                (pickProductServings !== "" && !(Number(pickProductServings) > 0))
+                (pickProductServings !== "" && !(Number(pickProductServings) > 0)) ||
+                repeatInvalid
               }
             >
-              {saving ? "Adding…" : "Add"}
+              {saving ? "Adding…" : repeat ? "Add repeating item" : "Add"}
             </button>
             <button type="button" className="btn-add" onClick={() => setStep("type")}>← Back</button>
           </div>
@@ -663,13 +666,14 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
                 placeholder="e.g. 43"
               />
             </div>
+            {repeatBlock}
             <button
               type="button"
               className="btn block"
               onClick={saveMeal}
-              disabled={saving || pickIngredient == null || !(Number(pickAmount) > 0)}
+              disabled={saving || pickIngredient == null || !(Number(pickAmount) > 0) || repeatInvalid}
             >
-              {saving ? "Adding…" : "Add"}
+              {saving ? "Adding…" : repeat ? "Add repeating item" : "Add"}
             </button>
             <button type="button" className="btn-add" onClick={() => setStep("type")}>← Back</button>
           </div>

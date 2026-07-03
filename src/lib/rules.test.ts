@@ -5,6 +5,7 @@ import { createRecipe } from "@/lib/recipes";
 import { createSlot } from "@/lib/slots";
 import { addEvent, listEvents, deleteEvent } from "@/lib/plan";
 import { matchingDates, createRule, topUpRules } from "@/lib/rules";
+import { schema } from "@/db";
 
 let db: TestDb;
 let hid: number;
@@ -45,6 +46,33 @@ describe("matchingDates", () => {
     const r = { ...base, startDate: "2026-06-03", untilDate: "2026-06-05" };
     expect(matchingDates(r, "2026-06-01", "2026-06-10"))
       .toEqual(["2026-06-03", "2026-06-04", "2026-06-05"]);
+  });
+});
+
+describe("direct-item rules", () => {
+  it("materializes a repeating product with a resolved canonical amount", () => {
+    const ingId = db.insert(schema.ingredients)
+      .values({ householdId: hid, name: "Flour", canonicalUnit: "g" }).returning().all()[0].id;
+    const shopId = db.insert(schema.shops).values({ householdId: hid, name: "Mart" }).returning().all()[0].id;
+    const productId = db.insert(schema.products)
+      .values({ householdId: hid, ingredientId: ingId, shopId, name: "Brand A", packSize: 1000, priority: 1, servingSize: 50 })
+      .returning().all()[0].id;
+    createRule(db, hid, "2026-06-01", { slotId, productId, servings: 2, ...base, daysOfWeek: "0000010" }); // Fridays
+    const evs = listEvents(db, hid, "2026-06-01", "2026-06-07");
+    expect(evs).toHaveLength(1);
+    expect(evs[0].productId).toBe(productId);
+    expect(evs[0].amount).toBe(100); // 2 servings × 50 g/serving, resolved at rule creation
+    expect(evs[0].ruleId).not.toBeNull();
+  });
+
+  it("materializes a repeating ingredient", () => {
+    const ingId = db.insert(schema.ingredients)
+      .values({ householdId: hid, name: "Salt", canonicalUnit: "g" }).returning().all()[0].id;
+    createRule(db, hid, "2026-06-01", { slotId, ingredientId: ingId, amount: 5, servings: 1, ...base, daysOfWeek: "0000010" });
+    const evs = listEvents(db, hid, "2026-06-01", "2026-06-07");
+    expect(evs).toHaveLength(1);
+    expect(evs[0].ingredientId).toBe(ingId);
+    expect(evs[0].amount).toBe(5);
   });
 });
 
