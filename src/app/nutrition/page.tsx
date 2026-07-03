@@ -213,16 +213,11 @@ function OverviewBody({ data, mode, openCard, setOpenCard }: {
         of {goals.calorieGoal} kcal · {pct}%{mode === "week" ? " · daily avg" : ""}
       </p>
 
-      <p className="section-label">Cooked vs planned{mode === "week" ? " (daily avg)" : ""}</p>
-      <PlannedRow label="Calories" cooked={n.calories} planned={data.planned.calories} unit=" kcal" />
-      <PlannedRow label="Protein" cooked={n.proteinG} planned={data.planned.proteinG} unit=" g" />
-      <PlannedRow label="Carbs" cooked={n.carbsG} planned={data.planned.carbsG} unit=" g" />
-      <PlannedRow label="Fat" cooked={n.fatG} planned={data.planned.fatG} unit=" g" />
-
-      <p className="section-label">Macros vs goal</p>
-      <MacroBar label="Protein" value={n.proteinG} goal={goals.proteinG} color={MACRO_COLOR.protein} />
-      <MacroBar label="Carbs" value={n.carbsG} goal={goals.carbsG} color={MACRO_COLOR.carbs} />
-      <MacroBar label="Fat" value={n.fatG} goal={goals.fatG} color={MACRO_COLOR.fat} />
+      <p className="section-label">Vs goal{mode === "week" ? " (daily avg)" : ""}</p>
+      <MacroBar label="Calories" cooked={n.calories} planned={data.planned.calories} goal={goals.calorieGoal} unit="" color="var(--enamel-dark)" />
+      <MacroBar label="Protein" cooked={n.proteinG} planned={data.planned.proteinG} goal={goals.proteinG} unit="g" color={MACRO_COLOR.protein} />
+      <MacroBar label="Carbs" cooked={n.carbsG} planned={data.planned.carbsG} goal={goals.carbsG} unit="g" color={MACRO_COLOR.carbs} />
+      <MacroBar label="Fat" cooked={n.fatG} planned={data.planned.fatG} goal={goals.fatG} unit="g" color={MACRO_COLOR.fat} />
 
       <p className="section-label">Diet scorecards</p>
       <div className="filter" style={{ gap: 6 }}>
@@ -279,35 +274,23 @@ function BreakdownBody({ data, mode, date }: { data: AnalysisData; mode: "day" |
   );
 }
 
-// Cooked (actual) vs planned (full day's plan). Bar fills to how much of the
-// plan has been cooked/eaten so far.
-function PlannedRow({ label, cooked, planned, unit }: { label: string; cooked: number; planned: number; unit: string }) {
-  const w = planned > 0 ? Math.min(100, (cooked / planned) * 100) : 0;
+// Two bars per nutrient — cooked (actual) and planned (full day's plan) — both
+// scaled to the goal, so the track's full width is the goal.
+function MacroBar({ label, cooked, planned, goal, unit, color }: {
+  label: string; cooked: number; planned: number; goal: number; unit: string; color: string;
+}) {
+  // One track = goal. Cooked (solid) then the not-yet-cooked remainder of the
+  // plan (faded) stacked after it. planned already includes cooked.
+  const pct = (v: number) => (goal > 0 ? Math.min(100, (v / goal) * 100) : 0);
+  const cookedW = pct(cooked);
+  const remW = Math.max(0, pct(planned) - cookedW);
   return (
     <div style={{ margin: "8px 0" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 3 }}>
-        <b>{label}</b>
-        <span className="mono" style={{ fontSize: 11, color: "var(--sage)" }}>
-          {Math.round(cooked)} / {Math.round(planned)}{unit}
-        </span>
-      </div>
-      <div style={{ height: 8, borderRadius: 99, background: "#e3ddcc", overflow: "hidden" }}>
-        <div style={{ height: "100%", borderRadius: 99, width: `${w}%`, background: "var(--sage)" }} />
-      </div>
-    </div>
-  );
-}
-
-function MacroBar({ label, value, goal, color }: { label: string; value: number; goal: number; color: string }) {
-  const w = goal > 0 ? Math.min(100, (value / goal) * 100) : 0;
-  return (
-    <div style={{ margin: "8px 0" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 3 }}>
-        <b>{label}</b>
-        <span className="mono" style={{ fontSize: 11, color: "var(--sage)" }}>{Math.round(value)} / {goal} g</span>
-      </div>
-      <div style={{ height: 8, borderRadius: 99, background: "#e3ddcc", overflow: "hidden" }}>
-        <div style={{ height: "100%", borderRadius: 99, width: `${w}%`, background: color }} />
+      <div style={{ fontSize: 13, marginBottom: 3 }}><b>{label}</b></div>
+      <div title={`${Math.round(cooked)} cooked · ${Math.round(planned)} planned / ${goal}${unit} goal`}
+        style={{ display: "flex", height: 8, borderRadius: 99, background: "#e3ddcc", overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${cookedW}%`, background: color }} />
+        <div style={{ height: "100%", width: `${remW}%`, background: color, opacity: 0.45 }} />
       </div>
     </div>
   );
