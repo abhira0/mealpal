@@ -72,7 +72,10 @@ export interface MealNutrition {
 export interface DayNutrition {
   date: string;
   meals: MealNutrition[];
+  /** actually cooked/eaten so far (planned meals contribute 0). */
   total: Nutrients;
+  /** the full day's plan: every meal counted (cooked at actual, planned at estimate). */
+  planned: Nutrients;
   /** distinct ingredient names missing nutrition across the day. */
   missing: string[];
 }
@@ -201,13 +204,15 @@ export function dayNutrition(
   // Totals count only what's actually been cooked/eaten — planned meals (estimates)
   // still show on their card but contribute 0, so the day total reflects reality.
   const total = zeroNutrients();
+  const planned = zeroNutrients();
   const missing = new Set<string>();
   for (const m of meals) {
+    addScaled(planned, m.nutrients, 1);
     if (m.estimate) continue;
     addScaled(total, m.nutrients, 1);
     for (const name of m.missing) missing.add(name);
   }
-  return { date, meals, total, missing: [...missing] };
+  return { date, meals, total, planned, missing: [...missing] };
 }
 
 /** Preferred available product (lowest priority) that has nutrition filled in. */
@@ -512,9 +517,11 @@ export function mondayOf(iso: string): string {
 
 export interface WeekNutrition {
   monday: string;
-  perDay: { date: string; total: Nutrients; hasMeals: boolean }[];
+  perDay: { date: string; total: Nutrients; planned: Nutrients; hasMeals: boolean }[];
   /** average over days that have meals only (partial weeks aren't dragged down). */
   average: Nutrients;
+  /** same average, but of the full daily plan (see DayNutrition.planned). */
+  plannedAverage: Nutrients;
   daysWithMeals: number;
   missing: string[];
 }
@@ -522,6 +529,7 @@ export interface WeekNutrition {
 export function weekNutrition(db: Db, householdId: number, monday: string): WeekNutrition {
   const perDay: WeekNutrition["perDay"] = [];
   const sum = zeroNutrients();
+  const plannedSum = zeroNutrients();
   const missing = new Set<string>();
   let daysWithMeals = 0;
   const lookups = dayLookups(db, householdId); // shared across the 7 days
@@ -532,11 +540,16 @@ export function weekNutrition(db: Db, householdId: number, monday: string): Week
     if (hasMeals) {
       daysWithMeals++;
       addScaled(sum, day.total, 1);
+      addScaled(plannedSum, day.planned, 1);
       for (const m of day.missing) missing.add(m);
     }
-    perDay.push({ date, total: day.total, hasMeals });
+    perDay.push({ date, total: day.total, planned: day.planned, hasMeals });
   }
   const average = zeroNutrients();
-  if (daysWithMeals > 0) for (const k of NUTRIENT_KEYS) average[k] = sum[k] / daysWithMeals;
-  return { monday, perDay, average, daysWithMeals, missing: [...missing] };
+  const plannedAverage = zeroNutrients();
+  if (daysWithMeals > 0) for (const k of NUTRIENT_KEYS) {
+    average[k] = sum[k] / daysWithMeals;
+    plannedAverage[k] = plannedSum[k] / daysWithMeals;
+  }
+  return { monday, perDay, average, plannedAverage, daysWithMeals, missing: [...missing] };
 }
