@@ -5,6 +5,7 @@ import { StockAdjust } from "@/components/StockAdjust";
 import { Sheet } from "@/components/Sheet";
 import { EditableValue, mmdd } from "@/components/Bill";
 import { formatQty } from "@/lib/units";
+import { todayISO } from "@/lib/dates";
 
 type Ingredient = {
   id: number;
@@ -21,8 +22,7 @@ const EXPIRY_WARN_DAYS = 7; // flag food spoiling within a week
 
 // Whole days from today (local) until a YYYY-MM-DD date; negative = already past.
 function daysUntil(ymd: string): number {
-  const today = new Date().toISOString().slice(0, 10);
-  return Math.round((Date.parse(ymd) - Date.parse(today)) / 86_400_000);
+  return Math.round((Date.parse(ymd) - Date.parse(todayISO())) / 86_400_000);
 }
 
 export default function PantryPage() {

@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { expiryByIngredient, stockByIngredient } from "@/lib/stock";
 import { plannedConsumption, runOutDates } from "@/lib/plan";
 import { buyRecommendation, learnedShelfLife, listExtras, urgency } from "@/lib/shopping";
+import { toISODate, todayISO } from "@/lib/dates";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -11,8 +12,8 @@ export async function GET(req: Request) {
   const hid = session.user.householdId;
   const sp = new URL(req.url).searchParams;
   const horizon = Math.min(90, Math.max(1, Number(sp.get("horizon")) || 14));
-  const from = new Date().toISOString().slice(0, 10);
-  const to = new Date(Date.now() + horizon * 86_400_000).toISOString().slice(0, 10);
+  const from = todayISO();
+  const to = toISODate(new Date(Date.now() + horizon * 86_400_000));
   const stock = stockByIngredient(db, hid);
   const target = plannedConsumption(db, hid, from, to, learnedShelfLife(db, hid));
   // Stock past its expiry date is spoiled: only what the plan consumes before
