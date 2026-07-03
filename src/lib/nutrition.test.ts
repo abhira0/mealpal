@@ -57,6 +57,8 @@ describe("dayNutrition", () => {
     expect(day.meals[0].nutrients.proteinG).toBeCloseTo(50); // 500g * 0.1
     expect(day.total.calories).toBe(0);
     expect(day.total.proteinG).toBe(0);
+    // planned total counts the estimate even though the cooked total doesn't
+    expect(day.planned.calories).toBe(1000);
     expect(day.missing).toEqual([]);
   });
 

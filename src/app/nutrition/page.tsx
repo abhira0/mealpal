@@ -163,6 +163,7 @@ interface AnalysisData {
   mode: "day" | "week";
   goals: Goals;
   nutrients: Nutrients;
+  planned: Nutrients;
   macros: { carbs: number; fat: number; protein: number };
   scorecards: Scorecard[];
   missing: string[];
@@ -211,6 +212,12 @@ function OverviewBody({ data, mode, openCard, setOpenCard }: {
       <p className="mono" style={{ textAlign: "center", margin: "-8px 0 0", fontSize: 12, color: "var(--sage)" }}>
         of {goals.calorieGoal} kcal · {pct}%{mode === "week" ? " · daily avg" : ""}
       </p>
+
+      <p className="section-label">Cooked vs planned{mode === "week" ? " (daily avg)" : ""}</p>
+      <PlannedRow label="Calories" cooked={n.calories} planned={data.planned.calories} unit=" kcal" />
+      <PlannedRow label="Protein" cooked={n.proteinG} planned={data.planned.proteinG} unit=" g" />
+      <PlannedRow label="Carbs" cooked={n.carbsG} planned={data.planned.carbsG} unit=" g" />
+      <PlannedRow label="Fat" cooked={n.fatG} planned={data.planned.fatG} unit=" g" />
 
       <p className="section-label">Macros vs goal</p>
       <MacroBar label="Protein" value={n.proteinG} goal={goals.proteinG} color={MACRO_COLOR.protein} />
@@ -269,6 +276,25 @@ function BreakdownBody({ data, mode, date }: { data: AnalysisData; mode: "day" |
       )}
       <MissingNotice missing={data.missing} />
     </>
+  );
+}
+
+// Cooked (actual) vs planned (full day's plan). Bar fills to how much of the
+// plan has been cooked/eaten so far.
+function PlannedRow({ label, cooked, planned, unit }: { label: string; cooked: number; planned: number; unit: string }) {
+  const w = planned > 0 ? Math.min(100, (cooked / planned) * 100) : 0;
+  return (
+    <div style={{ margin: "8px 0" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 3 }}>
+        <b>{label}</b>
+        <span className="mono" style={{ fontSize: 11, color: "var(--sage)" }}>
+          {Math.round(cooked)} / {Math.round(planned)}{unit}
+        </span>
+      </div>
+      <div style={{ height: 8, borderRadius: 99, background: "#e3ddcc", overflow: "hidden" }}>
+        <div style={{ height: "100%", borderRadius: 99, width: `${w}%`, background: "var(--sage)" }} />
+      </div>
+    </div>
   );
 }
 
