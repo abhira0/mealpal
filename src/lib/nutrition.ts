@@ -134,10 +134,11 @@ export function dayNutrition(
             eq(schema.stockMovements.reason, "cooked"),
           )).all();
         for (const m of moves) {
+          const variant = m.variantId != null ? variantById.get(m.variantId) : undefined;
           const p = m.productId != null ? productById.get(m.productId) : undefined;
-          const pn = p ? productNutrients(p) : null;
-          if (!pn) { missing.add(m.ingredientId); continue; }
-          addScaled(nutrients, pn, Math.abs(m.delta));
+          const src = variant ? variantNutrients(variant) : (p ? productNutrients(p) : null);
+          if (!src) { missing.add(m.ingredientId); continue; }
+          addScaled(nutrients, src, Math.abs(m.delta));
         }
       } else {
         for (const line of consumptionForRecipe(recipe, ev.servings)) {
@@ -197,9 +198,12 @@ export function dayNutrition(
     });
   }
 
+  // Totals count only what's actually been cooked/eaten — planned meals (estimates)
+  // still show on their card but contribute 0, so the day total reflects reality.
   const total = zeroNutrients();
   const missing = new Set<string>();
   for (const m of meals) {
+    if (m.estimate) continue;
     addScaled(total, m.nutrients, 1);
     for (const name of m.missing) missing.add(name);
   }

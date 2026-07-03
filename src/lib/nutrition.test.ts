@@ -52,8 +52,11 @@ describe("dayNutrition", () => {
     const day = dayNutrition(db, hid, "2026-07-01");
     expect(day.meals).toHaveLength(1);
     expect(day.meals[0].estimate).toBe(true);
-    expect(day.total.calories).toBe(1000); // 500g * 2 kcal/g
-    expect(day.total.proteinG).toBeCloseTo(50); // 500g * 0.1
+    // estimate shows on the meal card, but a planned meal is not counted in the day total
+    expect(day.meals[0].nutrients.calories).toBe(1000); // 500g * 2 kcal/g
+    expect(day.meals[0].nutrients.proteinG).toBeCloseTo(50); // 500g * 0.1
+    expect(day.total.calories).toBe(0);
+    expect(day.total.proteinG).toBe(0);
     expect(day.missing).toEqual([]);
   });
 
@@ -67,12 +70,22 @@ describe("dayNutrition", () => {
     expect(day.total.calories).toBe(1000);
   });
 
-  it("flags ingredients whose product has no nutrition, and undercounts", () => {
+  it("cooked meal counts the chosen variant's nutrition, not the product's", () => {
+    const pid = flourProduct({ calories: 2 }); // product: 2 kcal/g
+    const variantId = createVariant(db, hid, pid, { name: "Fortified", calories: 5 })!.id; // 5 kcal/g
+    recordPurchase(db, hid, { productId: pid, quantity: 1 });
+    const ev = event(bread().id, "cooked");
+    recordCooked(db, hid, ev.recipeId!, ev.servings, ev.id, new Map([[flourId, { productId: pid, variantId }]]));
+    const day = dayNutrition(db, hid, "2026-07-01");
+    expect(day.total.calories).toBe(2500); // 500g * 5 from the variant, not 2
+  });
+
+  it("flags on the meal card ingredients whose product has no nutrition", () => {
     flourProduct({ calories: null }); // photo not yet read into numbers
     event(bread().id, "planned");
     const day = dayNutrition(db, hid, "2026-07-01");
     expect(day.total.calories).toBe(0);
-    expect(day.missing).toEqual(["Flour"]);
+    expect(day.meals[0].missing).toEqual(["Flour"]);
   });
 
   it("counts a product with nutrition filled in but no calories (e.g. protein only)", () => {
@@ -83,8 +96,8 @@ describe("dayNutrition", () => {
     }).returning().all();
     event(bread().id, "planned");
     const day = dayNutrition(db, hid, "2026-07-01");
-    expect(day.total.proteinG).toBeCloseTo(50); // 500g * 0.1
-    expect(day.missing).toEqual([]); // not flagged as missing
+    expect(day.meals[0].nutrients.proteinG).toBeCloseTo(50); // 500g * 0.1
+    expect(day.meals[0].missing).toEqual([]); // not flagged as missing
   });
 });
 
@@ -198,7 +211,7 @@ describe("dayNutrition includes direct planner items", () => {
     const variantId = createVariant(db, hid, productId, { name: "Mega Omega", servingSize: 43, calories: 4 })!.id;
     addEvent(db, hid, { date: "2026-07-01", slotId, productId, variantId, servings: 1 }); // amount = 43g
     const day = dayNutrition(db, hid, "2026-07-01");
-    expect(day.total.calories).toBe(172); // 4 × 43
+    expect(day.meals[0].nutrients.calories).toBe(172); // 4 × 43 (planned → on card, not in total)
     expect(day.meals[0].recipeName).toBe("Mega Omega");
   });
 
@@ -206,6 +219,6 @@ describe("dayNutrition includes direct planner items", () => {
     flourProduct({ calories: 2 }); // 2 kcal/g preferred product
     addEvent(db, hid, { date: "2026-07-01", slotId, ingredientId: flourId, amount: 100, servings: 1 });
     const day = dayNutrition(db, hid, "2026-07-01");
-    expect(day.total.calories).toBe(200); // 2 × 100
+    expect(day.meals[0].nutrients.calories).toBe(200); // 2 × 100 (planned → on card, not in total)
   });
 });
