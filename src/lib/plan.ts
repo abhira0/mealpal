@@ -1,7 +1,7 @@
 import { and, asc, eq, gte, inArray, lte } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
-import { consumptionLinesForEvent, recordCookedForEvent } from "@/lib/consumption";
+import { type CookAllocations, consumptionLinesForEvent, recordCookedForEvent } from "@/lib/consumption";
 import { skipDay, endSeriesFrom, deleteRule } from "@/lib/rules";
 
 type Db = BetterSQLite3Database<typeof schema>;
@@ -155,7 +155,7 @@ export function deleteEvent(db: Db, householdId: number, eventId: number, scope:
 
 /** Mark an event cooked exactly once: deplete stock and flip status. */
 export function cookEvent(
-  db: Db, householdId: number, eventId: number, allocations?: Map<number, number>,
+  db: Db, householdId: number, eventId: number, allocations?: CookAllocations,
 ) {
   const [ev] = db.select().from(schema.mealEvents)
     .where(and(eq(schema.mealEvents.id, eventId), eq(schema.mealEvents.householdId, householdId))).all();

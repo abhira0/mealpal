@@ -11,8 +11,10 @@ type DeleteScope = "one" | "following" | "all";
 type CookChoice = {
   ingredientId: number;
   ingredientName: string;
-  products: { id: number; name: string; onHand: number }[];
+  products: { id: number; name: string; onHand: number; variants: { id: number; name: string }[] }[];
 };
+
+type Pick = { productId: number; variantId: number | null };
 
 function shortServings(n: number): string {
   const v = Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100);
@@ -48,11 +50,11 @@ export function MealCard({
   const [local, setLocal] = useState(status);
   const [askScope, setAskScope] = useState(false);
   const [choices, setChoices] = useState<CookChoice[] | null>(null);
-  const [picked, setPicked] = useState<Record<number, number>>({});
+  const [picked, setPicked] = useState<Record<number, Pick>>({});
   const [cookErr, setCookErr] = useState<string | null>(null);
   const cooked = local === "cooked";
 
-  async function doCook(allocations?: Record<number, number>) {
+  async function doCook(allocations?: Record<number, Pick>) {
     if (cooking) return;
     setCooking(true);
     setCookErr(null);
@@ -75,13 +77,16 @@ export function MealCard({
     }
   }
 
-  // Ask which product to use only when an ingredient has >1 in stock.
+  // Ask which product/variant was used when an ingredient has >1 in stock or has variants.
   async function cook() {
     if (cooking) return;
     const res = await fetch(`/api/events/${eventId}/cook`);
     const list = res.ok ? ((await res.json()) as CookChoice[]) : [];
     if (list.length === 0) return doCook();
-    setPicked(Object.fromEntries(list.map((c) => [c.ingredientId, c.products[0].id])));
+    setPicked(Object.fromEntries(list.map((c) => {
+      const p = c.products[0];
+      return [c.ingredientId, { productId: p.id, variantId: p.variants[0]?.id ?? null }];
+    })));
     setChoices(list);
   }
 
@@ -146,22 +151,43 @@ export function MealCard({
 
       <Sheet open={choices !== null} title="Which did you use?" onClose={() => setChoices(null)}>
         <div className="sh-body">
-          {choices?.map((c) => (
-            <div key={c.ingredientId} style={{ marginBottom: 12 }}>
-              <p className="body" style={{ color: "var(--sage)" }}>{c.ingredientName}</p>
-              {c.products.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className="btn block"
-                  style={{ opacity: picked[c.ingredientId] === p.id ? 1 : 0.55 }}
-                  onClick={() => setPicked((prev) => ({ ...prev, [c.ingredientId]: p.id }))}
-                >
-                  {p.name}
-                </button>
-              ))}
-            </div>
-          ))}
+          {choices?.map((c) => {
+            const sel = picked[c.ingredientId];
+            const selProduct = c.products.find((p) => p.id === sel?.productId) ?? c.products[0];
+            return (
+              <div key={c.ingredientId} style={{ marginBottom: 12 }}>
+                <p className="body" style={{ color: "var(--sage)" }}>{c.ingredientName}</p>
+                {c.products.length > 1 && c.products.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className="btn block"
+                    style={{ opacity: sel?.productId === p.id ? 1 : 0.55 }}
+                    onClick={() => setPicked((prev) => ({
+                      ...prev,
+                      [c.ingredientId]: { productId: p.id, variantId: p.variants[0]?.id ?? null },
+                    }))}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+                {selProduct.variants.length > 0 && selProduct.variants.map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    className="btn block"
+                    style={{ opacity: sel?.variantId === v.id ? 1 : 0.55 }}
+                    onClick={() => setPicked((prev) => ({
+                      ...prev,
+                      [c.ingredientId]: { productId: selProduct.id, variantId: v.id },
+                    }))}
+                  >
+                    {v.name}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
           <button type="button" className="btn block" disabled={cooking} onClick={() => doCook(picked)}>
             {cooking ? "Cooking…" : "Cook it"}
           </button>

@@ -239,6 +239,8 @@ export const stockMovements = sqliteTable("stock_movements", {
   ingredientId: integer("ingredient_id").notNull().references(() => ingredients.id),
   // which product these units are; null = unattributed (pre-migration / untagged backfill)
   productId: integer("product_id").references(() => products.id),
+  // which variant was used (cooked movements only); null = product's own nutrition
+  variantId: integer("variant_id").references(() => productVariants.id),
   // signed canonical units: + purchase, - cooked, +/- manual
   delta: integer("delta").notNull(),
   reason: text("reason").notNull(), // 'purchase' | 'cooked' | 'manual' | 'eaten'

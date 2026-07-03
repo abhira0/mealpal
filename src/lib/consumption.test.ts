@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import { makeTestDb, type TestDb } from "@/test/db";
 import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
@@ -6,6 +7,7 @@ import { createRecipe } from "@/lib/recipes";
 import { recordPurchase } from "@/lib/shopping";
 import { currentStock, stockByProduct } from "@/lib/stock";
 import { consumptionForRecipe, recordCooked, cookChoices } from "@/lib/consumption";
+import { createVariant } from "@/lib/variants";
 
 function seedFlourProducts(db: TestDb, hid: number, flourId: number) {
   const shopId = db.insert(schema.shops).values({ householdId: hid, name: "Mart" }).returning().all()[0].id;
@@ -67,7 +69,7 @@ describe("cook product attribution", () => {
     const { a, b } = seedFlourProducts(db, hid, flourId);
     recordPurchase(db, hid, { productId: a, quantity: 1 });
     recordPurchase(db, hid, { productId: b, quantity: 1 });
-    recordCooked(db, hid, bread().id, 1, null, new Map([[flourId, b]]));
+    recordCooked(db, hid, bread().id, 1, null, new Map([[flourId, { productId: b, variantId: null }]]));
     const s = stockByProduct(db, hid);
     expect(s.get(a)).toBe(1000); // untouched
     expect(s.get(b)).toBe(500);  // depleted as chosen
@@ -97,5 +99,30 @@ describe("cook product attribution", () => {
     const choices = cookChoices(db, hid, ev1.id);
     expect(choices).toHaveLength(1);
     expect(choices[0].products.map((p) => p.id).sort()).toEqual([a, b].sort());
+  });
+
+  it("cookChoices asks for a single product that has variants", () => {
+    const { a } = seedFlourProducts(db, hid, flourId);
+    recordPurchase(db, hid, { productId: a, quantity: 1 });
+    createVariant(db, hid, a, { name: "Fortified" });
+    const slotId = db.insert(schema.mealSlots)
+      .values({ householdId: hid, name: "Dinner" }).returning().all()[0].id;
+    const ev = db.insert(schema.mealEvents)
+      .values({ householdId: hid, date: "2026-07-01", slotId, recipeId: bread().id, servings: 1 })
+      .returning().all()[0];
+    const choices = cookChoices(db, hid, ev.id);
+    expect(choices).toHaveLength(1); // one product, but it has a variant → still asks
+    expect(choices[0].products[0].variants.map((v) => v.name)).toEqual(["Fortified"]);
+  });
+
+  it("records the chosen variant on the cook movement", () => {
+    const { a } = seedFlourProducts(db, hid, flourId);
+    recordPurchase(db, hid, { productId: a, quantity: 1 });
+    const variantId = createVariant(db, hid, a, { name: "Fortified" })!.id;
+    recordCooked(db, hid, bread().id, 1, null, new Map([[flourId, { productId: a, variantId }]]));
+    const [m] = db.select().from(schema.stockMovements)
+      .where(eq(schema.stockMovements.reason, "cooked")).all();
+    expect(m.productId).toBe(a);
+    expect(m.variantId).toBe(variantId);
   });
 });

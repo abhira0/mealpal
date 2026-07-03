@@ -10,6 +10,10 @@ type Db = BetterSQLite3Database<typeof schema>;
 // which attribute their stock to that exact product (not the preferred one).
 export interface ConsumptionLine { ingredientId: number; amount: number; productId?: number }
 
+/** Cook picker result: which product (and optional variant) was used, per ingredient. */
+export type CookAllocation = { productId: number; variantId: number | null };
+export type CookAllocations = Map<number, CookAllocation>;
+
 type MealEvent = typeof schema.mealEvents.$inferSelect;
 
 /**
@@ -59,13 +63,28 @@ function inStockProductsByIngredient(db: Db, householdId: number): Map<number, n
 export interface CookChoice {
   ingredientId: number;
   ingredientName: string;
-  products: { id: number; name: string; onHand: number }[];
+  products: { id: number; name: string; onHand: number; variants: { id: number; name: string }[] }[];
+}
+
+/** In-stock variants of each product, so the cook picker can ask which was used. */
+function variantsByProduct(db: Db, householdId: number): Map<number, { id: number; name: string }[]> {
+  const rows = db.select({ id: schema.productVariants.id, name: schema.productVariants.name, productId: schema.productVariants.productId })
+    .from(schema.productVariants)
+    .where(eq(schema.productVariants.householdId, householdId)).all();
+  const out = new Map<number, { id: number; name: string }[]>();
+  for (const v of rows) {
+    const list = out.get(v.productId) ?? [];
+    list.push({ id: v.id, name: v.name });
+    out.set(v.productId, list);
+  }
+  return out;
 }
 
 /**
- * Ingredients in this event's recipe that have MORE THAN ONE product in stock,
- * so the cook can't be attributed automatically — the user must pick which one
- * they used. Ingredients with 0 or 1 in-stock products are resolved silently.
+ * Ingredients in this event's recipe that need the user to pick before cooking:
+ * either MORE THAN ONE product is in stock, or the resolved product has variants
+ * (so we ask which variant was used, for nutrition). An ingredient with a single
+ * variant-less in-stock product is resolved silently.
  */
 export function cookChoices(db: Db, householdId: number, eventId: number): CookChoice[] {
   const [ev] = db.select().from(schema.mealEvents)
@@ -73,11 +92,14 @@ export function cookChoices(db: Db, householdId: number, eventId: number): CookC
   if (!ev) return [];
   const inStock = inStockProductsByIngredient(db, householdId);
   const onHand = stockByProduct(db, householdId);
+  const variants = variantsByProduct(db, householdId);
   const choices: CookChoice[] = [];
   for (const line of consumptionLinesForEvent(db, householdId, ev)) {
-    if (line.productId != null) continue; // direct product item: attribution fixed
+    if (line.productId != null) continue; // direct product item: product + variant fixed at plan time
     const ids = inStock.get(line.ingredientId) ?? [];
-    if (ids.length < 2) continue; // 0 or 1 → resolved automatically
+    if (ids.length === 0) continue; // nothing on hand → cooking is blocked elsewhere
+    const anyVariants = ids.some((id) => (variants.get(id)?.length ?? 0) > 0);
+    if (ids.length < 2 && !anyVariants) continue; // single variant-less product → resolved automatically
     const products = db.select({ id: schema.products.id, name: schema.products.name })
       .from(schema.products)
       .where(and(
@@ -91,7 +113,7 @@ export function cookChoices(db: Db, householdId: number, eventId: number): CookC
       ingredientName: ing?.name ?? "?",
       products: products
         .filter((p) => ids.includes(p.id))
-        .map((p) => ({ id: p.id, name: p.name, onHand: onHand.get(p.id) ?? 0 })),
+        .map((p) => ({ id: p.id, name: p.name, onHand: onHand.get(p.id) ?? 0, variants: variants.get(p.id) ?? [] })),
     });
   }
   return choices;
@@ -143,7 +165,7 @@ export function consumptionForRecipe(
  */
 export function recordCooked(
   db: Db, householdId: number, recipeId: number, servings: number, mealEventId: number | null,
-  allocations?: Map<number, number>,
+  allocations?: CookAllocations,
 ) {
   const recipe = getRecipe(db, householdId, recipeId);
   if (!recipe) throw new Error("recipe not found in household");
@@ -152,9 +174,11 @@ export function recordCooked(
   for (const line of lines) {
     const ids = inStock.get(line.ingredientId) ?? [];
     const chosen = allocations?.get(line.ingredientId);
-    const productId = (chosen && ids.includes(chosen)) ? chosen : (ids[0] ?? null);
+    const useChosen = chosen != null && ids.includes(chosen.productId);
+    const productId = useChosen ? chosen.productId : (ids[0] ?? null);
+    const variantId = useChosen ? chosen.variantId : null;
     recordMovement(db, householdId, {
-      ingredientId: line.ingredientId, productId, delta: -line.amount, reason: "cooked", mealEventId,
+      ingredientId: line.ingredientId, productId, variantId, delta: -line.amount, reason: "cooked", mealEventId,
     });
   }
   return lines;
@@ -167,21 +191,25 @@ export function recordCooked(
  * in-stock product (null if nothing on hand).
  */
 export function recordCookedForEvent(
-  db: Db, householdId: number, ev: MealEvent, allocations?: Map<number, number>,
+  db: Db, householdId: number, ev: MealEvent, allocations?: CookAllocations,
 ) {
   const inStock = inStockProductsByIngredient(db, householdId);
   const lines = consumptionLinesForEvent(db, householdId, ev);
   for (const line of lines) {
     let productId: number | null;
+    let variantId: number | null = null;
     if (line.productId != null) {
       productId = line.productId; // direct product item: fixed attribution
+      variantId = ev.variantId ?? null; // variant chosen at plan time
     } else {
       const ids = inStock.get(line.ingredientId) ?? [];
       const chosen = allocations?.get(line.ingredientId);
-      productId = (chosen && ids.includes(chosen)) ? chosen : (ids[0] ?? null);
+      const useChosen = chosen != null && ids.includes(chosen.productId);
+      productId = useChosen ? chosen.productId : (ids[0] ?? null);
+      variantId = useChosen ? chosen.variantId : null;
     }
     recordMovement(db, householdId, {
-      ingredientId: line.ingredientId, productId, delta: -line.amount, reason: "cooked", mealEventId: ev.id,
+      ingredientId: line.ingredientId, productId, variantId, delta: -line.amount, reason: "cooked", mealEventId: ev.id,
     });
   }
   return lines;

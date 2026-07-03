@@ -16,11 +16,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
-  // optional { allocations: { [ingredientId]: productId } } from the cook picker
+  // optional { allocations: { [ingredientId]: { productId, variantId } } } from the cook picker
   const body = await req.json().catch(() => null);
   const raw = body?.allocations;
   const allocations = raw && typeof raw === "object"
-    ? new Map(Object.entries(raw).map(([k, v]) => [Number(k), Number(v)]))
+    ? new Map(Object.entries(raw).map(([k, v]) => {
+        const a = v as { productId: number; variantId: number | null };
+        return [Number(k), { productId: Number(a.productId), variantId: a.variantId == null ? null : Number(a.variantId) }];
+      }))
     : undefined;
   // Block cooking unless every ingredient has stock on hand (trustworthy totals).
   const missing = unstockedIngredients(db, session.user.householdId, Number(id));

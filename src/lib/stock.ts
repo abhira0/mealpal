@@ -7,6 +7,7 @@ type Db = BetterSQLite3Database<typeof schema>;
 export interface MovementInput {
   ingredientId: number;
   productId?: number | null;
+  variantId?: number | null;
   delta: number;
   reason: "purchase" | "cooked" | "manual" | "eaten";
   mealEventId?: number | null;
@@ -18,6 +19,7 @@ export function recordMovement(db: Db, householdId: number, m: MovementInput) {
   const [row] = db.insert(schema.stockMovements)
     .values({
       householdId, ingredientId: m.ingredientId, productId: m.productId ?? null,
+      variantId: m.variantId ?? null,
       delta: m.delta, reason: m.reason,
       mealEventId: m.mealEventId ?? null, purchaseId: m.purchaseId ?? null,
       expiresAt: m.expiresAt ?? null,
