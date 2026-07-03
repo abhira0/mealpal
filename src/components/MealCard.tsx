@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Dropdown } from "@/components/Dropdown";
 import { QuantityChip } from "@/components/QuantityChip";
 import { Sheet } from "@/components/Sheet";
 
@@ -157,34 +158,31 @@ export function MealCard({
             return (
               <div key={c.ingredientId} style={{ marginBottom: 12 }}>
                 <p className="body" style={{ color: "var(--sage)" }}>{c.ingredientName}</p>
-                {c.products.length > 1 && c.products.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className="btn block"
-                    style={{ opacity: sel?.productId === p.id ? 1 : 0.55 }}
-                    onClick={() => setPicked((prev) => ({
-                      ...prev,
-                      [c.ingredientId]: { productId: p.id, variantId: p.variants[0]?.id ?? null },
-                    }))}
-                  >
-                    {p.name}
-                  </button>
-                ))}
-                {selProduct.variants.length > 0 && selProduct.variants.map((v) => (
-                  <button
-                    key={v.id}
-                    type="button"
-                    className="btn block"
-                    style={{ opacity: sel?.variantId === v.id ? 1 : 0.55 }}
-                    onClick={() => setPicked((prev) => ({
-                      ...prev,
-                      [c.ingredientId]: { productId: selProduct.id, variantId: v.id },
-                    }))}
-                  >
-                    {v.name}
-                  </button>
-                ))}
+                {c.products.length > 1 && (
+                  <div className="field">
+                    <span className="field-label">Product</span>
+                    <Dropdown
+                      label="Product"
+                      value={sel?.productId ?? null}
+                      options={c.products.map((p) => ({ id: p.id, label: p.name }))}
+                      onChange={(id) => {
+                        const p = c.products.find((x) => x.id === Number(id))!;
+                        setPicked((prev) => ({ ...prev, [c.ingredientId]: { productId: p.id, variantId: p.variants[0]?.id ?? null } }));
+                      }}
+                    />
+                  </div>
+                )}
+                {selProduct.variants.length > 0 && (
+                  <div className="field">
+                    <span className="field-label">Variant</span>
+                    <Dropdown
+                      label="Variant"
+                      value={sel?.variantId ?? null}
+                      options={selProduct.variants.map((v) => ({ id: v.id, label: v.name }))}
+                      onChange={(id) => setPicked((prev) => ({ ...prev, [c.ingredientId]: { productId: selProduct.id, variantId: Number(id) } }))}
+                    />
+                  </div>
+                )}
               </div>
             );
           })}
