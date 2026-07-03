@@ -322,18 +322,18 @@ input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:#a9a496;posi
   .nav a{flex-direction:row;align-items:center;gap:10px;font-size:11px;letter-spacing:.06em;text-align:left;padding:10px 12px;border-radius:8px;width:100%}
   .nav a.on{background:var(--enamel-dark)}
 
-  /* row/card/ticket lists flow into as many columns as fit (min 300px each);
+  /* row/card lists flow into as many columns as fit (min 300px each);
      every non-list child spans the full row. button.card = tappable list items
-     (pantry), .ticket = shop receipts. gap intentionally not set — .stack /
-     .stack-sm gaps carry over. */
-  .content:has(> .row),.content:has(> .account-row),.content:has(> button.card),.content:has(> .ticket),
+     (pantry). Shop tickets (.ticket) intentionally excluded: each stop reads
+     as a full-width receipt, matching the History tab. gap intentionally not
+     set — .stack / .stack-sm gaps carry over. */
+  .content:has(> .row),.content:has(> .account-row),.content:has(> button.card),
   .content :is(.stack,.stack-sm):has(> .row),
   .content :is(.stack,.stack-sm):has(> .account-row),
   .content :is(.stack,.stack-sm):has(> button.card){display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));align-items:start}
   .content:has(> .row) > :not(.row),
   .content:has(> .account-row) > :not(.account-row),
   .content:has(> button.card) > :not(button.card),
-  .content:has(> .ticket) > :not(.ticket),
   .content :is(.stack,.stack-sm):has(> .row) > :not(.row),
   .content :is(.stack,.stack-sm):has(> .account-row) > :not(.account-row),
   .content :is(.stack,.stack-sm):has(> button.card) > :not(button.card){grid-column:1/-1}
