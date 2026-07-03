@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 // Downscale a picked photo to a legible JPEG Blob (text must stay readable, so
 // much larger than the 64px favicon path) and normalize HEIC/PNG → JPEG.
@@ -46,6 +46,7 @@ export function NutritionPhoto({
   const [error, setError] = useState<string | null>(null);
   // bump to cache-bust the <img> after a replace (same path, new bytes)
   const [v, setV] = useState(0);
+  const dialogRef = useRef<HTMLDialogElement>(null);
 
   // Flip the "skip this product's photo" flag via a plain product PATCH.
   async function setSkip(next: boolean) {
@@ -99,11 +100,24 @@ export function NutritionPhoto({
         <p style={{ margin: 0, opacity: 0.6 }}>Photo skipped for this product.</p>
       ) : current ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={`${current}?v=${v}`}
-          alt="Nutrition facts label"
-          style={{ display: "block", maxHeight: 220, borderRadius: 8, border: "1px solid var(--line, #0001)" }}
-        />
+        <>
+          <img
+            src={`${current}?v=${v}`}
+            alt="Nutrition facts label"
+            title="Tap to view full screen"
+            onClick={() => dialogRef.current?.showModal()}
+            style={{ display: "block", maxHeight: 220, borderRadius: 8, border: "1px solid var(--line, #0001)", cursor: "zoom-in" }}
+          />
+          {/* Native <dialog> lightbox — works on mobile where Element.requestFullscreen doesn't. Tap to close. */}
+          <dialog
+            ref={dialogRef}
+            onClick={() => dialogRef.current?.close()}
+            style={{ maxWidth: "100vw", maxHeight: "100vh", width: "100vw", height: "100vh", border: "none", padding: 0, background: "#000e", display: "grid", placeItems: "center" }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`${current}?v=${v}`} alt="Nutrition facts label" style={{ maxWidth: "100vw", maxHeight: "100vh", objectFit: "contain", cursor: "zoom-out" }} />
+          </dialog>
+        </>
       ) : (
         <p style={{ margin: 0, opacity: 0.6 }}>No nutrition photo yet.</p>
       )}
