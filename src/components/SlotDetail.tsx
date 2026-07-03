@@ -46,7 +46,7 @@ export function SlotDetail({ id }: { id: string }) {
         title={slot.name}
       />
 
-      <div className="content stack-sm detail-view">
+      <div className="content stack-sm">
         {error && <p className="notice">{error}</p>}
 
         <span className="section-label">Details</span>

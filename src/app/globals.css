@@ -306,19 +306,13 @@ input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:#a9a496;posi
    Body becomes a flex row: an order:-1 sticky sidebar plus fluid content. This
    needs no :has(), so it works in every browser (no @supports gate needed) and
    /login — which renders no .nav — is just a single flex child that stays
-   centered. The list grids and the form/detail width cap below use :has();
-   browsers without it just get full-width single-column content, a fine
-   degradation. */
+   centered. The list grids below use :has(); browsers without it just get
+   full-width single-column content, a fine degradation. */
 @media (min-width:900px){
   body{display:flex;min-height:100dvh}
-  /* Full width by default so the feed/list pages (Today, Pantry, Shop,
-     Nutrition, Recipes, Manage) fill the space beside the sidebar. Only edit
-     forms (<form>) and single-record detail views (which mark themselves with
-     .detail-view) keep a readable, centered measure so inputs/text don't
-     stretch. Keying on an explicit class beats sniffing shared card classes,
-     which repeat on list pages too (e.g. the nutrition-photos grid). */
+  /* Full width for every page — lists, detail views, and forms alike — so
+     content fills the space beside the sidebar. */
   .app{flex:1;min-width:0;max-width:none;margin:0 auto;padding-bottom:32px}
-  .app:has(form),.app:has(.detail-view){max-width:960px}
   .content{padding:24px}
   .nav{order:-1;flex:none;position:sticky;inset:0 auto auto 0;height:100dvh;width:200px;max-width:none;margin:0;flex-direction:column;justify-content:flex-start;gap:2px;padding:18px 12px}
   .nav-brand{display:block;font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:-.02em;color:var(--paper);padding:4px 12px 14px}
