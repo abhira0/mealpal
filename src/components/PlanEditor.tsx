@@ -263,7 +263,7 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
       if (pickRecipe == null) return;
       item = { recipeId: pickRecipe, servings: pickServings };
     } else if (kind === "product") {
-      if (pickProduct == null || (variants.length > 0 && pickVariant == null)) return;
+      if (pickProduct == null) return; // variant optional: cook-time picker asks if omitted
       // whichever field the user actually typed into wins; if neither, default to 1 serving
       if (pickProductAmount !== "") {
         const amount = Number(pickProductAmount);
@@ -571,7 +571,7 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
             </div>
             {variants.length > 0 && (
               <div className="field">
-                <span className="field-label">Variant</span>
+                <span className="field-label">Variant (optional)</span>
                 <Dropdown
                   label="Variant"
                   value={pickVariant}
@@ -631,7 +631,6 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
               disabled={
                 saving ||
                 pickProduct == null ||
-                (variants.length > 0 && pickVariant == null) ||
                 (pickProductAmount !== "" && !(Number(pickProductAmount) > 0)) ||
                 (pickProductServings !== "" && !(Number(pickProductServings) > 0)) ||
                 repeatInvalid

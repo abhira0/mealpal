@@ -161,7 +161,15 @@ export function cookEvent(
     .where(and(eq(schema.mealEvents.id, eventId), eq(schema.mealEvents.householdId, householdId))).all();
   if (!ev || ev.status === "cooked") return; // no-op if missing or already cooked
   recordCookedForEvent(db, householdId, ev, allocations);
-  db.update(schema.mealEvents).set({ status: "cooked" })
+  // Direct product planned without a variant → persist the cook-time pick, so
+  // nutrition (which reads the event's variantId for direct items) reflects it.
+  const patch: { status: string; variantId?: number } = { status: "cooked" };
+  if (ev.productId != null && ev.variantId == null && allocations) {
+    const line = consumptionLinesForEvent(db, householdId, ev)[0];
+    const chosen = line ? allocations.get(line.ingredientId)?.variantId ?? null : null;
+    if (chosen != null) patch.variantId = chosen;
+  }
+  db.update(schema.mealEvents).set(patch)
     .where(eq(schema.mealEvents.id, ev.id)).run();
 }
 

@@ -95,7 +95,23 @@ export function cookChoices(db: Db, householdId: number, eventId: number): CookC
   const variants = variantsByProduct(db, householdId);
   const choices: CookChoice[] = [];
   for (const line of consumptionLinesForEvent(db, householdId, ev)) {
-    if (line.productId != null) continue; // direct product item: product + variant fixed at plan time
+    if (line.productId != null) {
+      // direct product item: product is fixed. Ask which variant only when none was
+      // chosen at plan time and the product actually has variants.
+      if (ev.variantId != null) continue;
+      const vs = variants.get(line.productId) ?? [];
+      if (vs.length === 0) continue;
+      const p = db.select({ name: schema.products.name }).from(schema.products)
+        .where(eq(schema.products.id, line.productId)).all()[0];
+      const ing = db.select({ name: schema.ingredients.name }).from(schema.ingredients)
+        .where(eq(schema.ingredients.id, line.ingredientId)).all()[0];
+      choices.push({
+        ingredientId: line.ingredientId,
+        ingredientName: ing?.name ?? "?",
+        products: [{ id: line.productId, name: p?.name ?? "?", onHand: onHand.get(line.productId) ?? 0, variants: vs }],
+      });
+      continue;
+    }
     const ids = inStock.get(line.ingredientId) ?? [];
     if (ids.length === 0) continue; // nothing on hand → cooking is blocked elsewhere
     const anyVariants = ids.some((id) => (variants.get(id)?.length ?? 0) > 0);
@@ -200,7 +216,8 @@ export function recordCookedForEvent(
     let variantId: number | null = null;
     if (line.productId != null) {
       productId = line.productId; // direct product item: fixed attribution
-      variantId = ev.variantId ?? null; // variant chosen at plan time
+      // variant chosen at plan time, else the cook-time pick
+      variantId = ev.variantId ?? allocations?.get(line.ingredientId)?.variantId ?? null;
     } else {
       const ids = inStock.get(line.ingredientId) ?? [];
       const chosen = allocations?.get(line.ingredientId);

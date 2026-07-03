@@ -47,7 +47,8 @@ export async function POST(req: Request) {
     return NextResponse.json(addEvent(db, hid, { ...base, ingredientId: Number(b.ingredientId), amount }), { status: 201 });
   }
 
-  // product item — assorted products require a variant (their own nutrition is empty)
+  // product item — variant is optional; if omitted for an assorted product, the
+  // cook picker asks which variant was used at cook time.
   const productId = Number(b.productId);
   const [product] = db.select().from(schema.products)
     .where(and(eq(schema.products.id, productId), eq(schema.products.householdId, hid))).all();
@@ -58,8 +59,6 @@ export async function POST(req: Request) {
     variantId = Number(b.variantId);
     if (!variants.some((v) => v.id === variantId))
       return NextResponse.json({ error: "variant not found for this product" }, { status: 400 });
-  } else if (variants.length > 0) {
-    return NextResponse.json({ error: "this product is assorted — pick a variant" }, { status: 400 });
   }
   // optional: log a direct canonical-unit amount (e.g. grams) instead of servings
   let amount: number | undefined;
