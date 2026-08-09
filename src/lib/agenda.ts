@@ -13,6 +13,7 @@ export interface AgendaMeal {
   slotName: string;
   name: string; // resolved meal name
   status: "planned" | "cooked";
+  phase: "planned" | "cooked" | "served"; // lifecycle phase for the UI's status chip
   batchBacked: boolean; // an active batch exists for this slot
   batchId: number | null; // that batch's id, or null
   mealsRemaining: number | null; // that batch's remaining, or null
@@ -32,6 +33,21 @@ export interface AgendaDay {
   cookFlags: CookFlag[]; // slots whose active batch runs out ON this date
   eatenCount: number; // meals considered done this day
   totalCount: number; // meals.length
+}
+
+/**
+ * Lifecycle phase for a meal row's status chip: "served" once it's been
+ * eaten/cooked (counts toward nutrition), "cooked" for a batch serving
+ * that's ready but not eaten today, else "planned".
+ */
+function derivePhase(m: {
+  eatenFromBatchToday: boolean;
+  status: "planned" | "cooked";
+  batchBacked: boolean;
+}): "planned" | "cooked" | "served" {
+  if (m.eatenFromBatchToday || m.status === "cooked") return "served";
+  if (m.batchBacked) return "cooked";
+  return "planned";
 }
 
 /** ISO date + n days, computed in local time (no UTC drift). */
@@ -145,12 +161,14 @@ export function agendaDays(
       const dayEvents = eventsByDate.get(d) ?? [];
       if (dayEvents.some((ev) => ev.slotId === b.slotId)) continue; // real event wins, no duplicate
       const eatenFromBatchToday = eatenKeys.has(`${b.id}:${d}`);
+      const status: "planned" | "cooked" = eatenFromBatchToday ? "cooked" : "planned";
       const meal: AgendaMeal & { _timeOfDay: string } = {
         eventId: null,
         slotId: b.slotId,
         slotName: slot?.name ?? "—",
         name: b.label,
-        status: eatenFromBatchToday ? "cooked" : "planned",
+        status,
+        phase: derivePhase({ eatenFromBatchToday, status, batchBacked: true }),
         batchBacked: true,
         batchId: b.id,
         mealsRemaining: b.mealsRemaining,
@@ -172,12 +190,14 @@ export function agendaDays(
         const batch = batchBySlot.get(ev.slotId) ?? null;
         const batchBacked = batch != null;
         const eatenFromBatchToday = batchBacked && eatenKeys.has(`${batch!.id}:${date}`);
+        const status = ev.status as "planned" | "cooked";
         return {
           eventId: ev.id,
           slotId: ev.slotId,
           slotName: slot?.name ?? "—",
           name: resolveName(ev),
-          status: ev.status as "planned" | "cooked",
+          status,
+          phase: derivePhase({ eatenFromBatchToday, status, batchBacked }),
           batchBacked,
           batchId: batch ? batch.id : null,
           mealsRemaining: batch ? batch.mealsRemaining : null,

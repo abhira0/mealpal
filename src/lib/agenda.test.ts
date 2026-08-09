@@ -43,6 +43,8 @@ describe("agendaDays", () => {
     expect(day.meals.map((m) => m.name)).toEqual(["Sandwich", "Biryani"]); // lunch (12:00) before dinner (19:00)
     expect(day.meals[0].status).toBe("cooked");
     expect(day.meals[1].status).toBe("planned");
+    expect(day.meals[0].phase).toBe("served"); // cooked event -> served
+    expect(day.meals[1].phase).toBe("planned"); // untouched rotation event -> planned
     expect(day.eatenCount).toBe(1); // only the cooked one
     expect(day.meals[0].ruleId).toBeNull(); // one-off events have no rule origin
   });
@@ -62,6 +64,7 @@ describe("agendaDays", () => {
     expect(meal.batchId).toBe(batch.id);
     expect(meal.mealsRemaining).toBe(3);
     expect(meal.eatenFromBatchToday).toBe(false);
+    expect(meal.phase).toBe("cooked"); // batch-backed, not eaten today -> cooked
     expect(days[0].eatenCount).toBe(0);
 
     eatFromBatch(db, hid, batch.id, "2026-08-09");
@@ -70,6 +73,7 @@ describe("agendaDays", () => {
     meal = days[0].meals[0];
     expect(meal.eatenFromBatchToday).toBe(true);
     expect(meal.mealsRemaining).toBe(2); // updated remaining after eating
+    expect(meal.phase).toBe("served"); // eaten from batch today -> served
     expect(days[0].eatenCount).toBe(1);
   });
 
@@ -106,7 +110,7 @@ describe("agendaDays", () => {
     const day0 = byDate.get("2026-08-09")!;
     expect(day0.meals).toHaveLength(1);
     expect(day0.meals[0]).toMatchObject({
-      eventId: null, batchBacked: true, batchId: batch.id, name: "Rice Bowl", status: "planned",
+      eventId: null, batchBacked: true, batchId: batch.id, name: "Rice Bowl", status: "planned", phase: "cooked",
     });
 
     const day1 = byDate.get("2026-08-10")!;
