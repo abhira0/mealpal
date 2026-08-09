@@ -17,6 +17,7 @@ export interface AgendaMeal {
   batchId: number | null; // that batch's id, or null
   mealsRemaining: number | null; // that batch's remaining, or null
   eatenFromBatchToday: boolean; // a batch_eaten row exists for (batchId, this date)
+  ruleId: number | null; // the recurring rule that generated this event, or null for one-offs
 }
 
 export interface CookFlag {
@@ -149,6 +150,7 @@ export function agendaDays(
           batchId: batch ? batch.id : null,
           mealsRemaining: batch ? batch.mealsRemaining : null,
           eatenFromBatchToday,
+          ruleId: ev.ruleId,
           _timeOfDay: slot?.timeOfDay ?? "12:00",
         };
       })

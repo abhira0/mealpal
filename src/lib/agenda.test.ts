@@ -44,6 +44,7 @@ describe("agendaDays", () => {
     expect(day.meals[0].status).toBe("cooked");
     expect(day.meals[1].status).toBe("planned");
     expect(day.eatenCount).toBe(1); // only the cooked one
+    expect(day.meals[0].ruleId).toBeNull(); // one-off events have no rule origin
   });
 
   it("overlays an active batch onto its slot's meal, and eatenFromBatchToday flips after eating", () => {
