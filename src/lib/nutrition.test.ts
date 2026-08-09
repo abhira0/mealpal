@@ -101,16 +101,18 @@ describe("dayNutrition", () => {
     expect(day.meals[0].missing).toEqual(["Flour"]);
   });
 
-  it("counts a product with nutrition filled in but no calories (e.g. protein only)", () => {
+  it("ignores a product with no calories, even if other nutrients are filled in", () => {
     const shopId = db.insert(schema.shops).values({ householdId: hid, name: "Mart" }).returning().all()[0].id;
     db.insert(schema.products).values({
       householdId: hid, ingredientId: flourId, shopId, name: "Brand A", packSize: 1000, priority: 1,
-      calories: null, proteinG: 0.1, // manually saved protein, calories left blank
+      calories: null, proteinG: 0.1, // protein saved but calories left blank → half-entered
     }).returning().all();
     event(bread().id, "planned");
     const day = dayNutrition(db, hid, "2026-07-01");
-    expect(day.meals[0].nutrients.proteinG).toBeCloseTo(50); // 500g * 0.1
-    expect(day.meals[0].missing).toEqual([]); // not flagged as missing
+    // calories is the anchor: a half-entered product would otherwise produce
+    // garbage per-gram totals, so it does not count and is flagged missing.
+    expect(day.meals[0].nutrients.proteinG).toBe(0);
+    expect(day.meals[0].missing).toEqual(["Flour"]);
   });
 });
 

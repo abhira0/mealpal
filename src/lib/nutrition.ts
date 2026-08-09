@@ -283,20 +283,10 @@ export function batchServingNutrients(db: Db, householdId: number, batchId: numb
   return out;
 }
 
-/** Preferred available product (lowest priority) that has nutrition filled in. */
+/** Preferred available product (lowest priority) with usable nutrition. */
 function preferredNutrients(db: Db, householdId: number, ingredientId: number): Nutrients | null {
-  const products = db.select().from(schema.products)
-    .where(and(
-      eq(schema.products.householdId, householdId),
-      eq(schema.products.ingredientId, ingredientId),
-      eq(schema.products.available, true),
-    ))
-    .orderBy(asc(schema.products.priority)).all();
-  for (const p of products) {
-    const pn = productNutrients(p);
-    if (pn) return pn;
-  }
-  return null;
+  const p = preferredProduct(db, householdId, ingredientId);
+  return p ? productNutrients(p) : null;
 }
 
 /**
@@ -314,7 +304,14 @@ function preferredProductInfo(
       eq(schema.products.available, true),
     ))
     .orderBy(asc(schema.products.priority)).all();
-  return { used: products.find(hasNutrition) ?? null, top: products[0] ?? null };
+  // "Usable" requires calories filled in — a half-entered product (e.g. carbs
+  // but no calories) would otherwise win priority and, since per-gram values
+  // are assumed, produce garbage totals. 0 kcal is fine (null = incomplete).
+  // ponytail: calories is the anchor; a 0-cal food with only micros must have
+  // calories entered as 0 (non-null) to count.
+  const usable = (p: ProductRow) =>
+    hasNutrition(p) && (p.calories as number | null) != null;
+  return { used: products.find(usable) ?? null, top: products[0] ?? null };
 }
 
 /** Preferred available product row (lowest priority) with nutrition filled in. */
