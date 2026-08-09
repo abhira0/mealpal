@@ -34,6 +34,13 @@ type CookFlag = { slotId: number; slotName: string; label: string };
 type AgendaDay = { date: string; meals: AgendaMeal[]; cookFlags: CookFlag[]; eatenCount: number; totalCount: number };
 type NextCook = { slotId: number; slotName: string; label: string; cookDate: string; daysAway: number };
 type AgendaResponse = { days: AgendaDay[]; nextCooks: NextCook[] };
+// Which product/variant a meal's ingredient could be served as (from GET .../cook).
+type CookChoice = {
+  ingredientId: number;
+  ingredientName: string;
+  products: { id: number; name: string; onHand: number; variants: { id: number; name: string }[] }[];
+};
+type CookPick = { productId: number; variantId: number | null };
 
 // Slot-name accent colors for the "Next cooking" cards.
 function slotAccent(slotName: string): string {
@@ -136,15 +143,17 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
 
   const [acting, setActing] = useState<number | null>(null);
 
-  async function eatMeal(meal: AgendaMeal, date: string) {
+  async function toggleMeal(meal: AgendaMeal, date: string) {
     // Synthetic batch rows (eventId null) share a batchId across every day
     // they're projected onto, so the optimistic update below must also scope
-    // by date — otherwise eating today's serving would flip every other
+    // by date — otherwise toggling today's serving would flip every other
     // day's row for the same batch too.
     const key = meal.batchBacked && meal.batchId != null ? meal.batchId : meal.eventId;
     if (acting === key) return;
+    // Currently served? Then this tap UNDOES it (un-serve); otherwise it serves.
+    const served = meal.status === "cooked" || (meal.batchBacked && meal.eatenFromBatchToday);
     setActing(key);
-    // optimistic check
+    // optimistic toggle
     setDays((prev) =>
       prev.map((d) => ({
         ...d,
@@ -153,6 +162,18 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
             ? m.eventId === meal.eventId
             : d.date === date && m.eventId == null && m.batchId === meal.batchId && m.slotId === meal.slotId;
           if (!matches) return m;
+          if (served) {
+            // undo: back to cooked (batch still has the serving) or planned (rotation meal)
+            return meal.batchBacked
+              ? {
+                  ...m,
+                  eatenFromBatchToday: false,
+                  status: "planned" as const,
+                  phase: "cooked" as const,
+                  mealsRemaining: (m.mealsRemaining ?? 0) + 1,
+                }
+              : { ...m, status: "planned" as const, phase: "planned" as const };
+          }
           return meal.batchBacked
             ? {
                 ...m,
@@ -165,18 +186,18 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
         }),
       })),
     );
+    const method = served ? "DELETE" : "POST";
     try {
       if (meal.batchBacked && meal.batchId != null) {
         await fetch(`/api/batches/${meal.batchId}/eat`, {
-          method: "POST",
+          method,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ date }),
         });
       } else if (meal.eventId != null) {
         await fetch(`/api/events/${meal.eventId}/cook`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ force: true }),
+          method,
+          ...(served ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ force: true }) }),
         });
       }
     } finally {
@@ -389,9 +410,9 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
           className="checkbox"
           role="checkbox"
           aria-checked={checked}
-          aria-label={checked ? `${meal.name} eaten` : `Mark ${meal.name} eaten`}
-          disabled={checked || acting === key}
-          onClick={() => eatMeal(meal, date)}
+          aria-label={checked ? `${meal.name} eaten, tap to undo` : `Mark ${meal.name} eaten`}
+          disabled={acting === key}
+          onClick={() => toggleMeal(meal, date)}
         />
         <div className="row-main">
           <div>{meal.name}</div>
@@ -938,7 +959,7 @@ function MacroBar({ label, cooked, planned, goal, unit, color }: {
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 3 }}>
         <b>{label}</b>
         <span className="mono" style={{ fontSize: 11, color: "var(--sage)" }}>
-          {Math.round(cooked)} / {goal}{unit}
+          {Math.round(planned)} / {goal}{unit}
         </span>
       </div>
       <div style={{ display: "flex", height: 8, borderRadius: 99, background: "#e3ddcc", overflow: "hidden" }}>
