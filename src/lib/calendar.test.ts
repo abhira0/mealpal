@@ -13,16 +13,18 @@ describe("calendar feed", () => {
     expect(calendarTokenValid(7, "short")).toBe(false); // length mismatch, no throw
   });
 
-  it("emits one all-day VEVENT per cook-prep date, with escaped text", () => {
+  it("emits a timed VEVENT per cook-prep date, with escaped text", () => {
     const cooks: NextCook[] = [
       { slotId: 2, slotName: "Lunch", label: "Chicken, rice", cookDate: "2026-08-09", daysAway: 0 },
+      { slotId: 1, slotName: "Breakfast", label: "Overnight Oats", cookDate: "2026-08-10", daysAway: 1 },
     ];
     const ics = buildIcs(cooks, new Date("2026-08-09T00:00:00Z"));
     expect(ics.startsWith("BEGIN:VCALENDAR")).toBe(true);
     expect(ics).toContain("\r\n"); // CRLF line endings
-    expect((ics.match(/BEGIN:VEVENT/g) ?? []).length).toBe(1);
-    expect(ics).toContain("DTSTART;VALUE=DATE:20260809");
-    expect(ics).toContain("DTEND;VALUE=DATE:20260810");
+    expect((ics.match(/BEGIN:VEVENT/g) ?? []).length).toBe(2);
+    expect(ics).toContain("DTSTART:20260809T180000"); // Lunch prep at 6pm (floating)
+    expect(ics).toContain("DTEND:20260809T183000");
+    expect(ics).toContain("DTSTART:20260810T200000"); // Overnight Oats at 8pm
     expect(ics).toContain("SUMMARY:🍳 Chicken\\, rice (Lunch prep)"); // comma escaped
     expect(ics).toContain("UID:cook-2-2026-08-09@mealpal");
     expect(ics.trimEnd().endsWith("END:VCALENDAR")).toBe(true);

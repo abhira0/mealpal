@@ -25,12 +25,21 @@ function esc(s: string): string {
 const ymd = (isoDate: string) => isoDate.replace(/-/g, ""); // "2026-08-09" -> "20260809"
 const nextDay = (isoDate: string) => ymd(new Date(Date.parse(isoDate) + 86_400_000).toISOString().slice(0, 10));
 
+// Wall-clock hour a prep should land at. Floating local time (no TZID/Z) so it
+// shows at that hour in every calendar app regardless of timezone.
+// ponytail: hardcoded times; hoist to slot config if you want them editable.
+function prepHour(c: NextCook): number | null {
+  if (c.label.toLowerCase().includes("overnight oats")) return 20; // 8pm
+  if (c.slotName === "Lunch" || c.slotName === "Dinner") return 18; // 6pm
+  return null; // fall back to all-day
+}
+
+const hh = (n: number) => String(n).padStart(2, "0");
+
 /**
  * The upcoming cook-prep dates (the homepage's "🍳 Next cooking" cards) as an
- * iCalendar feed of all-day events. All-day (VALUE=DATE) sidesteps slot-time
- * timezone math — a prep date is day-granular anyway.
- * ponytail: all-day events; emit DTSTART with the slot's timeOfDay if you want
- * prep to land at a real time.
+ * iCalendar feed. Prep with a known time (see prepHour) gets a 30-min timed
+ * event; anything else stays all-day (VALUE=DATE sidesteps timezone math).
  */
 export function buildIcs(cooks: NextCook[], stamp = new Date()): string {
   const dtstamp = stamp.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
@@ -43,12 +52,17 @@ export function buildIcs(cooks: NextCook[], stamp = new Date()): string {
     "X-WR-CALNAME:MealPal",
   ];
   for (const c of cooks) {
+    const hour = prepHour(c);
+    const [start, end] =
+      hour == null
+        ? [`DTSTART;VALUE=DATE:${ymd(c.cookDate)}`, `DTEND;VALUE=DATE:${nextDay(c.cookDate)}`]
+        : [`DTSTART:${ymd(c.cookDate)}T${hh(hour)}0000`, `DTEND:${ymd(c.cookDate)}T${hh(hour)}3000`];
     lines.push(
       "BEGIN:VEVENT",
       `UID:cook-${c.slotId}-${c.cookDate}@mealpal`,
       `DTSTAMP:${dtstamp}`,
-      `DTSTART;VALUE=DATE:${ymd(c.cookDate)}`,
-      `DTEND;VALUE=DATE:${nextDay(c.cookDate)}`,
+      start,
+      end,
       `SUMMARY:${esc(`🍳 ${c.label} (${c.slotName} prep)`)}`,
       "END:VEVENT",
     );
