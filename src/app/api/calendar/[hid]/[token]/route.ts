@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { agendaDays } from "@/lib/agenda";
+import { nextCooks } from "@/lib/agenda";
 import { topUpRules } from "@/lib/rules";
 import { buildIcs, calendarTokenValid } from "@/lib/calendar";
 import { todayISO } from "@/lib/dates";
+
+// Mirrors TodayAgenda's "🍳 Next cooking" filter — only these prep cards show.
+// ponytail: hardcoded to what the user cares about; keep in sync with TodayAgenda.
+const isVisibleCook = (c: { slotName: string; label: string }) =>
+  c.slotName === "Lunch" ||
+  c.slotName === "Dinner" ||
+  c.label.toLowerCase().includes("overnight oats");
 
 // Public ICS feed for calendar apps (TickTick "Subscribe by URL"). No session
 // cookie is sent on a subscription fetch, so auth is the per-household token.
@@ -18,9 +25,8 @@ export async function GET(
     return new NextResponse("Not found", { status: 404 });
   }
   const today = todayISO();
-  const to = new Date(Date.parse(today) + 14 * 86_400_000).toISOString().slice(0, 10);
   topUpRules(db, hid, today);
-  const ics = buildIcs(agendaDays(db, hid, today, to, today));
+  const ics = buildIcs(nextCooks(db, hid, today).filter(isVisibleCook));
   return new NextResponse(ics, {
     headers: {
       "Content-Type": "text/calendar; charset=utf-8",

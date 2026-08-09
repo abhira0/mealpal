@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import type { AgendaDay } from "@/lib/agenda";
+import type { NextCook } from "@/lib/agenda";
 
 // Per-household calendar token, derived from AUTH_SECRET — no DB column needed.
 // Unguessable and stable; rotating AUTH_SECRET revokes every feed at once.
@@ -26,13 +26,13 @@ const ymd = (isoDate: string) => isoDate.replace(/-/g, ""); // "2026-08-09" -> "
 const nextDay = (isoDate: string) => ymd(new Date(Date.parse(isoDate) + 86_400_000).toISOString().slice(0, 10));
 
 /**
- * All planned/eaten meals and batch-cook days in [from, to] as an iCalendar
- * feed of all-day events. All-day (VALUE=DATE) sidesteps slot-time timezone
- * math — the plan is day-granular anyway.
+ * The upcoming cook-prep dates (the homepage's "🍳 Next cooking" cards) as an
+ * iCalendar feed of all-day events. All-day (VALUE=DATE) sidesteps slot-time
+ * timezone math — a prep date is day-granular anyway.
  * ponytail: all-day events; emit DTSTART with the slot's timeOfDay if you want
- * meals to land at real times.
+ * prep to land at a real time.
  */
-export function buildIcs(days: AgendaDay[], stamp = new Date()): string {
+export function buildIcs(cooks: NextCook[], stamp = new Date()): string {
   const dtstamp = stamp.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   const lines: string[] = [
     "BEGIN:VCALENDAR",
@@ -42,25 +42,16 @@ export function buildIcs(days: AgendaDay[], stamp = new Date()): string {
     "NAME:MealPal",
     "X-WR-CALNAME:MealPal",
   ];
-  const event = (uid: string, date: string, summary: string) => {
+  for (const c of cooks) {
     lines.push(
       "BEGIN:VEVENT",
-      `UID:${uid}@mealpal`,
+      `UID:cook-${c.slotId}-${c.cookDate}@mealpal`,
       `DTSTAMP:${dtstamp}`,
-      `DTSTART;VALUE=DATE:${ymd(date)}`,
-      `DTEND;VALUE=DATE:${nextDay(date)}`,
-      `SUMMARY:${esc(summary)}`,
+      `DTSTART;VALUE=DATE:${ymd(c.cookDate)}`,
+      `DTEND;VALUE=DATE:${nextDay(c.cookDate)}`,
+      `SUMMARY:${esc(`🍳 ${c.label} (${c.slotName} prep)`)}`,
       "END:VEVENT",
     );
-  };
-  for (const day of days) {
-    for (const flag of day.cookFlags) {
-      event(`cook-${day.date}-${flag.slotId}`, day.date, `🍳 Cook: ${flag.label} (${flag.slotName})`);
-    }
-    for (const m of day.meals) {
-      const uid = m.eventId != null ? `ev-${m.eventId}` : `batch-${m.batchId}-${m.slotId}-${day.date}`;
-      event(uid, day.date, `${m.slotName}: ${m.name}`);
-    }
   }
   lines.push("END:VCALENDAR");
   return lines.join("\r\n") + "\r\n"; // RFC 5545 requires CRLF
