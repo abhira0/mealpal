@@ -23,6 +23,7 @@ type AgendaMeal = {
   slotName: string;
   name: string;
   status: "planned" | "cooked";
+  phase: "planned" | "cooked" | "served";
   batchBacked: boolean;
   batchId: number | null;
   mealsRemaining: number | null;
@@ -41,6 +42,15 @@ type DayAnalysis = {
 };
 
 const DOW = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+
+// Colors for the per-row phase chip: planned (taupe, not yet acted on),
+// cooked (amber, batch serving ready but not eaten today), served (green,
+// eaten/counts toward nutrition).
+const PHASE_CHIP: Record<AgendaMeal["phase"], { bg: string; fg: string }> = {
+  planned: { bg: "#a99e86", fg: "#fff" },
+  cooked: { bg: "#e0a92e", fg: "#3a2f10" },
+  served: { bg: "#5c8a5e", fg: "#fff" },
+};
 
 function initials(name: string | null | undefined): string {
   const s = (name ?? "").trim();
@@ -133,8 +143,14 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
             : d.date === date && m.eventId == null && m.batchId === meal.batchId && m.slotId === meal.slotId;
           if (!matches) return m;
           return meal.batchBacked
-            ? { ...m, eatenFromBatchToday: true, status: "cooked" as const, mealsRemaining: (m.mealsRemaining ?? 1) - 1 }
-            : { ...m, status: "cooked" as const };
+            ? {
+                ...m,
+                eatenFromBatchToday: true,
+                status: "cooked" as const,
+                phase: "served" as const,
+                mealsRemaining: (m.mealsRemaining ?? 1) - 1,
+              }
+            : { ...m, status: "cooked" as const, phase: "served" as const };
         }),
       })),
     );
@@ -377,6 +393,22 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
             {empty ? "empty · cook" : low ? "cook soon" : `${meal.mealsRemaining} left`}
           </span>
         )}
+        <span
+          aria-label={`Status: ${meal.phase}`}
+          style={{
+            background: PHASE_CHIP[meal.phase].bg,
+            color: PHASE_CHIP[meal.phase].fg,
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+            borderRadius: 99,
+            padding: "3px 8px",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {meal.phase}
+        </span>
         {meal.eventId != null && (
           <button
             type="button"
