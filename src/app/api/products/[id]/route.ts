@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import { deleteProduct, updateProduct, NUTRIENT_PATCH_KEYS, type ProductPatch } from "@/lib/products";
 import { dollarsToCents } from "@/lib/money";
+import { cacheProductImage } from "@/lib/product-image";
 
 // Pull any nutrient fields present in the body into a patch (per canonical unit).
 // Accepts numbers and null (clears). Ignores absent keys.
@@ -33,6 +34,11 @@ export async function PATCH(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const b = await req.json().catch(() => null);
+  const trimmedImageUrl = b?.imageUrl == null ? null : String(b.imageUrl).trim() || null;
+  const imageUrl =
+    b?.imageUrl !== undefined
+      ? (trimmedImageUrl === null ? null : (await cacheProductImage(Number(id), trimmedImageUrl)) ?? trimmedImageUrl)
+      : undefined;
   const row = updateProduct(db, session.user.householdId, Number(id), {
     ...(b?.ingredientId !== undefined ? { ingredientId: Number(b.ingredientId) } : {}),
     ...(b?.shopId !== undefined ? { shopId: Number(b.shopId) } : {}),
@@ -43,7 +49,7 @@ export async function PATCH(
     ...(pricePatch(b) ?? {}),
     ...(b?.available !== undefined ? { available: Boolean(b.available) } : {}),
     ...(b?.url !== undefined ? { url: b.url === null ? null : String(b.url).trim() || null } : {}),
-    ...(b?.imageUrl !== undefined ? { imageUrl: b.imageUrl === null ? null : String(b.imageUrl).trim() || null } : {}),
+    ...(imageUrl !== undefined ? { imageUrl } : {}),
     ...(b?.nutritionPhotoSkipped !== undefined ? { nutritionPhotoSkipped: Boolean(b.nutritionPhotoSkipped) } : {}),
     ...nutrientPatch(b),
   });

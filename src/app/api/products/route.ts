@@ -6,8 +6,10 @@ import {
   listAllProducts,
   listProductsForIngredient,
   nextPriorityForIngredient,
+  updateProduct,
 } from "@/lib/products";
 import { dollarsToCents } from "@/lib/money";
+import { cacheProductImage } from "@/lib/product-image";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -58,5 +60,9 @@ export async function POST(req: Request) {
     imageUrl: b?.imageUrl?.trim() || null,
     servingSize: b?.servingSize != null ? Number(b.servingSize) : null,
   });
+  if (row.imageUrl) {
+    const cached = await cacheProductImage(row.id, row.imageUrl);
+    if (cached && cached !== row.imageUrl) row.imageUrl = updateProduct(db, session.user.householdId, row.id, { imageUrl: cached })!.imageUrl;
+  }
   return NextResponse.json(row, { status: 201 });
 }

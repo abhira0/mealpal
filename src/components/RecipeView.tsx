@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { QuantityChip } from "@/components/QuantityChip";
 import { Stepper } from "@/components/Stepper";
@@ -73,6 +73,9 @@ export function RecipeView({ id }: { id: string }) {
   const [tab, setTab] = useState<Tab>("ingredients");
   const [activeMedia, setActiveMedia] = useState(0);
   const [nutriTab, setNutriTab] = useState<"label" | "breakdown">("label");
+  const [ytLoaded, setYtLoaded] = useState(false);
+  const [seek, setSeek] = useState<{ start: number; end: number } | null>(null);
+  const galleryRef = useRef<HTMLDivElement>(null);
 
   async function loadRecipe() {
     const rRes = await fetch(`/api/recipes/${id}`);
@@ -116,7 +119,16 @@ export function RecipeView({ id }: { id: string }) {
       <Chrome title={recipe.name} />
 
       <div className="content stack">
-        <Gallery media={recipe.media} active={activeMedia} onSelect={setActiveMedia} title={recipe.name} />
+        <Gallery
+          ref={galleryRef}
+          media={recipe.media}
+          active={activeMedia}
+          onSelect={setActiveMedia}
+          title={recipe.name}
+          loaded={ytLoaded}
+          onLoad={() => setYtLoaded(true)}
+          seek={seek}
+        />
 
         <div className="recipe-meta">
           <span className="body">
@@ -174,12 +186,32 @@ export function RecipeView({ id }: { id: string }) {
           <section>
             {recipe.steps.length > 0 ? (
               <ol style={{ listStyle: "none" }}>
-                {recipe.steps.map((s, i) => (
-                  <li key={s.position ?? i} className="step">
-                    <span className="num" aria-hidden="true">{i + 1}</span>
-                    <span className="step-text">{s.text}</span>
-                  </li>
-                ))}
+                {recipe.steps.map((s, i) => {
+                  const hasClip =
+                    recipe.media.some((m) => m.kind === "youtube") &&
+                    s.startSeconds != null &&
+                    s.endSeconds != null &&
+                    s.endSeconds > s.startSeconds;
+                  return (
+                    <li
+                      key={s.position ?? i}
+                      className={`step${hasClip ? " step-clickable" : ""}`}
+                      onClick={
+                        hasClip
+                          ? () => {
+                              setSeek({ start: s.startSeconds!, end: s.endSeconds! });
+                              setYtLoaded(true);
+                              galleryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                            }
+                          : undefined
+                      }
+                    >
+                      <span className="num" aria-hidden="true">{i + 1}</span>
+                      <span className="step-text">{s.text}</span>
+                      {hasClip && <span aria-hidden="true" style={{ marginLeft: 6, opacity: 0.6 }}>▶</span>}
+                    </li>
+                  );
+                })}
               </ol>
             ) : (
               <p className="body" style={{ color: "var(--sage)" }}>No steps yet.</p>
@@ -268,10 +300,10 @@ export function RecipeView({ id }: { id: string }) {
 
       {cooking && (
         <CookMode
-          steps={recipe.steps}
-          title={recipe.name}
+          recipe={recipe}
           videoId={youTubeId(recipe.media.find((m) => m.kind === "youtube")?.url ?? "")}
           onClose={() => setCooking(false)}
+          onSaved={() => loadRecipe()}
         />
       )}
     </>
@@ -279,21 +311,29 @@ export function RecipeView({ id }: { id: string }) {
 }
 
 function Gallery({
+  ref,
   media,
   active,
   onSelect,
   title,
+  loaded,
+  onLoad,
+  seek,
 }: {
+  ref?: React.Ref<HTMLDivElement>;
   media: Media[];
   active: number;
   onSelect: (i: number) => void;
   title: string;
+  loaded: boolean;
+  onLoad: () => void;
+  seek: { start: number; end: number } | null;
 }) {
-  if (media.length === 0) return <div className="media" aria-hidden="true" />;
+  if (media.length === 0) return null;
   const current = media[Math.min(active, media.length - 1)];
   return (
-    <div className="stack" style={{ gap: 8 }}>
-      <MediaBlock media={current} title={title} />
+    <div ref={ref} className="stack" style={{ gap: 8 }}>
+      <MediaBlock media={current} title={title} loaded={loaded} onLoad={onLoad} seek={seek} />
       {media.length > 1 && (
         <div className="gallery-strip">
           {media.map((m, i) => (
@@ -319,12 +359,42 @@ function Gallery({
   );
 }
 
-function MediaBlock({ media, title }: { media: Media; title: string }) {
+function MediaBlock({
+  media,
+  title,
+  loaded,
+  onLoad,
+  seek,
+}: {
+  media: Media;
+  title: string;
+  loaded: boolean;
+  onLoad: () => void;
+  seek: { start: number; end: number } | null;
+}) {
   const yt = media.kind === "youtube" ? youTubeId(media.url) : null;
   if (media.kind === "youtube" && yt) {
+    if (!loaded) {
+      return (
+        <button type="button" className="media yt-facade" onClick={onLoad} aria-label={`Play video: ${title}`}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`https://img.youtube.com/vi/${yt}/hqdefault.jpg`} alt="" />
+          <span className="yt-play" aria-hidden="true">▶</span>
+        </button>
+      );
+    }
+    const params = seek
+      ? `?start=${seek.start}&end=${seek.end}&autoplay=1&rel=0`
+      : "?autoplay=1&rel=0";
     return (
       <div className="media">
-        <iframe src={`https://www.youtube.com/embed/${yt}`} title={title} allowFullScreen />
+        <iframe
+          key={seek ? `${seek.start}-${seek.end}` : "full"}
+          src={`https://www.youtube.com/embed/${yt}${params}`}
+          title={title}
+          allow="autoplay; encrypted-media; fullscreen"
+          allowFullScreen
+        />
       </div>
     );
   }

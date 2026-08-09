@@ -53,5 +53,8 @@ next-env.d.ts
 # uploaded nutrition-facts label photos (user data)
 /public/nutrition/
 
+# cached product images (fetched from vendor URLs, not source)
+/public/products/
+
 # local database backups
 *.db.bak-*

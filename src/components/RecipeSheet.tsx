@@ -22,6 +22,7 @@ import { GripVertical, Plus, X } from "lucide-react";
 import { Sheet } from "@/components/Sheet";
 import { Stepper } from "@/components/Stepper";
 import { Dropdown } from "@/components/Dropdown";
+import { parseClip, fmtClip } from "@/lib/clip";
 
 type Ingredient = { id: number; name: string; canonicalUnit: string };
 type DraftIngredient = { ingredientId: number | null; amount: string };
@@ -44,25 +45,6 @@ type Tab = "details" | "ingredients" | "steps";
 
 let stepUid = 0;
 const newStep = (text = "", start = "", end = ""): DraftStep => ({ id: `s${stepUid++}`, text, start, end });
-
-/** "1:05" or "65" -> 65 seconds; blank/invalid -> null. */
-function parseClip(s: string): number | null {
-  const t = s.trim();
-  if (!t) return null;
-  if (t.includes(":")) {
-    const [m, sec] = t.split(":");
-    const total = Number(m) * 60 + Number(sec);
-    return Number.isFinite(total) ? total : null;
-  }
-  const n = Number(t);
-  return Number.isFinite(n) ? n : null;
-}
-
-/** 65 -> "1:05"; null -> "". */
-function fmtClip(n: number | null | undefined): string {
-  if (n == null) return "";
-  return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}`;
-}
 
 /** Downscale an image file to a JPEG data URL (longest side <= max px). */
 async function fileToPhotoDataUrl(file: File, max = 1024): Promise<string> {
