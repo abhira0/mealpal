@@ -34,7 +34,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       { status: 409 },
     );
   }
-  cookEvent(db, session.user.householdId, Number(id), allocations);
+  cookEvent(db, session.user.householdId, Number(id), allocations, true); // explicit cook-ahead
   return NextResponse.json({ ok: true });
 }
 

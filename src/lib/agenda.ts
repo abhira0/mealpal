@@ -18,6 +18,7 @@ export interface AgendaMeal {
   ingredientId: number | null;
   status: "planned" | "cooked" | "served";
   phase: "planned" | "cooked" | "served"; // lifecycle phase for the UI's status chip
+  cookedAhead: boolean; // stock depleted by an explicit cook-ahead — un-serve returns to 'cooked', else 'planned'
   batchBacked: boolean; // an active batch exists for this slot
   batchId: number | null; // that batch's id, or null
   mealsRemaining: number | null; // that batch's remaining, or null
@@ -189,6 +190,7 @@ export function agendaDays(
         ingredientId: null,
         status,
         phase: derivePhase({ eatenFromBatchToday, status, batchBacked: true }),
+        cookedAhead: false, // batches deplete at pack time, not via cook-ahead
         batchBacked: true,
         batchId: b.id,
         mealsRemaining: b.mealsRemaining,
@@ -228,6 +230,7 @@ export function agendaDays(
           ingredientId: ev.ingredientId,
           status,
           phase,
+          cookedAhead: ev.cookedAhead,
           batchBacked,
           batchId: batch ? batch.id : null,
           mealsRemaining: batch ? batch.mealsRemaining : null,

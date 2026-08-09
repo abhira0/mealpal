@@ -162,17 +162,24 @@ export function deleteEvent(db: Db, householdId: number, eventId: number, scope:
   }
 }
 
-/** Mark an event cooked exactly once: deplete stock and flip status. */
+/**
+ * Mark an event cooked exactly once: deplete stock and flip status.
+ * `cookedAhead` records whether this is an explicit "cook ahead" (true) or a
+ * depletion that happens as part of serving (false) — un-serve reads it to pick
+ * the right prior state to return to.
+ */
 export function cookEvent(
-  db: Db, householdId: number, eventId: number, allocations?: CookAllocations,
+  db: Db, householdId: number, eventId: number, allocations?: CookAllocations, cookedAhead = false,
 ) {
   const [ev] = db.select().from(schema.mealEvents)
     .where(and(eq(schema.mealEvents.id, eventId), eq(schema.mealEvents.householdId, householdId))).all();
   if (!ev || ev.status === "cooked" || ev.status === "served") return; // no-op if missing or already cooked/served
 
   // Direct product planned without a variant: resolve the cook-time variant and
-  // recompute the canonical amount from ITS serving size. The plan stored a
-  // 1-unit amount because the serving size lives on the variant, unknown then.
+  // recompute the canonical amount from ITS serving size (the plan stored a
+  // product-based amount since the serving size lives on the variant). This
+  // resolution feeds the stock movement only — it is NOT written back to the
+  // event, so the event stays the plan and undo (uncookEvent) returns cleanly.
   let effective = ev;
   if (ev.productId != null && ev.variantId == null && allocations) {
     const line = consumptionLinesForEvent(db, householdId, ev)[0];
@@ -182,14 +189,12 @@ export function cookEvent(
         .where(and(eq(schema.productVariants.id, chosen), eq(schema.productVariants.householdId, householdId))).all();
       const perServing = v?.s && v.s > 0 ? v.s : 1;
       const amount = Math.round(ev.servings * perServing);
-      db.update(schema.mealEvents).set({ variantId: chosen, amount })
-        .where(eq(schema.mealEvents.id, ev.id)).run();
       effective = { ...ev, variantId: chosen, amount };
     }
   }
 
   recordCookedForEvent(db, householdId, effective, allocations);
-  db.update(schema.mealEvents).set({ status: "cooked" })
+  db.update(schema.mealEvents).set({ status: "cooked", cookedAhead })
     .where(eq(schema.mealEvents.id, ev.id)).run();
 }
 
@@ -203,7 +208,7 @@ export function uncookEvent(db: Db, householdId: number, eventId: number) {
       eq(schema.stockMovements.householdId, householdId),
       eq(schema.stockMovements.mealEventId, ev.id),
     )).run();
-  db.update(schema.mealEvents).set({ status: "planned" })
+  db.update(schema.mealEvents).set({ status: "planned", cookedAhead: false })
     .where(eq(schema.mealEvents.id, ev.id)).run();
 }
 
@@ -224,11 +229,16 @@ export function serveEvent(
     .where(eq(schema.mealEvents.id, ev.id)).run();
 }
 
-/** Reverse serveEvent: flip status back to 'cooked'. Stock movements stay — use uncookEvent to also back those out. */
+/**
+ * Reverse serveEvent, returning to the state serving came FROM: 'cooked' if the
+ * meal was explicitly cooked ahead (stock stays depleted), otherwise all the way
+ * back to 'planned' with the serve's stock movements backed out.
+ */
 export function unserveEvent(db: Db, householdId: number, eventId: number) {
   const [ev] = db.select().from(schema.mealEvents)
     .where(and(eq(schema.mealEvents.id, eventId), eq(schema.mealEvents.householdId, householdId))).all();
   if (!ev || ev.status !== "served") return; // no-op if missing or not served
   db.update(schema.mealEvents).set({ status: "cooked" })
     .where(eq(schema.mealEvents.id, ev.id)).run();
+  if (!ev.cookedAhead) uncookEvent(db, householdId, eventId); // served directly → fully reverse to planned
 }

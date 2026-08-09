@@ -27,6 +27,7 @@ type AgendaMeal = {
   ingredientId: number | null;
   status: "planned" | "cooked" | "served";
   phase: "planned" | "cooked" | "served";
+  cookedAhead: boolean;
   batchBacked: boolean;
   batchId: number | null;
   mealsRemaining: number | null;
@@ -93,7 +94,7 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const todayIso = useMemo(todayISO, []);
-  const from = useMemo(() => addDays(todayIso, -1), [todayIso]);
+  const from = todayIso;
   const to = useMemo(() => addDays(todayIso, 5), [todayIso]);
 
   const [days, setDays] = useState<AgendaDay[]>([]);
@@ -152,10 +153,6 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
   const [cookChoice, setCookChoice] = useState<
     { meal: AgendaMeal; date: string; choices: CookChoice[]; picked: Record<number, CookPick> } | null
   >(null);
-  // Remember the last product/variant pick per event so undo → re-serve reuses
-  // it instead of re-asking. ponytail: session-only (lost on reload); persist on
-  // the event if it needs to survive reloads.
-  const [lastPicks, setLastPicks] = useState<Record<number, Record<number, CookPick>>>({});
 
   async function toggleMeal(meal: AgendaMeal, date: string) {
     // Synthetic batch rows (eventId null) share a batchId across every day
@@ -172,11 +169,6 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
       const res = await fetch(`/api/events/${meal.eventId}/cook`);
       const choices = res.ok ? ((await res.json()) as CookChoice[]) : [];
       if (choices.length > 0) {
-        const remembered = lastPicks[meal.eventId];
-        if (remembered) {
-          void serveWithPicks(meal, date, remembered);
-          return;
-        }
         const picked: Record<number, CookPick> = Object.fromEntries(
           choices.map((c) => {
             const p = c.products[0];
@@ -198,18 +190,21 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
             : d.date === date && m.eventId == null && m.batchId === meal.batchId && m.slotId === meal.slotId;
           if (!matches) return m;
           if (served) {
-            // undo: back to cooked (batch still has the serving, stock stays
-            // depleted) either way — a rotation meal's un-serve keeps its
-            // stock movements too, just flips status back to 'cooked'.
-            return meal.batchBacked
-              ? {
-                  ...m,
-                  eatenFromBatchToday: false,
-                  status: "planned" as const,
-                  phase: "cooked" as const,
-                  mealsRemaining: (m.mealsRemaining ?? 0) + 1,
-                }
-              : { ...m, status: "cooked" as const, phase: "cooked" as const };
+            // undo: batch servings go back to 'cooked' (still available). A
+            // rotation meal returns to whatever serving came from — 'cooked' if
+            // it was cooked ahead, else all the way back to 'planned'.
+            if (meal.batchBacked) {
+              return {
+                ...m,
+                eatenFromBatchToday: false,
+                status: "planned" as const,
+                phase: "cooked" as const,
+                mealsRemaining: (m.mealsRemaining ?? 0) + 1,
+              };
+            }
+            return meal.cookedAhead
+              ? { ...m, status: "cooked" as const, phase: "cooked" as const }
+              : { ...m, status: "planned" as const, phase: "planned" as const };
           }
           return meal.batchBacked
             ? {
@@ -243,12 +238,10 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
     }
   }
 
-  // Serve an event with a known product/variant pick (from the sheet or a
-  // remembered pick), and remember the pick for next time.
+  // Serve an event with a chosen product/variant pick (from the cook sheet).
   async function serveWithPicks(meal: AgendaMeal, _date: string, picked: Record<number, CookPick>) {
     if (meal.eventId == null) return;
     const eventId = meal.eventId;
-    setLastPicks((prev) => ({ ...prev, [eventId]: picked }));
     setActing(eventId);
     setDays((prev) =>
       prev.map((d) => ({

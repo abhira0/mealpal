@@ -137,11 +137,24 @@ describe("meal plan", () => {
     expect(listEvents(db, hid, "2026-07-01", "2026-07-01")[0].status).toBe("served");
   });
 
-  it("unserveEvent flips a served event back to cooked, keeping its stock movements", () => {
+  it("unserveEvent returns a directly-served event to planned, backing its stock out", () => {
     db.insert(schema.stockMovements)
       .values({ householdId: hid, ingredientId: flourId, delta: 2000, reason: "manual" }).run();
     const ev = addEvent(db, hid, { date: "2026-07-01", slotId, recipeId, servings: 2 });
-    serveEvent(db, hid, ev.id);
+    serveEvent(db, hid, ev.id); // planned → served (depletes stock as part of serving)
+    expect(currentStock(db, hid, flourId)).toBe(1500);
+    unserveEvent(db, hid, ev.id);
+    // Never explicitly cooked ahead → undo goes all the way back to planned.
+    expect(listEvents(db, hid, "2026-07-01", "2026-07-01")[0].status).toBe("planned");
+    expect(currentStock(db, hid, flourId)).toBe(2000); // serve's stock backed out
+  });
+
+  it("unserveEvent returns a cooked-ahead-then-served event to cooked, keeping its stock movements", () => {
+    db.insert(schema.stockMovements)
+      .values({ householdId: hid, ingredientId: flourId, delta: 2000, reason: "manual" }).run();
+    const ev = addEvent(db, hid, { date: "2026-07-01", slotId, recipeId, servings: 2 });
+    cookEvent(db, hid, ev.id, undefined, true); // explicit cook-ahead → 'cooked'
+    serveEvent(db, hid, ev.id); // cooked → served (no second depletion)
     expect(currentStock(db, hid, flourId)).toBe(1500);
     unserveEvent(db, hid, ev.id);
     expect(listEvents(db, hid, "2026-07-01", "2026-07-01")[0].status).toBe("cooked");
@@ -182,7 +195,7 @@ describe("direct items in a planner slot", () => {
     expect(events.find((e) => e.recipeId != null)?.variantName).toBeNull();
   });
 
-  it("a product planned without a variant gets the cook-time pick + amount persisted", () => {
+  it("a product planned without a variant records the cook-time pick on the movement, leaving the event as the plan", () => {
     const variantId = createVariant(db, hid, productId, { name: "Mega Omega", servingSize: 43, calories: 4 })!.id;
     recordPurchase(db, hid, { productId, quantity: 1 }); // +1000g
     const ev = addEvent(db, hid, { date: "2026-07-02", slotId, productId, servings: 1 }); // no variant
@@ -192,9 +205,16 @@ describe("direct items in a planner slot", () => {
     cookEvent(db, hid, ev.id, new Map([[flourId, { productId, variantId }]]));
     const cooked = listEvents(db, hid, "2026-07-02", "2026-07-02")[0];
     expect(cooked.status).toBe("cooked");
-    expect(cooked.variantId).toBe(variantId); // persisted onto the event
-    expect(cooked.amount).toBe(43); // 1 serving × the variant's 43g, recomputed at cook
-    expect(currentStock(db, hid, flourId)).toBe(957); // 1000 - 43
+    // The event stays the plan — the pick lives on the stock movement, so undo
+    // (uncookEvent) returns cleanly and re-serving asks the variant again.
+    expect(cooked.variantId).toBeNull();
+    expect(currentStock(db, hid, flourId)).toBe(957); // 1000 - 43 (variant serving size)
+    // Undo restores the clean planned state.
+    uncookEvent(db, hid, ev.id);
+    const planned = listEvents(db, hid, "2026-07-02", "2026-07-02")[0];
+    expect(planned.status).toBe("planned");
+    expect(planned.variantId).toBeNull();
+    expect(currentStock(db, hid, flourId)).toBe(1000); // movement backed out
   });
 
   it("a direct product item resolves amount from the variant's serving size and deducts that product", () => {
