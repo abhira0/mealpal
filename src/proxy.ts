@@ -6,8 +6,12 @@ const { auth } = NextAuth(authConfig);
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
   const { pathname } = req.nextUrl;
-  // /r/<token> is the public shared-recipe page; no auth required.
-  const isPublic = pathname.startsWith("/login") || pathname.startsWith("/r/");
+  // /r/<token> is the public shared-recipe page; /api/calendar/ self-auths via
+  // a per-household token (calendar apps send no session cookie). No auth here.
+  const isPublic =
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/r/") ||
+    pathname.startsWith("/api/calendar/");
   if (!isLoggedIn && !isPublic) {
     return Response.redirect(new URL("/login", req.nextUrl));
   }
