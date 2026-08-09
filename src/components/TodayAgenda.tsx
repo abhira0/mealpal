@@ -132,11 +132,7 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
     };
   }, [mounted, loadAgenda, loadAnalysis]);
 
-  // Scroll today's block into view once the agenda has rendered.
   const todayRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (!loading && days.length > 0) todayRef.current?.scrollIntoView({ block: "start" });
-  }, [loading, days.length]);
 
   const [acting, setActing] = useState<number | null>(null);
 
