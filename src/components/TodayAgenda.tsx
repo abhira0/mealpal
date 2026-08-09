@@ -15,6 +15,14 @@ type Product = { id: number; name: string; servingSize: number | null; canonical
 type ItemKind = "recipe" | "product";
 type PackItem = { kind: ItemKind; refId: number | null; amount: string };
 
+// Subset of GET /api/nutrition/analysis?mode=day&date=... used here — eaten
+// ("nutrients") vs planned ("planned") totals, scaled to the household goal.
+type DayAnalysis = {
+  goals: { calorieGoal: number; proteinG: number; carbsG: number; fatG: number };
+  nutrients: { calories: number; proteinG: number };
+  planned: { calories: number; proteinG: number };
+};
+
 function initials(name: string | null | undefined): string {
   const s = (name ?? "").trim();
   if (!s) return "ME";
@@ -64,6 +72,17 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
   }, []);
 
   const slotName = useMemo(() => new Map(slots.map((s) => [s.id, s.name])), [slots]);
+
+  const [analysis, setAnalysis] = useState<DayAnalysis | null>(null);
+  useEffect(() => {
+    if (!mounted) return;
+    let cancelled = false;
+    fetch(`/api/nutrition/analysis?mode=day&date=${todayISO()}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!cancelled) setAnalysis(d); })
+      .catch(() => { if (!cancelled) setAnalysis(null); });
+    return () => { cancelled = true; };
+  }, [mounted, batches]);
 
   async function eatOne(batch: Batch) {
     if (batch.mealsRemaining <= 0) return;
@@ -183,6 +202,28 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
       </header>
 
       <div className="content stack">
+        {analysis && (
+          <div>
+            <p className="section-label">Today vs goal</p>
+            <MacroBar
+              label="Calories"
+              cooked={analysis.nutrients.calories}
+              planned={analysis.planned.calories}
+              goal={analysis.goals.calorieGoal}
+              unit=""
+              color="var(--paprika)"
+            />
+            <MacroBar
+              label="Protein"
+              cooked={analysis.nutrients.proteinG}
+              planned={analysis.planned.proteinG}
+              goal={analysis.goals.proteinG}
+              unit="g"
+              color="var(--turmeric)"
+            />
+          </div>
+        )}
+
         {loading ? (
           <p className="loading">Loading…</p>
         ) : batches.length === 0 ? (
@@ -306,5 +347,29 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
         </div>
       </Sheet>
     </>
+  );
+}
+
+// Two bars per nutrient — eaten (solid) then the not-yet-eaten remainder of
+// the plan (faded) — both scaled to the goal, mirroring the nutrition page.
+function MacroBar({ label, cooked, planned, goal, unit, color }: {
+  label: string; cooked: number; planned: number; goal: number; unit: string; color: string;
+}) {
+  const pct = (v: number) => (goal > 0 ? Math.min(100, (v / goal) * 100) : 0);
+  const cookedW = pct(cooked);
+  const remW = Math.max(0, pct(planned) - cookedW);
+  return (
+    <div style={{ margin: "8px 0" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 3 }}>
+        <b>{label}</b>
+        <span className="mono" style={{ fontSize: 11, color: "var(--sage)" }}>
+          {Math.round(cooked)} / {goal}{unit}
+        </span>
+      </div>
+      <div style={{ display: "flex", height: 8, borderRadius: 99, background: "#e3ddcc", overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${cookedW}%`, background: color }} />
+        <div style={{ height: "100%", width: `${remW}%`, background: color, opacity: 0.45 }} />
+      </div>
+    </div>
   );
 }
