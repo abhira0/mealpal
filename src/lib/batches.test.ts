@@ -5,7 +5,7 @@ import { schema } from "@/db";
 import { createProduct } from "@/lib/products";
 import { recordPurchase } from "@/lib/shopping";
 import { currentStock } from "@/lib/stock";
-import { packBatch } from "@/lib/batches";
+import { packBatch, listBatches, getBatch } from "@/lib/batches";
 
 let db: TestDb; let hid: number; let slotId: number;
 beforeEach(() => {
@@ -44,5 +44,16 @@ describe("packBatch", () => {
     expect(batch.mealsRemaining).toBe(4);
     expect(currentStock(db, hid, veg)).toBe(600); // 1000 - 100*4
     expect(db.select().from(schema.batchItems).all()).toHaveLength(1);
+  });
+});
+
+describe("listBatches / getBatch", () => {
+  it("lists active batches (remaining > 0) and reads one with items", () => {
+    const b = packBatch(db, hid, { slotId, label: "Dinner", cookedDate: "2026-08-09", mealsTotal: 3, items: [] });
+    const active = listBatches(db, hid);
+    expect(active.map((x) => x.id)).toContain(b.id);
+    const full = getBatch(db, hid, b.id);
+    expect(full?.label).toBe("Dinner");
+    expect(Array.isArray(full?.items)).toBe(true);
   });
 });

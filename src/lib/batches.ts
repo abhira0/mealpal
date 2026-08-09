@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
 import { recordCooked } from "@/lib/consumption";
@@ -55,4 +55,23 @@ export function packBatch(db: Db, householdId: number, input: PackBatchInput) {
     }
     return batch;
   });
+}
+
+/** Active batches (still have servings left), newest cook first. */
+export function listBatches(db: Db, householdId: number) {
+  return db.select().from(schema.batches)
+    .where(and(eq(schema.batches.householdId, householdId)))
+    .all()
+    .filter((b) => b.mealsRemaining > 0)
+    .sort((a, b) => b.cookedDate.localeCompare(a.cookedDate));
+}
+
+/** One batch with its item rows, or null. */
+export function getBatch(db: Db, householdId: number, batchId: number) {
+  const [batch] = db.select().from(schema.batches)
+    .where(and(eq(schema.batches.id, batchId), eq(schema.batches.householdId, householdId))).all();
+  if (!batch) return null;
+  const items = db.select().from(schema.batchItems)
+    .where(eq(schema.batchItems.batchId, batchId)).all();
+  return { ...batch, items };
 }
