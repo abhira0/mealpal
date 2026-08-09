@@ -310,3 +310,38 @@ export const nutritionGoals = sqliteTable("nutrition_goals", {
   carbsG: integer("carbs_g").notNull(),
   fatG: integer("fat_g").notNull(),
 });
+
+// A cooked batch portioned into meals that deplete over days. Packing depletes
+// stock once (via the cook path); eating a serving counts meals_remaining down.
+export const batches = sqliteTable("batches", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  householdId: integer("household_id").notNull().references(() => households.id),
+  slotId: integer("slot_id").notNull().references(() => mealSlots.id),
+  label: text("label").notNull(),
+  cookedDate: text("cooked_date").notNull(), // YYYY-MM-DD
+  mealsTotal: integer("meals_total").notNull(),
+  mealsRemaining: integer("meals_remaining").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
+// Contents of ONE serving of a batch. One-of kind, mirroring meal_events:
+// recipe / product(+variant) / ingredient, plus amount in canonical units.
+// (Plan 1 handles recipe + product items; raw-ingredient items are a later plan.)
+export const batchItems = sqliteTable("batch_items", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  batchId: integer("batch_id").notNull().references(() => batches.id),
+  recipeId: integer("recipe_id").references(() => recipes.id),
+  productId: integer("product_id").references(() => products.id),
+  variantId: integer("variant_id").references(() => productVariants.id),
+  ingredientId: integer("ingredient_id").references(() => ingredients.id),
+  amount: real("amount"), // servings for a recipe item; canonical units for product/ingredient
+});
+
+// One serving of a batch eaten on a date. Drives nutrition (eaten basis).
+export const batchEaten = sqliteTable("batch_eaten", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  householdId: integer("household_id").notNull().references(() => households.id),
+  batchId: integer("batch_id").notNull().references(() => batches.id),
+  date: text("date").notNull(), // YYYY-MM-DD
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
