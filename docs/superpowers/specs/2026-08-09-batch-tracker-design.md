@@ -13,6 +13,31 @@ today?* The underlying goal is **discipline** (regaining weight/muscle lost over
 MyFitnessPal was considered and **dropped**: no usable public API, and MealPal
 already computes calories/protein vs goal, so syncing to a clone is overhead.
 
+## The 3-phase lifecycle (the spine)
+
+Every meal/component moves through three phases, and each phase owns a different
+dimension of the app:
+
+| Phase | Meaning | Feeds |
+|---|---|---|
+| **Planned** | intend to eat it | **pantry / shopping** — projects what to *buy* |
+| **Cooked** | raw stock used, food now ready (batch or same-day) | **stock ledger** — ingredients consumed, ready food exists |
+| **Eaten** | actually consumed | **nutrition tracking** |
+
+The Today agenda's per-day display is this lifecycle rendered adaptively
+(planned/cooked/eaten), not three literal rows.
+
+**Key behavior change — nutrition counts EATEN, not cooked.** Today the app
+treats cooking a meal as eating it (one-shot). Batches split the two: cooking a
+batch of 4 consumes 4 servings of stock (correct for the cooked/stock dimension)
+but must contribute **zero** calories until each serving is eaten. So
+`dayNutrition().total` must move from a cooked basis to an **eaten** basis
+(batch eat-taps + stock eat-taps). Planned nutrition (the estimate) is unchanged.
+
+For **stock-type** components (chapathi, dosa batter) the "cooked" phase is
+trivial/same-day: planned → bought (in stock) → eaten. The full three-phase
+split matters mainly for **batch** components.
+
 ## Core concepts
 
 ### Batch
