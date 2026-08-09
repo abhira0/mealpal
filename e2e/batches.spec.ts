@@ -37,17 +37,19 @@ test.describe("batch tracker (merged Today agenda)", () => {
     await expect(page.locator("p.eb", { hasText: "Today" })).toBeVisible();
     await expect(page.locator("p.section-label", { hasText: /^Today$/ })).toBeVisible();
 
-    // Open the pack-a-batch sheet via the floating "+" FAB menu.
+    // Open the merged "Add" sheet via the floating "+" FAB.
     const fab = page.getByRole("button", { name: "Add" });
     await expect(fab).toBeEnabled();
     await fab.click();
-    await page.getByRole("button", { name: "Pack a batch" }).click();
-    await expect(page.getByText("Pack a batch", { exact: true })).toBeVisible();
+    await expect(page.locator(".sh-title", { hasText: "Add" })).toBeVisible();
 
-    // Slot -> Breakfast (that's the slot the demo's "Morning Smoothie" lives in).
+    // Switch the type row to Batch.
+    await page.getByRole("button", { name: "Batch", exact: true }).click();
+
+    // Slot defaults to the first slot, which is Breakfast (that's the slot
+    // the demo's "Morning Smoothie" lives in) — verify rather than assume.
     const slotField = page.locator(".field").filter({ hasText: "Slot" });
-    await slotField.getByRole("button").click();
-    await page.getByRole("option", { name: "Breakfast" }).click();
+    await expect(slotField.getByRole("button")).toContainText("Breakfast");
 
     // Unique label so this run's batch is unambiguous and cleanly deletable.
     await page.getByPlaceholder("e.g. Chicken & rice").fill(LABEL);
@@ -59,8 +61,9 @@ test.describe("batch tracker (merged Today agenda)", () => {
     await expect(page.locator(".stepper .val")).toHaveText("2");
 
     // Recipe/product picker defaults to the first item — leave it as-is.
-    await page.getByRole("button", { name: "Pack", exact: true }).click();
-    await expect(page.getByText("Pack a batch", { exact: true })).toBeHidden();
+    // Scoped to the sheet: the FAB behind it is also named "Add".
+    await page.locator(".sheet").getByRole("button", { name: "Add", exact: true }).click();
+    await expect(page.locator(".sh-title", { hasText: "Add" })).toBeHidden();
 
     // Back on the agenda: today's row for the batch-backed slot's meal
     // (Morning Smoothie, in Breakfast) now carries a batch chip.

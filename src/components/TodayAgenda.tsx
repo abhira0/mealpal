@@ -15,7 +15,7 @@ type Ingredient = { id: number; name: string; canonicalUnit: string };
 type ItemKind = "recipe" | "product";
 type PackItem = { kind: ItemKind; refId: number | null; amount: string };
 
-type AddKind = "recipe" | "product" | "ingredient";
+type AddKind = "recipe" | "product" | "ingredient" | "batch";
 
 type AgendaMeal = {
   eventId: number;
@@ -115,10 +115,6 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
 
   const [acting, setActing] = useState<number | null>(null);
 
-  // Floating "+" FAB menu (Add meal / Pack a batch), replacing the old
-  // per-day and bottom-of-page add buttons.
-  const [fabOpen, setFabOpen] = useState(false);
-
   async function eatMeal(meal: AgendaMeal, date: string) {
     const key = meal.batchBacked && meal.batchId != null ? meal.batchId : meal.eventId;
     if (acting === key) return;
@@ -182,70 +178,11 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
     });
   }
 
-  // Pack-a-batch sheet state.
-  const [packOpen, setPackOpen] = useState(false);
-  const [packSlotId, setPackSlotId] = useState<number | null>(null);
-  const [packLabel, setPackLabel] = useState("");
-  const [packMeals, setPackMeals] = useState(4);
-  const [packItems, setPackItems] = useState<PackItem[]>([{ kind: "recipe", refId: null, amount: "" }]);
-  const [packing, setPacking] = useState(false);
-
-  function openPack(preselectSlotId?: number) {
-    setPackSlotId(preselectSlotId ?? slots[0]?.id ?? null);
-    setPackLabel("");
-    setPackMeals(4);
-    setPackItems([{ kind: "recipe", refId: recipes[0]?.id ?? null, amount: "" }]);
-    setPackOpen(true);
-  }
-
-  function addItem() {
-    setPackItems((prev) => [...prev, { kind: "recipe", refId: recipes[0]?.id ?? null, amount: "" }]);
-  }
-
-  function updateItem(i: number, patch: Partial<PackItem>) {
-    setPackItems((prev) => prev.map((it, j) => (j === i ? { ...it, ...patch } : it)));
-  }
-
-  function removeItem(i: number) {
-    setPackItems((prev) => prev.filter((_, j) => j !== i));
-  }
-
-  const packValid =
-    packSlotId != null &&
-    packLabel.trim().length > 0 &&
-    packMeals >= 1 &&
-    packItems.length > 0 &&
-    packItems.every((it) => it.refId != null);
-
-  async function pack() {
-    if (!packValid || packing) return;
-    setPacking(true);
-    const res = await fetch("/api/batches", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        slotId: packSlotId,
-        label: packLabel.trim(),
-        mealsTotal: packMeals,
-        cookedDate: todayIso,
-        items: packItems.map((it) => {
-          const amount = it.amount !== "" ? Number(it.amount) : undefined;
-          return it.kind === "recipe"
-            ? { recipeId: it.refId, amount }
-            : { productId: it.refId, amount };
-        }),
-      }),
-    });
-    setPacking(false);
-    if (res.ok) {
-      setPackOpen(false);
-      await loadAgenda();
-    }
-  }
-
-  // Add-meal sheet state: slot → day → kind → details → optional repeat rule.
-  // Mirrors PlanEditor's add wizard (POST /api/events for one-offs, POST
-  // /api/rules for recurring), collapsed into a single sheet.
+  // Unified "Add" sheet state: shared Day/Slot, a 4-way type row
+  // (recipe/product/ingredient/batch), then type-dependent fields.
+  // Recipe/product/ingredient mirrors PlanEditor's add wizard (POST
+  // /api/events for one-offs, POST /api/rules for recurring); batch reuses
+  // the same Day/Slot as cookedDate/slotId and posts to POST /api/batches.
   const [addOpen, setAddOpen] = useState(false);
   const [addSlotId, setAddSlotId] = useState<number | null>(null);
   const [addDate, setAddDate] = useState(todayIso);
@@ -265,10 +202,27 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
   const [addUntil, setAddUntil] = useState("");
   const [addSaving, setAddSaving] = useState(false);
 
-  function openAddMeal(date?: string, slotId?: number) {
-    setAddDate(date ?? todayIso);
-    setAddSlotId(slotId ?? slots[0]?.id ?? null);
-    setAddKind("recipe");
+  // Batch-only fields (addKind === "batch").
+  const [addLabel, setAddLabel] = useState("");
+  const [addMeals, setAddMeals] = useState(4);
+  const [addItems, setAddItems] = useState<PackItem[]>([{ kind: "recipe", refId: null, amount: "" }]);
+
+  function addBatchItem() {
+    setAddItems((prev) => [...prev, { kind: "recipe", refId: recipes[0]?.id ?? null, amount: "" }]);
+  }
+
+  function updateBatchItem(i: number, patch: Partial<PackItem>) {
+    setAddItems((prev) => prev.map((it, j) => (j === i ? { ...it, ...patch } : it)));
+  }
+
+  function removeBatchItem(i: number) {
+    setAddItems((prev) => prev.filter((_, j) => j !== i));
+  }
+
+  function openAdd(opts?: { date?: string; slotId?: number; type?: AddKind }) {
+    setAddDate(opts?.date ?? todayIso);
+    setAddSlotId(opts?.slotId ?? slots[0]?.id ?? null);
+    setAddKind(opts?.type ?? "recipe");
     setAddRecipeId(recipes[0]?.id ?? null);
     setAddServings(recipes[0]?.baseServings ?? 2);
     setAddProductId(null);
@@ -282,6 +236,9 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
     setAddIntervalN(1);
     setAddUnit("day");
     setAddUntil("");
+    setAddLabel("");
+    setAddMeals(4);
+    setAddItems([{ kind: "recipe", refId: recipes[0]?.id ?? null, amount: "" }]);
     setAddOpen(true);
   }
 
@@ -301,45 +258,80 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
       ? addRecipeId != null
       : addKind === "product"
         ? addProductId != null && (addProductAmount === "" || Number(addProductAmount) > 0)
-        : addIngredientId != null && Number(addAmount) > 0);
+        : addKind === "ingredient"
+          ? addIngredientId != null && Number(addAmount) > 0
+          : false);
+  const addBatchValid =
+    addSlotId != null &&
+    addLabel.trim().length > 0 &&
+    addMeals >= 1 &&
+    addItems.length > 0 &&
+    addItems.every((it) => it.refId != null);
+  const addValid = addKind === "batch" ? addBatchValid : addMealValid;
 
-  async function saveAddMeal() {
-    if (!addMealValid || addSaving || addSlotId == null) return;
-
-    let item: Record<string, unknown>;
-    if (addKind === "recipe") {
-      if (addRecipeId == null) return;
-      item = { recipeId: addRecipeId, servings: addServings };
-    } else if (addKind === "product") {
-      if (addProductId == null) return;
-      const amount = addProductAmount !== "" ? Number(addProductAmount) : undefined;
-      item = amount != null
-        ? { productId: addProductId, variantId: addVariantId, amount }
-        : { productId: addProductId, variantId: addVariantId, servings: addServings };
-    } else {
-      const amount = Number(addAmount);
-      if (addIngredientId == null || !Number.isFinite(amount) || amount <= 0) return;
-      item = { ingredientId: addIngredientId, amount };
-    }
-
-    const url = addRepeat ? "/api/rules" : "/api/events";
-    const body = addRepeat
-      ? {
-          ...item, slotId: addSlotId, startDate: addDate,
-          intervalN: addIntervalN, unit: addUnit,
-          daysOfWeek: addRepeatDays.map((d) => (d ? "1" : "0")).join(""),
-          untilDate: addUntil || null,
-        }
-      : { date: addDate, slotId: addSlotId, ...item };
-
+  async function submitAdd() {
+    if (!addValid || addSaving || addSlotId == null) return;
     setAddSaving(true);
-    const res = await fetch(url, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-    });
-    setAddSaving(false);
-    if (res.ok) {
-      setAddOpen(false);
-      await Promise.all([loadAgenda(), loadAnalysis()]);
+    try {
+      if (addKind === "batch") {
+        const res = await fetch("/api/batches", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            slotId: addSlotId,
+            label: addLabel.trim(),
+            mealsTotal: addMeals,
+            cookedDate: addDate,
+            items: addItems.map((it) => {
+              const amount = it.amount !== "" ? Number(it.amount) : undefined;
+              return it.kind === "recipe"
+                ? { recipeId: it.refId, amount }
+                : { productId: it.refId, amount };
+            }),
+          }),
+        });
+        if (res.ok) {
+          setAddOpen(false);
+          await loadAgenda();
+        }
+        return;
+      }
+
+      let item: Record<string, unknown>;
+      if (addKind === "recipe") {
+        if (addRecipeId == null) return;
+        item = { recipeId: addRecipeId, servings: addServings };
+      } else if (addKind === "product") {
+        if (addProductId == null) return;
+        const amount = addProductAmount !== "" ? Number(addProductAmount) : undefined;
+        item = amount != null
+          ? { productId: addProductId, variantId: addVariantId, amount }
+          : { productId: addProductId, variantId: addVariantId, servings: addServings };
+      } else {
+        const amount = Number(addAmount);
+        if (addIngredientId == null || !Number.isFinite(amount) || amount <= 0) return;
+        item = { ingredientId: addIngredientId, amount };
+      }
+
+      const url = addRepeat ? "/api/rules" : "/api/events";
+      const body = addRepeat
+        ? {
+            ...item, slotId: addSlotId, startDate: addDate,
+            intervalN: addIntervalN, unit: addUnit,
+            daysOfWeek: addRepeatDays.map((d) => (d ? "1" : "0")).join(""),
+            untilDate: addUntil || null,
+          }
+        : { date: addDate, slotId: addSlotId, ...item };
+
+      const res = await fetch(url, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        setAddOpen(false);
+        await Promise.all([loadAgenda(), loadAnalysis()]);
+      }
+    } finally {
+      setAddSaving(false);
     }
   }
 
@@ -484,7 +476,7 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
                           type="button"
                           className="row"
                           style={{ width: "100%", textAlign: "left", border: "none", cursor: "pointer" }}
-                          onClick={() => openPack(flag.slotId)}
+                          onClick={() => openAdd({ date: day.date, slotId: flag.slotId, type: "batch" })}
                         >
                           <span className="row-main">🍳 cook {flag.label}</span>
                           <span className="chip run">{flag.slotName}</span>
@@ -508,18 +500,17 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
 
       </div>
 
-      {/* Floating "+" FAB replaces the old per-day / bottom add buttons.
-          Disabled while loading: opening a sheet early locks the default
-          item's refId to null (recipes/products not fetched yet), leaving
-          the forms stuck invalid. Sits above the bottom nav (z-index 30)
-          but below the Sheet's scrim/panel (z-index 40/41) so an open sheet
+      {/* Floating "+" FAB opens the merged Add sheet directly. Disabled
+          while loading: opening the sheet early locks the default item's
+          refId to null (recipes/products not fetched yet), leaving the
+          form stuck invalid. Sits above the bottom nav (z-index 30) but
+          below the Sheet's scrim/panel (z-index 40/41) so an open sheet
           still covers it. */}
       <button
         type="button"
         aria-label="Add"
-        aria-expanded={fabOpen}
         disabled={loading}
-        onClick={() => setFabOpen((v) => !v)}
+        onClick={() => openAdd()}
         style={{
           position: "fixed",
           right: 20,
@@ -540,157 +531,10 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
           cursor: loading ? "default" : "pointer",
         }}
       >
-        {fabOpen ? "×" : "+"}
+        +
       </button>
 
-      {fabOpen && (
-        <>
-          <button
-            type="button"
-            aria-label="Close menu"
-            onClick={() => setFabOpen(false)}
-            style={{ position: "fixed", inset: 0, background: "transparent", border: "none", zIndex: 34, cursor: "default" }}
-          />
-          <div
-            style={{
-              position: "fixed",
-              right: 20,
-              bottom: 148,
-              zIndex: 35,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-end",
-              gap: 8,
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => {
-                setFabOpen(false);
-                openAddMeal();
-              }}
-              style={{
-                background: "var(--paper-raised)",
-                border: "1px solid var(--line)",
-                borderRadius: 99,
-                padding: "10px 16px",
-                fontSize: 14,
-                fontWeight: 600,
-                boxShadow: "0 4px 12px rgba(0,0,0,.18)",
-                cursor: "pointer",
-              }}
-            >
-              Add meal
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setFabOpen(false);
-                openPack();
-              }}
-              style={{
-                background: "var(--paper-raised)",
-                border: "1px solid var(--line)",
-                borderRadius: 99,
-                padding: "10px 16px",
-                fontSize: 14,
-                fontWeight: 600,
-                boxShadow: "0 4px 12px rgba(0,0,0,.18)",
-                cursor: "pointer",
-              }}
-            >
-              Pack a batch
-            </button>
-          </div>
-        </>
-      )}
-
-      <Sheet open={packOpen} title="Pack a batch" onClose={() => setPackOpen(false)}>
-        <div className="sh-body stack-sm">
-          <div className="field">
-            <span className="field-label">Slot</span>
-            <Dropdown
-              label="Slot"
-              value={packSlotId}
-              options={slots.map((s) => ({ id: s.id, label: s.name }))}
-              onChange={(id) => setPackSlotId(Number(id))}
-            />
-          </div>
-          <div className="field">
-            <span className="field-label">Label</span>
-            <input
-              className="input"
-              value={packLabel}
-              onChange={(e) => setPackLabel(e.target.value)}
-              placeholder="e.g. Chicken & rice"
-            />
-          </div>
-          <div className="servings-row">
-            <span className="field-label" style={{ marginBottom: 0 }}>Meals</span>
-            <Stepper value={packMeals} min={1} onChange={setPackMeals} />
-          </div>
-
-          <p className="section-label">Contents</p>
-          {packItems.map((it, i) => (
-            <div key={i} className="stack-sm" style={{ border: "1px solid var(--line)", borderRadius: 8, padding: 10 }}>
-              <div className="filter">
-                <button
-                  type="button"
-                  aria-pressed={it.kind === "recipe"}
-                  onClick={() => updateItem(i, { kind: "recipe", refId: recipes[0]?.id ?? null })}
-                >
-                  Recipe
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={it.kind === "product"}
-                  // ponytail: no variant picker for direct-product batch items — base product only
-                  onClick={() => updateItem(i, { kind: "product", refId: products[0]?.id ?? null })}
-                >
-                  Product
-                </button>
-              </div>
-              <div className="field">
-                <span className="field-label">{it.kind === "recipe" ? "Recipe" : "Product"}</span>
-                <Dropdown
-                  label={it.kind === "recipe" ? "Recipe" : "Product"}
-                  value={it.refId}
-                  options={
-                    it.kind === "recipe"
-                      ? recipes.map((r) => ({ id: r.id, label: r.name }))
-                      : products.map((p) => ({ id: p.id, label: p.name }))
-                  }
-                  onChange={(id) => updateItem(i, { refId: Number(id) })}
-                />
-              </div>
-              <div className="field">
-                <span className="field-label">Amount (optional)</span>
-                <input
-                  className="input mono"
-                  inputMode="decimal"
-                  value={it.amount}
-                  onChange={(e) => updateItem(i, { amount: e.target.value.replace(/[^0-9.]/g, "") })}
-                  placeholder="e.g. 4"
-                />
-              </div>
-              {packItems.length > 1 && (
-                <button type="button" className="btn-add" onClick={() => removeItem(i)}>
-                  Remove item
-                </button>
-              )}
-            </div>
-          ))}
-          <button type="button" className="btn-add" onClick={addItem}>
-            + Add item
-          </button>
-
-          <button type="button" className="btn block" disabled={!packValid || packing} onClick={pack}>
-            {packing ? "Packing…" : "Pack"}
-          </button>
-        </div>
-      </Sheet>
-
-      <Sheet open={addOpen} title="Add a meal" onClose={() => setAddOpen(false)}>
+      <Sheet open={addOpen} title="Add" onClose={() => setAddOpen(false)}>
         <div className="sh-body stack-sm">
           <div className="field">
             <span className="field-label">Day</span>
@@ -720,6 +564,9 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
             </button>
             <button type="button" aria-pressed={addKind === "ingredient"} onClick={() => setAddKind("ingredient")}>
               Ingredient
+            </button>
+            <button type="button" aria-pressed={addKind === "batch"} onClick={() => setAddKind("batch")}>
+              Batch
             </button>
           </div>
 
@@ -806,64 +653,140 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
             </>
           )}
 
-          <div className="servings-row">
-            <span className="field-label" style={{ marginBottom: 0 }}>Repeat</span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={addRepeat}
-              className={addRepeat ? "btn" : "btn-add"}
-              onClick={() => setAddRepeat((v) => !v)}
-            >
-              {addRepeat ? "On" : "Off"}
-            </button>
-          </div>
-          {addRepeat && (
+          {addKind === "batch" && (
             <>
-              {addUnit === "week" && (
-                <div className="week week--repeat" role="group" aria-label="Repeat on">
-                  {DOW.map((label, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      aria-pressed={addRepeatDays[i]}
-                      className={addRepeatDays[i] ? "day on" : "day"}
-                      onClick={() => setAddRepeatDays((ds) => ds.map((d, j) => (j === i ? !d : d)))}
-                    >
-                      <span className="dow">{label[0]}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="servings-row">
-                <span className="field-label" style={{ marginBottom: 0 }}>Every</span>
-                <Stepper value={addIntervalN} min={1} onChange={setAddIntervalN} />
-                <Dropdown
-                  label="Unit"
-                  value={addUnit}
-                  options={[
-                    { id: "week", label: addIntervalN > 1 ? "weeks" : "week" },
-                    { id: "day", label: addIntervalN > 1 ? "days" : "day" },
-                  ]}
-                  onChange={(id) => setAddUnit(id === "day" ? "day" : "week")}
-                />
-              </div>
               <div className="field">
-                <span className="field-label">Until (optional)</span>
+                <span className="field-label">Label</span>
                 <input
-                  type="date"
                   className="input"
-                  data-empty={addUntil ? undefined : ""}
-                  value={addUntil}
-                  min={addDate}
-                  onChange={(e) => setAddUntil(e.target.value)}
+                  value={addLabel}
+                  onChange={(e) => setAddLabel(e.target.value)}
+                  placeholder="e.g. Chicken & rice"
                 />
               </div>
+              <div className="servings-row">
+                <span className="field-label" style={{ marginBottom: 0 }}>Meals</span>
+                <Stepper value={addMeals} min={1} onChange={setAddMeals} />
+              </div>
+
+              <p className="section-label">Contents</p>
+              {addItems.map((it, i) => (
+                <div key={i} className="stack-sm" style={{ border: "1px solid var(--line)", borderRadius: 8, padding: 10 }}>
+                  <div className="filter">
+                    <button
+                      type="button"
+                      aria-pressed={it.kind === "recipe"}
+                      onClick={() => updateBatchItem(i, { kind: "recipe", refId: recipes[0]?.id ?? null })}
+                    >
+                      Recipe
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={it.kind === "product"}
+                      // ponytail: no variant picker for direct-product batch items — base product only
+                      onClick={() => updateBatchItem(i, { kind: "product", refId: products[0]?.id ?? null })}
+                    >
+                      Product
+                    </button>
+                  </div>
+                  <div className="field">
+                    <span className="field-label">{it.kind === "recipe" ? "Recipe" : "Product"}</span>
+                    <Dropdown
+                      label={it.kind === "recipe" ? "Recipe" : "Product"}
+                      value={it.refId}
+                      options={
+                        it.kind === "recipe"
+                          ? recipes.map((r) => ({ id: r.id, label: r.name }))
+                          : products.map((p) => ({ id: p.id, label: p.name }))
+                      }
+                      onChange={(id) => updateBatchItem(i, { refId: Number(id) })}
+                    />
+                  </div>
+                  <div className="field">
+                    <span className="field-label">Amount (optional)</span>
+                    <input
+                      className="input mono"
+                      inputMode="decimal"
+                      value={it.amount}
+                      onChange={(e) => updateBatchItem(i, { amount: e.target.value.replace(/[^0-9.]/g, "") })}
+                      placeholder="e.g. 4"
+                    />
+                  </div>
+                  {addItems.length > 1 && (
+                    <button type="button" className="btn-add" onClick={() => removeBatchItem(i)}>
+                      Remove item
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button type="button" className="btn-add" onClick={addBatchItem}>
+                + Add item
+              </button>
             </>
           )}
 
-          <button type="button" className="btn block" disabled={!addMealValid || addSaving} onClick={saveAddMeal}>
-            {addSaving ? "Adding…" : addRepeat ? "Add repeating meal" : "Add meal"}
+          {addKind !== "batch" && (
+            <>
+              <div className="servings-row">
+                <span className="field-label" style={{ marginBottom: 0 }}>Repeat</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={addRepeat}
+                  className={addRepeat ? "btn" : "btn-add"}
+                  onClick={() => setAddRepeat((v) => !v)}
+                >
+                  {addRepeat ? "On" : "Off"}
+                </button>
+              </div>
+              {addRepeat && (
+                <>
+                  {addUnit === "week" && (
+                    <div className="week week--repeat" role="group" aria-label="Repeat on">
+                      {DOW.map((label, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          aria-pressed={addRepeatDays[i]}
+                          className={addRepeatDays[i] ? "day on" : "day"}
+                          onClick={() => setAddRepeatDays((ds) => ds.map((d, j) => (j === i ? !d : d)))}
+                        >
+                          <span className="dow">{label[0]}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="servings-row">
+                    <span className="field-label" style={{ marginBottom: 0 }}>Every</span>
+                    <Stepper value={addIntervalN} min={1} onChange={setAddIntervalN} />
+                    <Dropdown
+                      label="Unit"
+                      value={addUnit}
+                      options={[
+                        { id: "week", label: addIntervalN > 1 ? "weeks" : "week" },
+                        { id: "day", label: addIntervalN > 1 ? "days" : "day" },
+                      ]}
+                      onChange={(id) => setAddUnit(id === "day" ? "day" : "week")}
+                    />
+                  </div>
+                  <div className="field">
+                    <span className="field-label">Until (optional)</span>
+                    <input
+                      type="date"
+                      className="input"
+                      data-empty={addUntil ? undefined : ""}
+                      value={addUntil}
+                      min={addDate}
+                      onChange={(e) => setAddUntil(e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          <button type="button" className="btn block" disabled={!addValid || addSaving} onClick={submitAdd}>
+            {addSaving ? "Adding…" : "Add"}
           </button>
         </div>
       </Sheet>
