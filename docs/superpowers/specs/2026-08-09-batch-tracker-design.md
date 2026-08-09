@@ -1,113 +1,111 @@
-# Batch Tracker + Today / 7-Day Overview — Design
+# Batch Tracker + "Today" Agenda — Design
 
 Date: 2026-08-09
 Status: approved (pending spec review)
 
 ## Problem
 
-The user meal-preps in batches (e.g. a lunch of mushroom biryani + paneer sauté
-+ veggie sauté, packed into 4 boxes; dinner of sabji+roti for 3–4 days). The pain
-is **not** cooking — it's tracking:
+The user meal-preps in batches but can't track it: *when does the current batch
+run out → when is the next cook day?* and *did I actually eat my ~5–6 meals
+today?* The underlying goal is **discipline** (regaining weight/muscle lost over
+2 years), so the feature must be near-zero-friction or it won't get used.
 
-- When does the current batch run out → **when is the next cook day?**
-- Did I actually eat my ~5–6 meals today? (discipline; goal is regaining
-  muscle/weight lost over 2 years)
+MyFitnessPal was considered and **dropped**: no usable public API, and MealPal
+already computes calories/protein vs goal, so syncing to a clone is overhead.
 
-Underlying goal is **discipline**, so the feature must be low-friction or it
-won't get used. MyFitnessPal was considered and **dropped**: no usable public
-API, and MealPal already computes calories/protein vs goal — piping data to a
-clone is pure overhead.
+## Core concepts
 
-## Core model: the batch
+### Batch
+A cooking session portioned into meals that deplete over days.
+- Fields: `slot`, `label`, `cookedDate`, `mealsTotal` (N), `mealsRemaining`
+  (starts at N, counts down; editable — after the first meal you often revise 4→3).
+- **Contents** = the items in one serving (recipe / product / ingredient +
+  amount). Packing depletes stock once for `N × contents` via the existing
+  cook→stock ledger.
+- When `mealsRemaining <= 1`, the batch throws a **cook** signal.
 
-A **batch** is one cooking session portioned into meals that deplete over days.
+### Meal = components from two sources (confirmed)
+A meal is **one or more components**, each tagged:
+- **batch** — cooked ahead (lunch box; dinner's sabji). Backed by an active
+  batch, counts down → **cook** signal. *(net-new)*
+- **stock** — ready-made, bought (chapathi, dosa batter, frozen veg, oats/
+  smoothie ingredients). Consumed per meal from product stock → **buy** signal.
+  *(reuses existing stock + shopping — `stockMovements`, `runOutDates`)*
 
-Fields:
-- `slot` — lunch / dinner / etc. (existing `mealSlots`)
-- `label` — free text ("mushroom biryani lunch")
-- `cookedDate` — when packed
-- `mealsTotal` (N) — how many meals it covers
-- `mealsRemaining` — starts at N, counts down; editable anytime (after the first
-  meal you often revise 4→3)
-- **contents** — the items in **one** serving
+Lunch = one batch component (fully cooked). Dinner = mixed: sabji (batch) +
+chapathi ×2 (stock). Eating a meal decrements **every** component and each fires
+its own signal; "cook sabji" and "buy chapathi" never get confused.
 
-**Contents = item lines** (`batch_items`), each one of the same three kinds the
-planner already supports: a **recipe**, a **product** (+optional variant), or a
-raw **ingredient**, plus an `amount` in canonical units. This reuse means
-nutrition and stock math come for free — no new nutrition code.
-
-"Always attach contents" was chosen: every batch carries its contents so
-nutrition always works. Repeat friction is handled by **clone**, not templates
-(below).
-
-## Behaviors
-
-**Pack / cook a batch:** create the batch, deplete stock once for `N × contents`
-using the existing cook→stock ledger (`stockMovements`, reason `'cooked'`).
-Reuse the existing product/variant-selection + "cook anyway / negative stock"
-(`force`) behavior. This is the only stock write for the batch's whole life.
-
-**Eat one meal (one tap):**
-1. `mealsRemaining` → `mealsRemaining − 1` (floor 0)
-2. today's slot marked eaten on the overview
-3. one serving's contents logged as nutrition — an `'eaten'` movement / a
-   `consumptions`-style row (reuse existing eat-log), so it flows into
-   `dayNutrition().total`
-
-**Cook signal:** a batch with `mealsRemaining <= 1` surfaces
-"cook your <slot> batch" on the overview. The cook day is **computed, not
-remembered**. No push/reminders — opening the app is the reminder.
-
-**Repeat next week:** "pack again" on a past batch clones its contents; user sets
-a new count. No template entity to maintain. *(If named templates are wanted
-later, add then — not now.)*
-
-**No-cook daily meals** (morning smoothie, overnight oats, bread toast, dry
-fruit — recipes already in the DB): not batches. They appear on the overview as
-plain checkboxes; ticking logs their nutrition the same way an eat-tap does.
+### Standard day (daily template)
+The fixed 6-meal rotation (smoothie, oats, lunch, dinner, toast, nuts) is defined
+**once** and auto-fills every day, reusing the existing recurring `mealRules`
+engine. Lunch/dinner slots are filled by whatever batch is currently active.
+Editable, and one missed day never changes the template.
 
 ## Screens
 
-### Today / this-slot actions
-Eat-taps and the cook signal live on the overview (below) — no separate "today"
-screen needed beyond the current day's column. Header shows progress against
-goal, e.g. `3 / 6 meals · 1,850 / 2,600 kcal · 90 / 150g protein` (reuse
-`dayNutrition` + `nutritionGoals`).
+### "Today" tab (the home, `/`) — replaces the current planner strip
+An **agenda scroll**, mobile-first. The app already has a "Today" bottom-nav tab
+(clock icon) at `/`; this becomes its content. Other tabs (Nutrition, Pantry,
+Shop, Manage) unchanged.
 
-### 7-day overview (new page)
-One column per day (today → +6). Each day shows three rows:
+- **Scroll model:** opens pinned at **today**; scroll **up** = past days /
+  history, scroll **down** = future + cook-days. Today is always home. *(Q1a)*
+- **Adaptive detail per day** *(Q2·3)* — surfaces action, not the repeated
+  rotation:
+  - **past** day → one-line eaten summary ("6/6 ✓") — the "did I hit it" read
+  - **today** → full meal list with tap-to-eat
+  - **future** day → only its **cook-day** flags; quiet days stay quiet
+  - This *is* the planned/cooked/eaten information, rendered by day-type rather
+    than as three literal rows.
+- **Eat = one tap** *(Q3a):* tap a meal's checkbox → eaten, every component
+  decremented (batches −1, stock −amount), nutrition logged toward goal. Tap
+  again = undo. Long-press a batch pill to fix its count.
+- **Progress:** today shows a compact `meals · kcal · protein` read vs
+  `nutritionGoals`; detail stays on the Nutrition tab.
+- **Light editing** *(Q6b):* the ＋ button offers **one-off meal** and **batch**;
+  each row has a quick ✎. Structural edits (standard day, batch contents) live
+  under the **Manage** tab.
 
-1. **Planned** — `mealEvents` with status `planned` (what you intend to eat;
-   generated by the existing planner/rules).
-2. **Cooked** — batches whose `cookedDate` is that day (what you actually made).
-3. **Eaten** — meals logged that day (batch eat-taps + no-cook checkboxes);
-   drives the discipline read "did I eat?".
-
-The three-row read is: intended → made → actually consumed.
+### Packing a batch *(Q4a)*
+Two entry points:
+- The agenda's `🍳 cook <slot>` flag **is** the primary trigger: tap it → a pack
+  sheet opens **pre-filled by cloning the last batch of that slot** (contents
+  copied). Set `mealsTotal` with a stepper, hit pack → stock depletes ×N,
+  countdown starts. Editing contents is only needed when the combo changes.
+- The Today **＋ button** gains a **"batch"** option (alongside "one-off meal"),
+  which opens the same pack sheet — blank for a brand-new combo, or pick a past
+  batch to clone.
 
 ## Data / architecture
 
-- **New tables:** `batches`, `batch_items` (mirroring meal-item kinds), both
-  scoped by `householdId`. Add via hand-written SQL migration (db:generate is
-  known-broken per project memory) + `__drizzle_migrations` row; apply with the
-  sqlite3 CLI for any table rebuild.
-- **Reuse (no new math):** nutrition (`src/lib/nutrition.ts`), stock ledger
-  (`src/lib/stock.ts`), cook/stock depletion + product selection
-  (`src/lib/consumption.ts`, `src/lib/plan.ts`), goals (`nutritionGoals`).
+- **New tables** (scoped by `householdId`): `batches`, `batch_items` (serving
+  contents, mirroring the recipe/product/ingredient item kinds).
+- **Meal components:** the standard-day meals need to hold multiple components of
+  mixed source. Extend the meal-template representation (`mealRules`/`mealEvents`
+  already carry a single recipe/product/ingredient) to allow multiple component
+  lines per meal, each tagged batch vs stock. Exact shape decided in the plan.
+- **Reuse (no new math):** nutrition (`src/lib/nutrition.ts`), stock ledger +
+  shopping (`src/lib/stock.ts`, `runOutDates`), cook/stock depletion + product
+  selection (`src/lib/consumption.ts`, `src/lib/plan.ts`), goals
+  (`nutritionGoals`), recurring rules (`src/lib/rules.ts`).
 - **Pattern:** domain logic as plain functions in `src/lib/batches.ts` (vitest
-  beside it), thin API routes under `src/app/api/batches/**`. No server actions
-  (matches the codebase). New page under `src/app/overview/` (name TBD).
-- **Do NOT** contort batches into `mealEvents`; batches are their own lifecycle.
+  beside it); thin REST route handlers under `src/app/api/batches/**` (no server
+  actions — matches the codebase). Agenda UI rebuilds `/` (currently
+  `PlanEditor`).
+- **Migrations:** hand-written SQL (db:generate is known-broken per project
+  memory); apply table rebuilds via sqlite3 CLI + a `__drizzle_migrations` row.
+- Batches are their own lifecycle — not contorted into the day-grid.
 
 ## Explicitly not building
 
-MyFitnessPal sync/export, meal templates, push/scheduled reminders. Add a
-one-way CSV export only if a concrete need appears.
+MyFitnessPal sync/export, meal templates beyond the single daily one, per-weekday
+patterns (add if weekends actually diverge), push/scheduled reminders (opening
+the app is the reminder). A one-way CSV export only if a concrete need appears.
 
-## Open items for review
+## Resolved design decisions
 
-- Contents-as-recipe: a recipe component (biryani) depletes its raw ingredients
-  and contributes recipe nutrition scaled by amount — confirm this is the
-  intended stock behavior vs. treating the finished dish as opaque.
-- Overview window: today→+6 vs. the planner's yesterday→+5 strip. Default
-  today→+6; align with planner if preferred.
+Direction **C** (agenda) · scroll **a** (today-pinned) · detail **3** (adaptive)
+· eat **a** (one-tap) · pack **a** (cook-flag pre-filled clone) · daily meals
+**a** (fixed template) · mixed batch/stock components (confirmed) · editing **b**
+(light inline + Manage for structure).
