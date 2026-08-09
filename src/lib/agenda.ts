@@ -1,8 +1,9 @@
-import { and, eq, gte, lte } from "drizzle-orm";
+import { and, eq, gte, isNotNull, lte } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
 import { getRecipe } from "@/lib/recipes";
 import { listBatches } from "@/lib/batches";
+import { unstockedIngredients } from "@/lib/consumption";
 import { localNoon, toISODate } from "@/lib/dates";
 
 type Db = BetterSQLite3Database<typeof schema>;
@@ -12,6 +13,9 @@ export interface AgendaMeal {
   slotId: number;
   slotName: string;
   name: string; // resolved meal name
+  recipeId: number | null; // item identity, for linking the name to its detail page
+  productId: number | null;
+  ingredientId: number | null;
   status: "planned" | "cooked";
   phase: "planned" | "cooked" | "served"; // lifecycle phase for the UI's status chip
   batchBacked: boolean; // an active batch exists for this slot
@@ -19,6 +23,8 @@ export interface AgendaMeal {
   mealsRemaining: number | null; // that batch's remaining, or null
   eatenFromBatchToday: boolean; // a batch_eaten row exists for (batchId, this date)
   ruleId: number | null; // the recurring rule that generated this event, or null for one-offs
+  outOfStock: boolean; // planned rotation meal whose ingredients aren't fully in stock
+  missingItems: string[]; // those ingredients' names, when outOfStock
 }
 
 export interface CookFlag {
@@ -175,6 +181,9 @@ export function agendaDays(
         slotId: b.slotId,
         slotName: slot?.name ?? "—",
         name: b.label,
+        recipeId: null, // a batch row is not a single recipe/product — no redirect
+        productId: null,
+        ingredientId: null,
         status,
         phase: derivePhase({ eatenFromBatchToday, status, batchBacked: true }),
         batchBacked: true,
@@ -182,6 +191,8 @@ export function agendaDays(
         mealsRemaining: b.mealsRemaining,
         eatenFromBatchToday,
         ruleId: null,
+        outOfStock: false, // batch rows already consumed their stock at pack time
+        missingItems: [],
         _timeOfDay: slot?.timeOfDay ?? "12:00",
       };
       const bucket = syntheticByDate.get(d);
@@ -199,18 +210,28 @@ export function agendaDays(
         const batchBacked = batch != null;
         const eatenFromBatchToday = batchBacked && eatenKeys.has(`${batch!.id}:${date}`);
         const status = ev.status as "planned" | "cooked";
+        const phase = derivePhase({ eatenFromBatchToday, status, batchBacked });
+        // Only a real, planned rotation meal (not cooked/served, not batch-backed)
+        // can be flagged: batches already consumed their stock at pack time, and
+        // cooked/served meals already happened.
+        const missingItems = phase === "planned" ? unstockedIngredients(db, householdId, ev.id) : [];
         return {
           eventId: ev.id,
           slotId: ev.slotId,
           slotName: slot?.name ?? "—",
           name: resolveName(ev),
+          recipeId: ev.recipeId,
+          productId: ev.productId,
+          ingredientId: ev.ingredientId,
           status,
-          phase: derivePhase({ eatenFromBatchToday, status, batchBacked }),
+          phase,
           batchBacked,
           batchId: batch ? batch.id : null,
           mealsRemaining: batch ? batch.mealsRemaining : null,
           eatenFromBatchToday,
           ruleId: ev.ruleId,
+          outOfStock: missingItems.length > 0,
+          missingItems,
           _timeOfDay: slot?.timeOfDay ?? "12:00",
         };
       })
@@ -252,11 +273,42 @@ export function nextCooks(db: Db, householdId: number, today: string): NextCook[
   }
 
   const todayMs = localNoon(today).getTime();
+  const daysFrom = (date: string) =>
+    Math.max(0, Math.round((localNoon(date).getTime() - todayMs) / 86_400_000));
+
   const result: NextCook[] = [];
   for (const [slotId, { cookDate, label }] of bySlot) {
     const slot = slotById.get(slotId);
-    const daysAway = Math.max(0, Math.round((localNoon(cookDate).getTime() - todayMs) / 86_400_000));
-    result.push({ slotId, slotName: slot?.name ?? "—", label, cookDate, daysAway });
+    result.push({ slotId, slotName: slot?.name ?? "—", label, cookDate, daysAway: daysFrom(cookDate) });
+  }
+
+  // Recurring recipe meals (make-ahead items like Overnight Oats) also surface
+  // here: a recipe's prep date is its next upcoming *planned* occurrence.
+  // ponytail: this includes every recurring recipe meal (smoothies, toast, …),
+  // not only make-ahead ones — a `mealPrep` flag on recipes would let us show
+  // just true prep-ahead items; deferred (needs a schema/migration change).
+  const plannedRecipeEvents = db.select().from(schema.mealEvents)
+    .where(and(
+      eq(schema.mealEvents.householdId, householdId),
+      gte(schema.mealEvents.date, today),
+      eq(schema.mealEvents.status, "planned"),
+      isNotNull(schema.mealEvents.recipeId),
+    )).all();
+  const byRecipe = new Map<number, { date: string; slotId: number }>();
+  for (const ev of plannedRecipeEvents) {
+    const rid = ev.recipeId!;
+    const existing = byRecipe.get(rid);
+    if (!existing || ev.date < existing.date) byRecipe.set(rid, { date: ev.date, slotId: ev.slotId });
+  }
+  for (const [recipeId, { date, slotId }] of byRecipe) {
+    const slot = slotById.get(slotId);
+    result.push({
+      slotId,
+      slotName: slot?.name ?? "—",
+      label: getRecipe(db, householdId, recipeId)?.name ?? "Recipe",
+      cookDate: date,
+      daysAway: daysFrom(date),
+    });
   }
 
   return result.sort((a, b) => a.cookDate.localeCompare(b.cookDate));
