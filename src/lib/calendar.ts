@@ -25,16 +25,16 @@ function esc(s: string): string {
 const ymd = (isoDate: string) => isoDate.replace(/-/g, ""); // "2026-08-09" -> "20260809"
 const nextDay = (isoDate: string) => ymd(new Date(Date.parse(isoDate) + 86_400_000).toISOString().slice(0, 10));
 
-// Wall-clock hour a prep should land at. Floating local time (no TZID/Z) so it
-// shows at that hour in every calendar app regardless of timezone.
+// Wall-clock [start, end] hours a prep should occupy. Floating local time (no
+// TZID/Z) so it shows at that hour in every calendar app regardless of timezone.
 // ponytail: hardcoded times; hoist to slot config if you want them editable.
-function prepHour(c: NextCook): number | null {
-  if (c.label.toLowerCase().includes("overnight oats")) return 20; // 8pm
-  if (c.slotName === "Lunch" || c.slotName === "Dinner") return 18; // 6pm
+function prepHours(c: NextCook): [number, number] | null {
+  if (c.label.toLowerCase().includes("overnight oats")) return [20, 20.5]; // 8–8:30pm
+  if (c.slotName === "Lunch" || c.slotName === "Dinner") return [18, 20]; // 6–8pm
   return null; // fall back to all-day
 }
 
-const hh = (n: number) => String(n).padStart(2, "0");
+const clock = (h: number) => `${String(Math.floor(h)).padStart(2, "0")}${String((h % 1) * 60).padStart(2, "0")}00`;
 
 /**
  * The upcoming cook-prep dates (the homepage's "🍳 Next cooking" cards) as an
@@ -52,11 +52,11 @@ export function buildIcs(cooks: NextCook[], stamp = new Date()): string {
     "X-WR-CALNAME:MealPal",
   ];
   for (const c of cooks) {
-    const hour = prepHour(c);
+    const hours = prepHours(c);
     const [start, end] =
-      hour == null
+      hours == null
         ? [`DTSTART;VALUE=DATE:${ymd(c.cookDate)}`, `DTEND;VALUE=DATE:${nextDay(c.cookDate)}`]
-        : [`DTSTART:${ymd(c.cookDate)}T${hh(hour)}0000`, `DTEND:${ymd(c.cookDate)}T${hh(hour)}3000`];
+        : [`DTSTART:${ymd(c.cookDate)}T${clock(hours[0])}`, `DTEND:${ymd(c.cookDate)}T${clock(hours[1])}`];
     lines.push(
       "BEGIN:VEVENT",
       `UID:cook-${c.slotId}-${c.cookDate}@mealpal`,
