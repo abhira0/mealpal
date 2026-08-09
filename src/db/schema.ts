@@ -147,6 +147,8 @@ export const recipes = sqliteTable("recipes", {
   baseServings: integer("base_servings").notNull().default(1),
   notes: text("notes"),
   totalMinutes: integer("total_minutes"),
+  // null = private; non-null unguessable token exposes a public read-only page at /r/<token>
+  shareToken: text("share_token"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 

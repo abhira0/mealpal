@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { makeTestDb, type TestDb } from "@/test/db";
 import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
-import { createRecipe, deleteRecipe, getRecipe, listRecipes, updateRecipe } from "@/lib/recipes";
+import { createRecipe, deleteRecipe, getPublicRecipe, getRecipe, listRecipes, setShared, updateRecipe } from "@/lib/recipes";
 
 let db: TestDb;
 let hid: number;
@@ -43,6 +43,35 @@ describe("recipes", () => {
       ingredients: [], steps: [], media: [],
     });
     expect(getRecipe(db, hid, r.id)?.totalMinutes).toBeNull();
+  });
+
+  it("shares publicly by token with resolved ingredient names and no cost, then revokes", () => {
+    const r = createRecipe(db, hid, {
+      name: "Bread", baseServings: 2, notes: "yum",
+      ingredients: [{ ingredientId: flourId, amount: 500 }],
+      steps: [{ text: "Mix" }], media: [{ kind: "youtube", url: "https://youtu.be/x" }],
+    });
+
+    const token = setShared(db, hid, r.id, true);
+    expect(token).toBeTruthy();
+
+    const pub = getPublicRecipe(db, token!)!;
+    expect(pub.name).toBe("Bread");
+    expect(pub.ingredients[0]).toMatchObject({ name: "Flour", unit: "g", amount: 500 });
+    expect(pub.steps.map((s) => s.text)).toEqual(["Mix"]);
+    expect(pub).not.toHaveProperty("costCents");
+    expect(pub).not.toHaveProperty("householdId");
+
+    setShared(db, hid, r.id, false);
+    expect(getPublicRecipe(db, token!)).toBeUndefined();
+  });
+
+  it("only the owning household can share a recipe", () => {
+    const other = seedHousehold(db);
+    const r = createRecipe(db, hid, {
+      name: "Bread", baseServings: 1, notes: null, ingredients: [], steps: [], media: [],
+    });
+    expect(setShared(db, other, r.id, true)).toBeNull();
   });
 
   it("persists per-step clip times", () => {

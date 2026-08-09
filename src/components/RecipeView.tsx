@@ -22,11 +22,13 @@ type Recipe = {
   ingredients: RecipeIngredient[];
   steps: Step[];
   media: Media[];
+  shareToken: string | null;
   costCents: number | null;
   nutrition?: {
     perServing: FactValues;
     byIngredient: { ingredientId: number; name: string; unit: string; amount: number; values: FactValues }[];
     missing: string[];
+    substituted: { ingredient: string; used: string }[];
   };
 };
 
@@ -75,6 +77,7 @@ export function RecipeView({ id }: { id: string }) {
   const [nutriTab, setNutriTab] = useState<"label" | "breakdown">("label");
   const [ytLoaded, setYtLoaded] = useState(false);
   const [seek, setSeek] = useState<{ start: number; end: number } | null>(null);
+  const [shareToken, setShareToken] = useState<string | null>(null);
   const galleryRef = useRef<HTMLDivElement>(null);
 
   async function loadRecipe() {
@@ -87,6 +90,17 @@ export function RecipeView({ id }: { id: string }) {
     setRecipe(r);
     setServings(r.baseServings || 1);
     setActiveMedia(0);
+    setShareToken(r.shareToken);
+  }
+
+  async function toggleShare() {
+    const enabled = !shareToken;
+    const res = await fetch(`/api/recipes/${id}/share`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    });
+    if (res.ok) setShareToken((await res.json()).token);
   }
 
   useEffect(() => {
@@ -275,10 +289,32 @@ export function RecipeView({ id }: { id: string }) {
                 Missing nutrition for: {recipe.nutrition!.missing.join(", ")} — totals may be low.
               </p>
             )}
+            {recipe.nutrition!.substituted.length > 0 && (
+              <p className="body" style={{ color: "var(--sage)", marginTop: 6 }}>
+                {recipe.nutrition!.substituted.map((s) => `${s.ingredient}: preferred product has no label, using ${s.used}`).join("; ")}.
+              </p>
+            )}
           </section>
         )}
 
         {recipe.notes ? <p className="body" style={{ color: "var(--sage)" }}>{recipe.notes}</p> : null}
+
+        <section className="stack">
+          <div className="recipe-meta">
+            <span className="title">Public link</span>
+            <button type="button" className="btn" onClick={toggleShare}>
+              {shareToken ? "Revoke" : "Share"}
+            </button>
+          </div>
+          {shareToken && (
+            <input
+              className="input"
+              readOnly
+              value={`${typeof window !== "undefined" ? window.location.origin : ""}/r/${shareToken}`}
+              onFocus={(e) => e.currentTarget.select()}
+            />
+          )}
+        </section>
 
         <EditDeleteActions
           singular="recipe"

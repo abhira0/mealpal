@@ -5,8 +5,10 @@ const { auth } = NextAuth(authConfig);
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
-  const isLoginPage = req.nextUrl.pathname.startsWith("/login");
-  if (!isLoggedIn && !isLoginPage) {
+  const { pathname } = req.nextUrl;
+  // /r/<token> is the public shared-recipe page; no auth required.
+  const isPublic = pathname.startsWith("/login") || pathname.startsWith("/r/");
+  if (!isLoggedIn && !isPublic) {
     return Response.redirect(new URL("/login", req.nextUrl));
   }
 });

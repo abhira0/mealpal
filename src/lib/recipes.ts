@@ -120,6 +120,47 @@ export function getRecipe(db: Db, householdId: number, id: number) {
   return { ...recipe, ingredients, steps, media, costCents: recipeCostCents(db, householdId, ingredients) };
 }
 
+/** Enable/disable public sharing for a recipe you own. Returns the token (or null). */
+export function setShared(db: Db, householdId: number, id: number, enabled: boolean): string | null {
+  const token = enabled ? crypto.randomUUID() : null;
+  const [row] = db.update(schema.recipes).set({ shareToken: token })
+    .where(and(eq(schema.recipes.id, id), eq(schema.recipes.householdId, householdId)))
+    .returning().all();
+  return row ? token : null;
+}
+
+/**
+ * Public read-only view by share token, no household scope. Ingredient names/units
+ * are resolved so the page is self-contained. Never exposes cost, nutrition, or household.
+ */
+export function getPublicRecipe(db: Db, token: string) {
+  if (!token) return undefined;
+  const [recipe] = db.select().from(schema.recipes)
+    .where(eq(schema.recipes.shareToken, token)).all();
+  if (!recipe) return undefined;
+  const rows = db.select({
+    ingredientId: schema.recipeIngredients.ingredientId,
+    amount: schema.recipeIngredients.amount,
+    name: schema.ingredients.name,
+    unit: schema.ingredients.canonicalUnit,
+  }).from(schema.recipeIngredients)
+    .innerJoin(schema.ingredients, eq(schema.ingredients.id, schema.recipeIngredients.ingredientId))
+    .where(eq(schema.recipeIngredients.recipeId, recipe.id)).all();
+  const steps = db.select().from(schema.recipeSteps)
+    .where(eq(schema.recipeSteps.recipeId, recipe.id)).orderBy(asc(schema.recipeSteps.position)).all();
+  const media = db.select().from(schema.recipeMedia)
+    .where(eq(schema.recipeMedia.recipeId, recipe.id)).all();
+  return {
+    name: recipe.name,
+    baseServings: recipe.baseServings,
+    totalMinutes: recipe.totalMinutes,
+    notes: recipe.notes,
+    ingredients: rows,
+    steps: steps.map((s) => ({ position: s.position, text: s.text })),
+    media: media.map((m) => ({ kind: m.kind, url: m.url })),
+  };
+}
+
 /**
  * Cost in cents to cook the recipe at baseServings, or null if any ingredient's
  * top-priority available product has no effective price. Each ingredient costs
