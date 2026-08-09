@@ -8,7 +8,7 @@ import { localNoon, toISODate } from "@/lib/dates";
 type Db = BetterSQLite3Database<typeof schema>;
 
 export interface AgendaMeal {
-  eventId: number;
+  eventId: number | null; // null for a synthetic batch-projected row (no meal_event backs it)
   slotId: number;
   slotName: string;
   name: string; // resolved meal name
@@ -120,10 +120,11 @@ export function agendaDays(
     return "Item";
   }
 
-  // day -> cook flags landing on it, computed from each active batch's projected empty date
+  // day -> cook flags landing on it: the day AFTER each active batch's coverage
+  // window ends (cookedDate + mealsTotal), i.e. right after its last covered day.
   const cookFlagsByDate = new Map<string, CookFlag[]>();
   for (const b of activeBatches) {
-    const cookDate = addDays(today, b.mealsRemaining);
+    const cookDate = addDays(b.cookedDate, b.mealsTotal);
     if (cookDate < from || cookDate > to) continue;
     const slot = slotById.get(b.slotId);
     const flag: CookFlag = { slotId: b.slotId, slotName: slot?.name ?? "—", label: b.label };
@@ -132,10 +133,41 @@ export function agendaDays(
     else cookFlagsByDate.set(cookDate, [flag]);
   }
 
+  // day -> synthetic batch meal rows: for each active batch's coverage window
+  // (cookedDate .. cookedDate + mealsTotal - 1), project a meal row onto every
+  // covered day that has no real meal_event for that batch's slot already.
+  const syntheticByDate = new Map<string, (AgendaMeal & { _timeOfDay: string })[]>();
+  for (const b of activeBatches) {
+    const slot = slotById.get(b.slotId);
+    const coverageEnd = addDays(b.cookedDate, b.mealsTotal - 1);
+    for (const d of dateRange(b.cookedDate, coverageEnd)) {
+      if (d < from || d > to) continue;
+      const dayEvents = eventsByDate.get(d) ?? [];
+      if (dayEvents.some((ev) => ev.slotId === b.slotId)) continue; // real event wins, no duplicate
+      const eatenFromBatchToday = eatenKeys.has(`${b.id}:${d}`);
+      const meal: AgendaMeal & { _timeOfDay: string } = {
+        eventId: null,
+        slotId: b.slotId,
+        slotName: slot?.name ?? "—",
+        name: b.label,
+        status: eatenFromBatchToday ? "cooked" : "planned",
+        batchBacked: true,
+        batchId: b.id,
+        mealsRemaining: b.mealsRemaining,
+        eatenFromBatchToday,
+        ruleId: null,
+        _timeOfDay: slot?.timeOfDay ?? "12:00",
+      };
+      const bucket = syntheticByDate.get(d);
+      if (bucket) bucket.push(meal);
+      else syntheticByDate.set(d, [meal]);
+    }
+  }
+
   return dateRange(from, to).map((date) => {
     const dayEvents = eventsByDate.get(date) ?? [];
     const meals: AgendaMeal[] = dayEvents
-      .map((ev) => {
+      .map((ev): AgendaMeal & { _timeOfDay: string } => {
         const slot = slotById.get(ev.slotId);
         const batch = batchBySlot.get(ev.slotId) ?? null;
         const batchBacked = batch != null;
@@ -154,6 +186,7 @@ export function agendaDays(
           _timeOfDay: slot?.timeOfDay ?? "12:00",
         };
       })
+      .concat(syntheticByDate.get(date) ?? [])
       .sort((a, b) => a._timeOfDay.localeCompare(b._timeOfDay))
       .map(({ _timeOfDay, ...m }) => m);
 

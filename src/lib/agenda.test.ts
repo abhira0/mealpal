@@ -89,6 +89,42 @@ describe("agendaDays", () => {
     expect(byDate.get("2026-08-12")!.cookFlags).toEqual([]);
   });
 
+  it("projects a packed batch as a synthetic meal row on every day of its coverage window, and defers to a real event if one exists", () => {
+    const batch = packBatch(db, hid, {
+      slotId: lunchSlot, label: "Rice Bowl", cookedDate: "2026-08-09", mealsTotal: 3, items: [],
+    });
+
+    // a real Lunch event on the middle covered day should suppress the synthetic row there
+    const middleRecipe = makeRecipe("Actual Lunch");
+    db.insert(schema.mealEvents).values({
+      householdId: hid, date: "2026-08-10", slotId: lunchSlot, recipeId: middleRecipe, servings: 1, status: "planned",
+    }).run();
+
+    const days = agendaDays(db, hid, "2026-08-09", "2026-08-13", "2026-08-09");
+    const byDate = new Map(days.map((d) => [d.date, d]));
+
+    const day0 = byDate.get("2026-08-09")!;
+    expect(day0.meals).toHaveLength(1);
+    expect(day0.meals[0]).toMatchObject({
+      eventId: null, batchBacked: true, batchId: batch.id, name: "Rice Bowl", status: "planned",
+    });
+
+    const day1 = byDate.get("2026-08-10")!;
+    expect(day1.meals).toHaveLength(1); // real event wins, no duplicate synthetic row
+    expect(day1.meals[0].eventId).not.toBeNull();
+    expect(day1.meals[0].name).toBe("Actual Lunch");
+
+    const day2 = byDate.get("2026-08-11")!;
+    expect(day2.meals).toHaveLength(1);
+    expect(day2.meals[0]).toMatchObject({ eventId: null, batchBacked: true, batchId: batch.id, name: "Rice Bowl" });
+
+    // cook-flag lands the day AFTER the coverage window (cookedDate + mealsTotal)
+    expect(byDate.get("2026-08-12")!.cookFlags).toEqual([
+      { slotId: lunchSlot, slotName: "Lunch", label: "Rice Bowl" },
+    ]);
+    expect(byDate.get("2026-08-13")!.cookFlags).toEqual([]);
+  });
+
   it("returns an empty day for a date in range with no events", () => {
     const days = agendaDays(db, hid, "2026-08-09", "2026-08-10", "2026-08-09");
     expect(days).toHaveLength(2);
