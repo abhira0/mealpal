@@ -216,6 +216,16 @@ describe("batchServingNutrients", () => {
     });
     expect(batchServingNutrients(db, hid, batch.id).calories).toBe(200); // 2 × 100
   });
+
+  it("sums one serving's nutrition from a batch's recipe item", () => {
+    const pid = flourProduct({ calories: 2 }); // 2 kcal/g preferred product
+    recordPurchase(db, hid, { productId: pid, quantity: 1 }); // stock for packing
+    const batch = packBatch(db, hid, {
+      slotId, label: "Bread batch", cookedDate: "2026-07-01", mealsTotal: 1,
+      items: [{ recipeId: bread().id, amount: 1 }], // 500 g flour / serving
+    });
+    expect(batchServingNutrients(db, hid, batch.id).calories).toBe(1000); // 500g × 2
+  });
 });
 
 describe("dayNutrition counts batch servings eaten", () => {

@@ -42,7 +42,7 @@ export function packBatch(db: Db, householdId: number, input: PackBatchInput) {
         recordCooked(tx as unknown as Db, householdId, item.recipeId, servings, null);
       } else if (item.productId != null) {
         const [p] = tx.select({ ingredientId: schema.products.ingredientId })
-          .from(schema.products).where(eq(schema.products.id, item.productId)).all();
+          .from(schema.products).where(and(eq(schema.products.id, item.productId), eq(schema.products.householdId, householdId))).all();
         if (p) {
           recordMovement(tx as unknown as Db, householdId, {
             ingredientId: p.ingredientId, productId: item.productId, variantId: item.variantId ?? null,

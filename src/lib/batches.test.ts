@@ -3,6 +3,7 @@ import { makeTestDb, type TestDb } from "@/test/db";
 import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
 import { createProduct } from "@/lib/products";
+import { createRecipe } from "@/lib/recipes";
 import { recordPurchase } from "@/lib/shopping";
 import { currentStock } from "@/lib/stock";
 import { packBatch, listBatches, getBatch, eatFromBatch, uneatFromBatch } from "@/lib/batches";
@@ -44,6 +45,24 @@ describe("packBatch", () => {
     expect(batch.mealsRemaining).toBe(4);
     expect(currentStock(db, hid, veg)).toBe(600); // 1000 - 100*4
     expect(db.select().from(schema.batchItems).all()).toHaveLength(1);
+  });
+
+  it("depletes stock for a recipe item by (amount at 1 serving) x mealsTotal", () => {
+    const rice = db.insert(schema.ingredients).values({ householdId: hid, name: "Rice", canonicalUnit: "g" }).returning().all()[0].id;
+    const shop = db.insert(schema.shops).values({ householdId: hid, name: "Costco" }).returning().all()[0].id;
+    const prod = createProduct(db, hid, { ingredientId: rice, shopId: shop, name: "Basmati", packSize: 1000, priority: 1, url: null }).id;
+    recordPurchase(db, hid, { productId: prod, quantity: 1 }); // +1000 g
+    const recipe = createRecipe(db, hid, {
+      name: "Rice bowl", baseServings: 1, notes: null,
+      ingredients: [{ ingredientId: rice, amount: 200 }], steps: [], media: [], // 200 g / serving
+    });
+
+    packBatch(db, hid, {
+      slotId, label: "Rice meals", cookedDate: "2026-08-09", mealsTotal: 3,
+      items: [{ recipeId: recipe.id, amount: 1 }],
+    });
+
+    expect(currentStock(db, hid, rice)).toBe(400); // 1000 - 200*1*3
   });
 });
 
