@@ -218,6 +218,21 @@ describe("batchServingNutrients", () => {
   });
 });
 
+describe("dayNutrition counts batch servings eaten", () => {
+  it("adds one serving's nutrition per batchEaten row (eaten basis)", () => {
+    const pid = flourProduct({ calories: 2 }); // 2 kcal/g → 100g serving = 200 kcal
+    recordPurchase(db, hid, { productId: pid, quantity: 1 });
+    const batch = packBatch(db, hid, {
+      slotId, label: "Dal", cookedDate: "2026-07-01", mealsTotal: 4,
+      items: [{ productId: pid, amount: 100 }],
+    });
+    // cooked-but-uneaten contributes nothing to the day total
+    expect(dayNutrition(db, hid, "2026-07-01").total.calories).toBe(0);
+    eatFromBatch(db, hid, batch.id, "2026-07-01");
+    expect(dayNutrition(db, hid, "2026-07-01").total.calories).toBe(200);
+  });
+});
+
 describe("dayNutrition includes direct planner items", () => {
   it("a direct product-variant item adds variant nutrition × amount", () => {
     const shopId = db.insert(schema.shops).values({ householdId: hid, name: "Costco" }).returning().all()[0].id;

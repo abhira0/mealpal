@@ -201,6 +201,25 @@ export function dayNutrition(
     });
   }
 
+  // Batch servings eaten this day: each contributes one serving's nutrition
+  // (eaten basis — a cooked-but-uneaten batch contributes nothing).
+  const batchEatenRows = db.select().from(schema.batchEaten)
+    .where(and(eq(schema.batchEaten.householdId, householdId), eq(schema.batchEaten.date, date))).all();
+  for (const be of batchEatenRows) {
+    const [batch] = db.select().from(schema.batches)
+      .where(eq(schema.batches.id, be.batchId)).all();
+    const nutrients = batchServingNutrients(db, householdId, be.batchId);
+    meals.push({
+      eventId: -1_000_000 - be.id, // negative namespace, distinct from snacks
+      recipeName: batch?.label ?? "Batch meal",
+      slotName: batch ? (slots.get(batch.slotId) ?? "—") : "—",
+      servings: 1,
+      estimate: false, // eaten = real, counts toward total
+      nutrients,
+      missing: [],
+    });
+  }
+
   // Totals count only what's actually been cooked/eaten — planned meals (estimates)
   // still show on their card but contribute 0, so the day total reflects reality.
   const total = zeroNutrients();
