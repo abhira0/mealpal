@@ -224,10 +224,10 @@ function OverviewBody({ data, mode, openCard, setOpenCard }: {
       </p>
 
       <p className="section-label">Vs goal{mode === "week" ? " (daily avg)" : ""}</p>
-      <MacroBar label="Calories" cooked={n.calories} planned={data.planned.calories} goal={goals.calorieGoal} unit="" color="var(--enamel-dark)" />
-      <MacroBar label="Protein" cooked={n.proteinG} planned={data.planned.proteinG} goal={goals.proteinG} unit="g" color={MACRO_COLOR.protein} />
-      <MacroBar label="Carbs" cooked={n.carbsG} planned={data.planned.carbsG} goal={goals.carbsG} unit="g" color={MACRO_COLOR.carbs} />
-      <MacroBar label="Fat" cooked={n.fatG} planned={data.planned.fatG} goal={goals.fatG} unit="g" color={MACRO_COLOR.fat} />
+      <MacroBar label="Calories" served={n.calories} planned={data.planned.calories} goal={goals.calorieGoal} unit="" color="var(--enamel-dark)" />
+      <MacroBar label="Protein" served={n.proteinG} planned={data.planned.proteinG} goal={goals.proteinG} unit="g" color={MACRO_COLOR.protein} />
+      <MacroBar label="Carbs" served={n.carbsG} planned={data.planned.carbsG} goal={goals.carbsG} unit="g" color={MACRO_COLOR.carbs} />
+      <MacroBar label="Fat" served={n.fatG} planned={data.planned.fatG} goal={goals.fatG} unit="g" color={MACRO_COLOR.fat} />
 
       <p className="section-label">Diet scorecards</p>
       <div className="filter" style={{ gap: 6 }}>
@@ -290,27 +290,27 @@ function BreakdownBody({ data, mode, date }: { data: AnalysisData; mode: "day" |
   );
 }
 
-// Two bars per nutrient — cooked (actual) and planned (full day's plan) — both
+// Two bars per nutrient — served (actual) and planned (full day's plan) — both
 // scaled to the goal, so the track's full width is the goal.
-function MacroBar({ label, cooked, planned, goal, unit, color }: {
-  label: string; cooked: number; planned: number; goal: number; unit: string; color: string;
+function MacroBar({ label, served, planned, goal, unit, color }: {
+  label: string; served: number; planned: number; goal: number; unit: string; color: string;
 }) {
-  // One track = goal. Cooked (solid) then the not-yet-cooked remainder of the
-  // plan (faded) stacked after it. planned already includes cooked.
+  // One track = goal. Served (solid) then the not-yet-served remainder of the
+  // plan (faded) stacked after it. planned already includes served.
   const pct = (v: number) => (goal > 0 ? Math.min(100, (v / goal) * 100) : 0);
-  const cookedW = pct(cooked);
-  const remW = Math.max(0, pct(planned) - cookedW);
+  const servedW = pct(served);
+  const remW = Math.max(0, pct(planned) - servedW);
   return (
     <div style={{ margin: "8px 0" }}>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 3 }}>
         <b>{label}</b>
         <span className="mono" style={{ fontSize: 11, color: "var(--sage)" }}>
-          {Math.round(cooked)} cooked · {Math.round(planned)} planned / {goal}{unit}
+          {Math.round(served)} served · {Math.round(planned)} planned / {goal}{unit}
         </span>
       </div>
-      <div title={`${Math.round(cooked)} cooked · ${Math.round(planned)} planned / ${goal}${unit} goal`}
+      <div title={`${Math.round(served)} served · ${Math.round(planned)} planned / ${goal}${unit} goal`}
         style={{ display: "flex", height: 8, borderRadius: 99, background: "#e3ddcc", overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${cookedW}%`, background: color }} />
+        <div style={{ height: "100%", width: `${servedW}%`, background: color }} />
         <div style={{ height: "100%", width: `${remW}%`, background: color, opacity: 0.45 }} />
       </div>
     </div>
