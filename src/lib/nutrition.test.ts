@@ -33,7 +33,7 @@ function bread() {
   });
 }
 
-function event(recipeId: number, status: "planned" | "cooked" = "planned") {
+function event(recipeId: number, status: "planned" | "cooked" | "served" = "planned") {
   return db.insert(schema.mealEvents)
     .values({ householdId: hid, date: "2026-07-01", slotId, recipeId, servings: 1, status })
     .returning().all()[0];
@@ -63,21 +63,31 @@ describe("dayNutrition", () => {
     expect(day.missing).toEqual([]);
   });
 
-  it("cooked meal is exact, from the actual product the cook recorded", () => {
+  it("a cooked-but-not-served meal is still an estimate and contributes 0 to the total", () => {
     const pid = flourProduct({ calories: 2 });
     recordPurchase(db, hid, { productId: pid, quantity: 1 }); // +1000g on pid
     const ev = event(bread().id, "cooked");
+    recordCooked(db, hid, ev.recipeId!, ev.servings, ev.id); // stock depleted, but not yet served
+    const day = dayNutrition(db, hid, "2026-07-01");
+    expect(day.meals[0].estimate).toBe(true);
+    expect(day.total.calories).toBe(0);
+  });
+
+  it("served meal is exact, from the actual product the cook recorded", () => {
+    const pid = flourProduct({ calories: 2 });
+    recordPurchase(db, hid, { productId: pid, quantity: 1 }); // +1000g on pid
+    const ev = event(bread().id, "served");
     recordCooked(db, hid, ev.recipeId!, ev.servings, ev.id); // -500g attributed to pid
     const day = dayNutrition(db, hid, "2026-07-01");
     expect(day.meals[0].estimate).toBe(false);
     expect(day.total.calories).toBe(1000);
   });
 
-  it("cooked meal counts the chosen variant's nutrition, not the product's", () => {
+  it("served meal counts the chosen variant's nutrition, not the product's", () => {
     const pid = flourProduct({ calories: 2 }); // product: 2 kcal/g
     const variantId = createVariant(db, hid, pid, { name: "Fortified", calories: 5 })!.id; // 5 kcal/g
     recordPurchase(db, hid, { productId: pid, quantity: 1 });
-    const ev = event(bread().id, "cooked");
+    const ev = event(bread().id, "served");
     recordCooked(db, hid, ev.recipeId!, ev.servings, ev.id, new Map([[flourId, { productId: pid, variantId }]]));
     const day = dayNutrition(db, hid, "2026-07-01");
     expect(day.total.calories).toBe(2500); // 500g * 5 from the variant, not 2

@@ -142,7 +142,16 @@ export function runOutDates(
 export function deleteEvent(db: Db, householdId: number, eventId: number, scope: DeleteScope = "one") {
   const [ev] = db.select().from(schema.mealEvents)
     .where(and(eq(schema.mealEvents.id, eventId), eq(schema.mealEvents.householdId, householdId))).all();
-  if (!ev || ev.status === "cooked") return;
+  if (!ev) return;
+  // A cooked or served event owns stock movements; drop them first so removing
+  // it also backs out its stock/nutrition, then delete as usual.
+  if (ev.status === "cooked" || ev.status === "served") {
+    db.delete(schema.stockMovements)
+      .where(and(
+        eq(schema.stockMovements.householdId, householdId),
+        eq(schema.stockMovements.mealEventId, ev.id),
+      )).run();
+  }
   if (!ev.ruleId || scope === "one") {
     if (ev.ruleId) skipDay(db, ev.ruleId, ev.date, ev.slotId);
     else db.delete(schema.mealEvents).where(eq(schema.mealEvents.id, ev.id)).run();
@@ -159,7 +168,7 @@ export function cookEvent(
 ) {
   const [ev] = db.select().from(schema.mealEvents)
     .where(and(eq(schema.mealEvents.id, eventId), eq(schema.mealEvents.householdId, householdId))).all();
-  if (!ev || ev.status === "cooked") return; // no-op if missing or already cooked
+  if (!ev || ev.status === "cooked" || ev.status === "served") return; // no-op if missing or already cooked/served
 
   // Direct product planned without a variant: resolve the cook-time variant and
   // recompute the canonical amount from ITS serving size. The plan stored a
@@ -195,5 +204,31 @@ export function uncookEvent(db: Db, householdId: number, eventId: number) {
       eq(schema.stockMovements.mealEventId, ev.id),
     )).run();
   db.update(schema.mealEvents).set({ status: "planned" })
+    .where(eq(schema.mealEvents.id, ev.id)).run();
+}
+
+/**
+ * Mark an event served: the one action that counts toward nutrition. If it's
+ * still 'planned', deplete stock first (same path cookEvent uses) then flip
+ * straight to 'served'. If it's already 'cooked', stock was depleted at cook
+ * time — just flip the status, no second depletion.
+ */
+export function serveEvent(
+  db: Db, householdId: number, eventId: number, allocations?: CookAllocations,
+) {
+  const [ev] = db.select().from(schema.mealEvents)
+    .where(and(eq(schema.mealEvents.id, eventId), eq(schema.mealEvents.householdId, householdId))).all();
+  if (!ev || ev.status === "served") return; // no-op if missing or already served
+  if (ev.status === "planned") cookEvent(db, householdId, eventId, allocations); // depletes stock, sets 'cooked'
+  db.update(schema.mealEvents).set({ status: "served" })
+    .where(eq(schema.mealEvents.id, ev.id)).run();
+}
+
+/** Reverse serveEvent: flip status back to 'cooked'. Stock movements stay — use uncookEvent to also back those out. */
+export function unserveEvent(db: Db, householdId: number, eventId: number) {
+  const [ev] = db.select().from(schema.mealEvents)
+    .where(and(eq(schema.mealEvents.id, eventId), eq(schema.mealEvents.householdId, householdId))).all();
+  if (!ev || ev.status !== "served") return; // no-op if missing or not served
+  db.update(schema.mealEvents).set({ status: "cooked" })
     .where(eq(schema.mealEvents.id, ev.id)).run();
 }

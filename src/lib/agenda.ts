@@ -16,7 +16,7 @@ export interface AgendaMeal {
   recipeId: number | null; // item identity, for linking the name to its detail page
   productId: number | null;
   ingredientId: number | null;
-  status: "planned" | "cooked";
+  status: "planned" | "cooked" | "served";
   phase: "planned" | "cooked" | "served"; // lifecycle phase for the UI's status chip
   batchBacked: boolean; // an active batch exists for this slot
   batchId: number | null; // that batch's id, or null
@@ -50,17 +50,19 @@ export interface AgendaDay {
 }
 
 /**
- * Lifecycle phase for a meal row's status chip: "served" once it's been
- * eaten/cooked (counts toward nutrition), "cooked" for a batch serving
- * that's ready but not eaten today, else "planned".
+ * Lifecycle phase for a meal row's status chip: "served" once it's actually
+ * been eaten (counts toward nutrition) — status 'served' or eaten from a
+ * batch today; "cooked" once stock's been depleted but it hasn't been eaten
+ * yet — status 'cooked' or a batch serving that's ready but untouched today;
+ * else "planned".
  */
 function derivePhase(m: {
   eatenFromBatchToday: boolean;
-  status: "planned" | "cooked";
+  status: "planned" | "cooked" | "served";
   batchBacked: boolean;
 }): "planned" | "cooked" | "served" {
-  if (m.eatenFromBatchToday || m.status === "cooked") return "served";
-  if (m.batchBacked) return "cooked";
+  if (m.status === "served" || m.eatenFromBatchToday) return "served";
+  if (m.status === "cooked" || m.batchBacked) return "cooked";
   return "planned";
 }
 
@@ -142,7 +144,8 @@ export function agendaDays(
     if (ev.productId != null) {
       const variant = ev.variantId != null ? variantById.get(ev.variantId) : undefined;
       const p = productById.get(ev.productId);
-      return variant?.name ?? p?.name ?? "Item";
+      if (!p) return variant?.name ?? "Item";
+      return variant ? `${p.name} · ${variant.name}` : p.name;
     }
     if (ev.ingredientId != null) {
       return ingredientById.get(ev.ingredientId)?.name ?? "Item";
@@ -209,7 +212,7 @@ export function agendaDays(
         const batch = batchBySlot.get(ev.slotId) ?? null;
         const batchBacked = batch != null;
         const eatenFromBatchToday = batchBacked && eatenKeys.has(`${batch!.id}:${date}`);
-        const status = ev.status as "planned" | "cooked";
+        const status = ev.status as "planned" | "cooked" | "served";
         const phase = derivePhase({ eatenFromBatchToday, status, batchBacked });
         // Only a real, planned rotation meal (not cooked/served, not batch-backed)
         // can be flagged: batches already consumed their stock at pack time, and
@@ -239,7 +242,7 @@ export function agendaDays(
       .sort((a, b) => a._timeOfDay.localeCompare(b._timeOfDay))
       .map(({ _timeOfDay, ...m }) => m);
 
-    const eatenCount = meals.filter((m) => m.status === "cooked" || (m.batchBacked && m.eatenFromBatchToday)).length;
+    const eatenCount = meals.filter((m) => m.phase === "served").length;
 
     return {
       date,

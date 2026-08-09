@@ -33,7 +33,7 @@ describe("agendaDays", () => {
       householdId: hid, date: "2026-08-09", slotId: dinnerSlot, recipeId: dinnerRecipe, servings: 1, status: "planned",
     }).run();
     db.insert(schema.mealEvents).values({
-      householdId: hid, date: "2026-08-09", slotId: lunchSlot, recipeId: lunchRecipe, servings: 1, status: "cooked",
+      householdId: hid, date: "2026-08-09", slotId: lunchSlot, recipeId: lunchRecipe, servings: 1, status: "served",
     }).run();
 
     const days = agendaDays(db, hid, "2026-08-09", "2026-08-09", "2026-08-09");
@@ -42,15 +42,25 @@ describe("agendaDays", () => {
     expect(day.date).toBe("2026-08-09");
     expect(day.totalCount).toBe(2);
     expect(day.meals.map((m) => m.name)).toEqual(["Sandwich", "Biryani"]); // lunch (12:00) before dinner (19:00)
-    expect(day.meals[0].status).toBe("cooked");
+    expect(day.meals[0].status).toBe("served");
     expect(day.meals[1].status).toBe("planned");
-    expect(day.meals[0].phase).toBe("served"); // cooked event -> served
+    expect(day.meals[0].phase).toBe("served"); // served event -> served
     expect(day.meals[1].phase).toBe("planned"); // untouched rotation event -> planned
-    expect(day.eatenCount).toBe(1); // only the cooked one
+    expect(day.eatenCount).toBe(1); // only the served one
     expect(day.meals[0].ruleId).toBeNull(); // one-off events have no rule origin
     expect(day.meals[0].recipeId).toBe(lunchRecipe); // recipe meals expose recipeId for name linking
     expect(day.meals[0].productId).toBeNull();
     expect(day.meals[0].ingredientId).toBeNull();
+  });
+
+  it("derives 'cooked' phase for a stock-depleted-but-unserved event, distinct from 'served'", () => {
+    const recipe = makeRecipe("Overnight Oats");
+    db.insert(schema.mealEvents).values({
+      householdId: hid, date: "2026-08-09", slotId: lunchSlot, recipeId: recipe, servings: 1, status: "cooked",
+    }).run();
+    const days = agendaDays(db, hid, "2026-08-09", "2026-08-09", "2026-08-09");
+    expect(days[0].meals[0].phase).toBe("cooked"); // depleted stock, not yet served
+    expect(days[0].eatenCount).toBe(0); // cooked-but-unserved doesn't count as eaten
   });
 
   it("overlays an active batch onto its slot's meal, and eatenFromBatchToday flips after eating", () => {
@@ -179,7 +189,8 @@ describe("agendaDays", () => {
     expect(riceMeal.outOfStock).toBe(false);
     expect(riceMeal.missingItems).toEqual([]);
 
-    const cookedMeal = meals.find((m) => m.phase === "served" && m.name === "Already Cooked")!;
+    const cookedMeal = meals.find((m) => m.name === "Already Cooked")!;
+    expect(cookedMeal.phase).toBe("cooked"); // status 'cooked' -> phase 'cooked', not flagged
     expect(cookedMeal.outOfStock).toBe(false);
     expect(cookedMeal.missingItems).toEqual([]);
 

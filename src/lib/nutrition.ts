@@ -129,7 +129,7 @@ export function dayNutrition(
       const recipe = getRecipe(db, householdId, ev.recipeId);
       if (!recipe) continue;
       name = recipe.name;
-      if (ev.status === "cooked") {
+      if (ev.status === "served") {
         const moves = db.select().from(schema.stockMovements)
           .where(and(
             eq(schema.stockMovements.householdId, householdId),
@@ -173,7 +173,7 @@ export function dayNutrition(
       recipeName: name,
       slotName: slots.get(ev.slotId) ?? "—",
       servings: ev.servings,
-      estimate: ev.status !== "cooked",
+      estimate: ev.status !== "served",
       nutrients,
       missing: [...missing].map((id) => ingredientName.get(id) ?? "?"),
     });
@@ -397,7 +397,7 @@ export function dayIngredientTable(db: Db, householdId: number, date: string): I
     if (ev.recipeId != null) {
       const recipe = getRecipe(db, householdId, ev.recipeId);
       if (!recipe) continue;
-      if (ev.status === "cooked") {
+      if (ev.status === "served") {
         const moves = db.select().from(schema.stockMovements)
           .where(and(
             eq(schema.stockMovements.householdId, householdId),

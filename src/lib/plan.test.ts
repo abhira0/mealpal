@@ -4,7 +4,7 @@ import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
 import { createRecipe } from "@/lib/recipes";
 import { createSlot } from "@/lib/slots";
-import { addEvent, listEvents, cookEvent, plannedConsumption, runOutDates } from "@/lib/plan";
+import { addEvent, listEvents, cookEvent, uncookEvent, serveEvent, unserveEvent, deleteEvent, plannedConsumption, runOutDates } from "@/lib/plan";
 import { currentStock } from "@/lib/stock";
 import { createProduct } from "@/lib/products";
 import { createVariant } from "@/lib/variants";
@@ -90,6 +90,66 @@ describe("meal plan", () => {
     // cooking again is a no-op (already cooked)
     cookEvent(db, hid, ev.id);
     expect(currentStock(db, hid, flourId)).toBe(1500);
+  });
+
+  it("removing a cooked event deletes it and backs out its stock movements", () => {
+    db.insert(schema.stockMovements)
+      .values({ householdId: hid, ingredientId: flourId, delta: 2000, reason: "manual" }).run();
+    const ev = addEvent(db, hid, { date: "2026-07-01", slotId, recipeId, servings: 2 });
+    cookEvent(db, hid, ev.id);
+    expect(currentStock(db, hid, flourId)).toBe(1500);
+    deleteEvent(db, hid, ev.id);
+    expect(listEvents(db, hid, "2026-07-01", "2026-07-01")).toHaveLength(0);
+    expect(currentStock(db, hid, flourId)).toBe(2000); // cook movement reversed
+  });
+
+  it("removing a served event also backs out its stock movements", () => {
+    db.insert(schema.stockMovements)
+      .values({ householdId: hid, ingredientId: flourId, delta: 2000, reason: "manual" }).run();
+    const ev = addEvent(db, hid, { date: "2026-07-01", slotId, recipeId, servings: 2 });
+    serveEvent(db, hid, ev.id);
+    expect(currentStock(db, hid, flourId)).toBe(1500);
+    deleteEvent(db, hid, ev.id);
+    expect(listEvents(db, hid, "2026-07-01", "2026-07-01")).toHaveLength(0);
+    expect(currentStock(db, hid, flourId)).toBe(2000);
+  });
+
+  it("serving a planned event depletes stock once and sets status served", () => {
+    db.insert(schema.stockMovements)
+      .values({ householdId: hid, ingredientId: flourId, delta: 2000, reason: "manual" }).run();
+    const ev = addEvent(db, hid, { date: "2026-07-01", slotId, recipeId, servings: 2 });
+    serveEvent(db, hid, ev.id);
+    expect(currentStock(db, hid, flourId)).toBe(1500); // 2000 - 500
+    expect(listEvents(db, hid, "2026-07-01", "2026-07-01")[0].status).toBe("served");
+    // serving again is a no-op (already served)
+    serveEvent(db, hid, ev.id);
+    expect(currentStock(db, hid, flourId)).toBe(1500);
+  });
+
+  it("serving an already-cooked event just flips status, without depleting stock again", () => {
+    db.insert(schema.stockMovements)
+      .values({ householdId: hid, ingredientId: flourId, delta: 2000, reason: "manual" }).run();
+    const ev = addEvent(db, hid, { date: "2026-07-01", slotId, recipeId, servings: 2 });
+    cookEvent(db, hid, ev.id);
+    expect(currentStock(db, hid, flourId)).toBe(1500); // 2000 - 500, depleted at cook time
+    serveEvent(db, hid, ev.id);
+    expect(currentStock(db, hid, flourId)).toBe(1500); // unchanged — no second depletion
+    expect(listEvents(db, hid, "2026-07-01", "2026-07-01")[0].status).toBe("served");
+  });
+
+  it("unserveEvent flips a served event back to cooked, keeping its stock movements", () => {
+    db.insert(schema.stockMovements)
+      .values({ householdId: hid, ingredientId: flourId, delta: 2000, reason: "manual" }).run();
+    const ev = addEvent(db, hid, { date: "2026-07-01", slotId, recipeId, servings: 2 });
+    serveEvent(db, hid, ev.id);
+    expect(currentStock(db, hid, flourId)).toBe(1500);
+    unserveEvent(db, hid, ev.id);
+    expect(listEvents(db, hid, "2026-07-01", "2026-07-01")[0].status).toBe("cooked");
+    expect(currentStock(db, hid, flourId)).toBe(1500); // stock stays depleted
+    // uncookEvent then reverses the stock, back to planned
+    uncookEvent(db, hid, ev.id);
+    expect(listEvents(db, hid, "2026-07-01", "2026-07-01")[0].status).toBe("planned");
+    expect(currentStock(db, hid, flourId)).toBe(2000);
   });
 });
 
