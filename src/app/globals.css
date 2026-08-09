@@ -292,7 +292,7 @@ input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:#a9a496;posi
 .cook-step{flex:1;display:flex;flex-direction:column;justify-content:center;gap:16px;text-align:center}
 .cook-num{font-family:var(--mono);font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--sage)}
 .cook-clip{width:min(100%,640px);aspect-ratio:16/9;margin:0 auto;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
-.cook-clip iframe{width:100%;height:100%;border:none}
+.cook-clip iframe,.cook-clip video{width:100%;height:100%;border:none;object-fit:cover}
 .cook-replay{align-self:center}
 .cook-text{font-family:var(--display);font-weight:700;font-size:clamp(20px,4.5vw,34px);line-height:1.25;margin:0}
 .cook-dots{display:flex;gap:8px;justify-content:center}
@@ -302,15 +302,14 @@ input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:#a9a496;posi
 .cook-nav .btn{flex:1}
 .cook-top-actions{display:flex;align-items:center;gap:12px}
 .cook-edit-toggle{flex:none;width:auto;padding:6px 12px;font-size:13px}
-.cook-edit{display:flex;flex-direction:column;gap:12px;text-align:left;width:min(100%,640px);margin:0 auto}
-.cook-edit-player{width:100%;aspect-ratio:16/9;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
-.cook-edit-player iframe{width:100%;height:100%;border:none}
-.cook-edit-text{font-family:var(--display);font-weight:700;font-size:18px;resize:vertical}
-.cook-edit-clip-fields{display:flex;gap:8px;flex-wrap:wrap}
-.cook-edit-clip-field{flex:1;min-width:160px;display:flex;gap:6px}
-.cook-edit-clip-field .input{flex:1}
-.cook-edit-step-actions{display:flex;gap:8px;flex-wrap:wrap}
-.cook-edit-step-actions .btn{flex:none;width:auto;padding:6px 12px;font-size:13px}
+.cook-edit{display:flex;flex-direction:column;gap:12px;text-align:left;width:min(100%,980px);margin:0 auto}
+.cook-edit-media{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.cook-edit-clip{flex:2;min-width:240px;aspect-ratio:16/9;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+.cook-edit-clip iframe{width:100%;height:100%;border:none}
+.cook-edit-times{flex:1;min-width:160px;display:flex;flex-direction:column;gap:12px}
+.cook-edit-clip-field{display:flex;flex-direction:column;gap:4px}
+.cook-edit-text{width:100%;border:none;background:none;box-shadow:none;padding:0;text-align:left;font-family:var(--display);font-weight:700;font-size:clamp(20px,4.5vw,34px);line-height:1.25;resize:vertical}
+.cook-edit-text:focus{outline:none}
 
 /* recipe editor */
 .icon-x{flex:none;display:grid;place-items:center;width:34px;height:34px;border:1px solid var(--line);border-radius:8px;background:var(--paper-raised);color:var(--sage);cursor:pointer}

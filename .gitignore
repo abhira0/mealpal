@@ -58,3 +58,7 @@ next-env.d.ts
 
 # local database backups
 *.db.bak-*
+
+# cached recipe video clips (downloaded + trimmed from YouTube on demand)
+/public/clips/
+/.cache/
