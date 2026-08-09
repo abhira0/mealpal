@@ -4,7 +4,7 @@ import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
 import { createRecipe } from "@/lib/recipes";
 import { packBatch, eatFromBatch } from "@/lib/batches";
-import { agendaDays } from "@/lib/agenda";
+import { agendaDays, nextCooks } from "@/lib/agenda";
 
 let db: TestDb;
 let hid: number;
@@ -137,5 +137,40 @@ describe("agendaDays", () => {
     expect(days[1].totalCount).toBe(0);
     expect(days[1].eatenCount).toBe(0);
     expect(days[1].cookFlags).toEqual([]);
+  });
+});
+
+describe("nextCooks", () => {
+  it("returns one entry per slot with an active batch, sorted by cook date", () => {
+    packBatch(db, hid, {
+      slotId: lunchSlot, label: "Rice Bowl", cookedDate: "2026-08-09", mealsTotal: 4, items: [],
+    });
+    packBatch(db, hid, {
+      slotId: dinnerSlot, label: "Chicken Curry", cookedDate: "2026-08-09", mealsTotal: 6, items: [],
+    });
+
+    const result = nextCooks(db, hid, "2026-08-09");
+    expect(result).toEqual([
+      { slotId: lunchSlot, slotName: "Lunch", label: "Rice Bowl", cookDate: "2026-08-13", daysAway: 4 },
+      { slotId: dinnerSlot, slotName: "Dinner", label: "Chicken Curry", cookDate: "2026-08-15", daysAway: 6 },
+    ]);
+  });
+
+  it("keeps only the soonest-cooking batch when a slot has multiple active batches", () => {
+    packBatch(db, hid, {
+      slotId: lunchSlot, label: "Older", cookedDate: "2026-08-05", mealsTotal: 10, items: [],
+    });
+    packBatch(db, hid, {
+      slotId: lunchSlot, label: "Newer", cookedDate: "2026-08-09", mealsTotal: 2, items: [],
+    });
+
+    const result = nextCooks(db, hid, "2026-08-09");
+    expect(result).toHaveLength(1);
+    expect(result[0].label).toBe("Newer");
+    expect(result[0].cookDate).toBe("2026-08-11");
+  });
+
+  it("returns an empty array when there are no active batches", () => {
+    expect(nextCooks(db, hid, "2026-08-09")).toEqual([]);
   });
 });

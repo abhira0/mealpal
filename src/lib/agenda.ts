@@ -27,6 +27,14 @@ export interface CookFlag {
   label: string;
 }
 
+export interface NextCook {
+  slotId: number;
+  slotName: string;
+  label: string;
+  cookDate: string;
+  daysAway: number;
+}
+
 export interface AgendaDay {
   date: string;
   meals: AgendaMeal[]; // ordered by slot timeOfDay
@@ -220,4 +228,36 @@ export function agendaDays(
       totalCount: meals.length,
     };
   });
+}
+
+/**
+ * Next meal-prep date per slot: for each active batch, its cook date is
+ * cookedDate + mealsTotal days (the day its coverage window runs out, same
+ * math as agendaDays' cook flags). A slot with multiple active batches keeps
+ * only the one that runs out soonest. Sorted by cookDate ascending.
+ */
+export function nextCooks(db: Db, householdId: number, today: string): NextCook[] {
+  const slots = db.select().from(schema.mealSlots)
+    .where(eq(schema.mealSlots.householdId, householdId)).all();
+  const slotById = new Map(slots.map((s) => [s.id, s]));
+
+  const activeBatches = listBatches(db, householdId);
+  const bySlot = new Map<number, { cookDate: string; label: string }>();
+  for (const b of activeBatches) {
+    const cookDate = addDays(b.cookedDate, b.mealsTotal);
+    const existing = bySlot.get(b.slotId);
+    if (!existing || cookDate < existing.cookDate) {
+      bySlot.set(b.slotId, { cookDate, label: b.label });
+    }
+  }
+
+  const todayMs = localNoon(today).getTime();
+  const result: NextCook[] = [];
+  for (const [slotId, { cookDate, label }] of bySlot) {
+    const slot = slotById.get(slotId);
+    const daysAway = Math.max(0, Math.round((localNoon(cookDate).getTime() - todayMs) / 86_400_000));
+    result.push({ slotId, slotName: slot?.name ?? "—", label, cookDate, daysAway });
+  }
+
+  return result.sort((a, b) => a.cookDate.localeCompare(b.cookDate));
 }
