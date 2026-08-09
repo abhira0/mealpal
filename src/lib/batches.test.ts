@@ -5,7 +5,7 @@ import { schema } from "@/db";
 import { createProduct } from "@/lib/products";
 import { recordPurchase } from "@/lib/shopping";
 import { currentStock } from "@/lib/stock";
-import { packBatch, listBatches, getBatch } from "@/lib/batches";
+import { packBatch, listBatches, getBatch, eatFromBatch, uneatFromBatch } from "@/lib/batches";
 
 let db: TestDb; let hid: number; let slotId: number;
 beforeEach(() => {
@@ -55,5 +55,21 @@ describe("listBatches / getBatch", () => {
     const full = getBatch(db, hid, b.id);
     expect(full?.label).toBe("Dinner");
     expect(Array.isArray(full?.items)).toBe(true);
+  });
+});
+
+describe("eatFromBatch / uneatFromBatch", () => {
+  it("counts down on eat and back up on undo, flooring at 0", () => {
+    const b = packBatch(db, hid, { slotId, label: "Lunch", cookedDate: "2026-08-09", mealsTotal: 2, items: [] });
+    eatFromBatch(db, hid, b.id, "2026-08-09");
+    expect(getBatch(db, hid, b.id)?.mealsRemaining).toBe(1);
+    eatFromBatch(db, hid, b.id, "2026-08-10");
+    eatFromBatch(db, hid, b.id, "2026-08-11"); // past 0
+    expect(getBatch(db, hid, b.id)?.mealsRemaining).toBe(0);
+    expect(db.select().from(schema.batchEaten).all()).toHaveLength(3);
+
+    uneatFromBatch(db, hid, b.id, "2026-08-11");
+    expect(getBatch(db, hid, b.id)?.mealsRemaining).toBe(1);
+    expect(db.select().from(schema.batchEaten).all()).toHaveLength(2);
   });
 });
