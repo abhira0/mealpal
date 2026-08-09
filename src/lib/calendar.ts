@@ -25,8 +25,25 @@ function esc(s: string): string {
 const ymd = (isoDate: string) => isoDate.replace(/-/g, ""); // "2026-08-09" -> "20260809"
 const nextDay = (isoDate: string) => ymd(new Date(Date.parse(isoDate) + 86_400_000).toISOString().slice(0, 10));
 
-// Wall-clock [start, end] hours a prep should occupy. Floating local time (no
-// TZID/Z) so it shows at that hour in every calendar app regardless of timezone.
+// Prep times are Arizona wall-clock. Phoenix never observes DST, so the offset
+// is a constant -0700 — a one-rule VTIMEZONE, and every client pins the event
+// to 6/8pm AZ regardless of the viewer's own timezone.
+// ponytail: hardcoded to America/Phoenix; store a per-household tz if you ever
+// go multi-timezone.
+const TZID = "America/Phoenix";
+const VTIMEZONE = [
+  "BEGIN:VTIMEZONE",
+  `TZID:${TZID}`,
+  "BEGIN:STANDARD",
+  "DTSTART:19700101T000000",
+  "TZOFFSETFROM:-0700",
+  "TZOFFSETTO:-0700",
+  "TZNAME:MST",
+  "END:STANDARD",
+  "END:VTIMEZONE",
+];
+
+// Wall-clock [start, end] hours a prep should occupy, in AZ time.
 // ponytail: hardcoded times; hoist to slot config if you want them editable.
 function prepHours(c: NextCook): [number, number] | null {
   if (c.label.toLowerCase().includes("overnight oats")) return [20, 20.5]; // 8–8:30pm
@@ -50,13 +67,14 @@ export function buildIcs(cooks: NextCook[], stamp = new Date()): string {
     "CALSCALE:GREGORIAN",
     "NAME:MealPal",
     "X-WR-CALNAME:MealPal",
+    ...VTIMEZONE,
   ];
   for (const c of cooks) {
     const hours = prepHours(c);
     const [start, end] =
       hours == null
         ? [`DTSTART;VALUE=DATE:${ymd(c.cookDate)}`, `DTEND;VALUE=DATE:${nextDay(c.cookDate)}`]
-        : [`DTSTART:${ymd(c.cookDate)}T${clock(hours[0])}`, `DTEND:${ymd(c.cookDate)}T${clock(hours[1])}`];
+        : [`DTSTART;TZID=${TZID}:${ymd(c.cookDate)}T${clock(hours[0])}`, `DTEND;TZID=${TZID}:${ymd(c.cookDate)}T${clock(hours[1])}`];
     lines.push(
       "BEGIN:VEVENT",
       `UID:cook-${c.slotId}-${c.cookDate}@mealpal`,

@@ -22,9 +22,10 @@ describe("calendar feed", () => {
     expect(ics.startsWith("BEGIN:VCALENDAR")).toBe(true);
     expect(ics).toContain("\r\n"); // CRLF line endings
     expect((ics.match(/BEGIN:VEVENT/g) ?? []).length).toBe(2);
-    expect(ics).toContain("DTSTART:20260809T180000"); // Lunch prep 6–8pm (floating)
-    expect(ics).toContain("DTEND:20260809T200000");
-    expect(ics).toContain("DTSTART:20260810T200000"); // Overnight Oats at 8pm
+    expect(ics).toContain("TZID:America/Phoenix"); // VTIMEZONE present
+    expect(ics).toContain("DTSTART;TZID=America/Phoenix:20260809T180000"); // Lunch 6–8pm AZ
+    expect(ics).toContain("DTEND;TZID=America/Phoenix:20260809T200000");
+    expect(ics).toContain("DTSTART;TZID=America/Phoenix:20260810T200000"); // Overnight Oats 8pm AZ
     expect(ics).toContain("SUMMARY:🍳 Chicken\\, rice (Lunch prep)"); // comma escaped
     expect(ics).toContain("UID:cook-2-2026-08-09@mealpal");
     expect(ics.trimEnd().endsWith("END:VCALENDAR")).toBe(true);
