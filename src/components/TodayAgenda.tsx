@@ -1,19 +1,32 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Dropdown } from "@/components/Dropdown";
 import { Stepper } from "@/components/Stepper";
 import { Sheet } from "@/components/Sheet";
-import { todayISO } from "@/lib/dates";
+import { todayISO, toISODate, localNoon } from "@/lib/dates";
 
-type Batch = { id: number; slotId: number; label: string; cookedDate: string; mealsTotal: number; mealsRemaining: number };
 type Slot = { id: number; name: string; timeOfDay: string };
 type Recipe = { id: number; name: string; baseServings: number };
 type Product = { id: number; name: string; servingSize: number | null; canonicalUnit: string };
 
 type ItemKind = "recipe" | "product";
 type PackItem = { kind: ItemKind; refId: number | null; amount: string };
+
+type AgendaMeal = {
+  eventId: number;
+  slotId: number;
+  slotName: string;
+  name: string;
+  status: "planned" | "cooked";
+  batchBacked: boolean;
+  batchId: number | null;
+  mealsRemaining: number | null;
+  eatenFromBatchToday: boolean;
+};
+type CookFlag = { slotId: number; slotName: string; label: string };
+type AgendaDay = { date: string; meals: AgendaMeal[]; cookFlags: CookFlag[]; eatenCount: number; totalCount: number };
 
 // Subset of GET /api/nutrition/analysis?mode=day&date=... used here — eaten
 // ("nutrients") vs planned ("planned") totals, scaled to the household goal.
@@ -32,35 +45,49 @@ function initials(name: string | null | undefined): string {
   return (a + b || a).toUpperCase();
 }
 
+function addDays(date: string, n: number): string {
+  return toISODate(new Date(localNoon(date).getTime() + n * 86_400_000));
+}
+
 export function TodayAgenda({ userName }: { userName?: string | null }) {
   // ponytail: server can't know the client's date/timezone, so all
   // time-derived text is client-only to avoid hydration drift.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const todayIso = useMemo(todayISO, []);
+  const from = useMemo(() => addDays(todayIso, -1), [todayIso]);
+  const to = useMemo(() => addDays(todayIso, 5), [todayIso]);
 
-  const [batches, setBatches] = useState<Batch[]>([]);
+  const [days, setDays] = useState<AgendaDay[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [analysis, setAnalysis] = useState<DayAnalysis | null>(null);
 
-  const loadBatches = useCallback(async () => {
-    const res = await fetch("/api/batches");
-    if (res.ok) setBatches((await res.json()) as Batch[]);
-  }, []);
+  const loadAgenda = useCallback(async () => {
+    const res = await fetch(`/api/agenda?from=${from}&to=${to}&today=${todayIso}`, { cache: "no-store" });
+    if (res.ok) setDays((await res.json()) as AgendaDay[]);
+  }, [from, to, todayIso]);
+
+  const loadAnalysis = useCallback(async () => {
+    const res = await fetch(`/api/nutrition/analysis?mode=day&date=${todayIso}`, { cache: "no-store" });
+    if (res.ok) setAnalysis((await res.json()) as DayAnalysis);
+    else setAnalysis(null);
+  }, [todayIso]);
 
   useEffect(() => {
+    if (!mounted) return;
     let alive = true;
     (async () => {
-      const [bRes, sRes, rRes, pRes] = await Promise.all([
-        fetch("/api/batches"),
+      const [, sRes, rRes, pRes] = await Promise.all([
+        loadAgenda(),
         fetch("/api/slots"),
         fetch("/api/recipes"),
         fetch("/api/products"),
+        loadAnalysis(),
       ]);
       if (!alive) return;
-      if (bRes.ok) setBatches((await bRes.json()) as Batch[]);
       if (sRes.ok) setSlots((await sRes.json()) as Slot[]);
       if (rRes.ok) setRecipes((await rRes.json()) as Recipe[]);
       if (pRes.ok) setProducts((await pRes.json()) as Product[]);
@@ -69,44 +96,49 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [mounted, loadAgenda, loadAnalysis]);
 
-  const slotName = useMemo(() => new Map(slots.map((s) => [s.id, s.name])), [slots]);
-
-  const [analysis, setAnalysis] = useState<DayAnalysis | null>(null);
+  // Scroll today's block into view once the agenda has rendered.
+  const todayRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    if (!mounted) return;
-    let cancelled = false;
-    fetch(`/api/nutrition/analysis?mode=day&date=${todayISO()}`, { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (!cancelled) setAnalysis(d); })
-      .catch(() => { if (!cancelled) setAnalysis(null); });
-    return () => { cancelled = true; };
-  }, [mounted, batches]);
+    if (!loading && days.length > 0) todayRef.current?.scrollIntoView({ block: "start" });
+  }, [loading, days.length]);
 
   const [acting, setActing] = useState<number | null>(null);
 
-  async function eatOne(batch: Batch) {
-    if (batch.mealsRemaining <= 0 || acting === batch.id) return;
-    setActing(batch.id);
-    // optimistic decrement, then reconcile from the response
-    setBatches((prev) =>
-      prev.map((b) => (b.id === batch.id ? { ...b, mealsRemaining: b.mealsRemaining - 1 } : b)),
+  async function eatMeal(meal: AgendaMeal) {
+    const key = meal.batchBacked && meal.batchId != null ? meal.batchId : meal.eventId;
+    if (acting === key) return;
+    setActing(key);
+    // optimistic check
+    setDays((prev) =>
+      prev.map((d) => ({
+        ...d,
+        meals: d.meals.map((m) =>
+          m.eventId === meal.eventId
+            ? meal.batchBacked
+              ? { ...m, eatenFromBatchToday: true, mealsRemaining: (m.mealsRemaining ?? 1) - 1 }
+              : { ...m, status: "cooked" as const }
+            : m,
+        ),
+      })),
     );
     try {
-      const res = await fetch(`/api/batches/${batch.id}/eat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: todayISO() }),
-      });
-      if (res.ok) {
-        const updated = (await res.json()) as Batch;
-        setBatches((prev) => prev.map((b) => (b.id === batch.id ? updated : b)));
+      if (meal.batchBacked && meal.batchId != null) {
+        await fetch(`/api/batches/${meal.batchId}/eat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date: todayIso }),
+        });
       } else {
-        // reconcile from the server on failure too
-        await loadBatches();
+        await fetch(`/api/events/${meal.eventId}/cook`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ force: true }),
+        });
       }
     } finally {
+      await Promise.all([loadAgenda(), loadAnalysis()]);
       setActing(null);
     }
   }
@@ -119,8 +151,8 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
   const [packItems, setPackItems] = useState<PackItem[]>([{ kind: "recipe", refId: null, amount: "" }]);
   const [packing, setPacking] = useState(false);
 
-  function openPack() {
-    setPackSlotId(slots[0]?.id ?? null);
+  function openPack(preselectSlotId?: number) {
+    setPackSlotId(preselectSlotId ?? slots[0]?.id ?? null);
     setPackLabel("");
     setPackMeals(4);
     setPackItems([{ kind: "recipe", refId: recipes[0]?.id ?? null, amount: "" }]);
@@ -156,7 +188,7 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
         slotId: packSlotId,
         label: packLabel.trim(),
         mealsTotal: packMeals,
-        cookedDate: todayISO(),
+        cookedDate: todayIso,
         items: packItems.map((it) => {
           const amount = it.amount !== "" ? Number(it.amount) : undefined;
           return it.kind === "recipe"
@@ -168,7 +200,7 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
     setPacking(false);
     if (res.ok) {
       setPackOpen(false);
-      await loadBatches();
+      await loadAgenda();
     }
   }
 
@@ -233,27 +265,85 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
 
         {loading ? (
           <p className="loading">Loading…</p>
-        ) : batches.length === 0 ? (
-          <p className="empty">No active batches — pack one below.</p>
+        ) : days.length === 0 ? (
+          <p className="empty">Nothing on the agenda — pack a batch below.</p>
         ) : (
           <div className="stack-sm">
-            {batches.map((b) => {
-              const empty = b.mealsRemaining <= 0;
-              const low = b.mealsRemaining <= 1 && !empty;
+            {days.map((day) => {
+              const isToday = day.date === todayIso;
+              const isPast = day.date < todayIso;
               return (
-                <div key={b.id} className="card" style={empty ? { opacity: 0.5 } : undefined}>
-                  <div className="card-row">
-                    <span className="title row-main">{b.label}</span>
-                    <span className={low || empty ? "chip run" : "chip"}>
-                      {empty ? "empty · cook" : low ? "1 left · cook soon" : `${b.mealsRemaining} left`}
-                    </span>
-                  </div>
-                  <div className="card-row" style={{ marginTop: 12 }}>
-                    <span className="slot">{slotName.get(b.slotId) ?? ""}</span>
-                    <button type="button" className="btn" disabled={empty || acting === b.id} onClick={() => eatOne(b)}>
-                      Ate one
-                    </button>
-                  </div>
+                <div key={day.date} ref={isToday ? todayRef : undefined}>
+                  <p
+                    className="section-label"
+                    style={isToday ? { color: "var(--paprika)", borderTopColor: "var(--paprika)" } : undefined}
+                  >
+                    {dayHeaderLabel(day.date, todayIso)}
+                  </p>
+
+                  {isPast && (
+                    <p className="empty" style={{ padding: "0 0 8px", textAlign: "left" }}>
+                      {day.eatenCount}/{day.totalCount} eaten{day.eatenCount === day.totalCount && day.totalCount > 0 ? " ✓" : ""}
+                    </p>
+                  )}
+
+                  {isToday && day.meals.length === 0 && (
+                    <p className="empty" style={{ padding: "0 0 8px", textAlign: "left" }}>
+                      Nothing planned today.
+                    </p>
+                  )}
+
+                  {isToday && (
+                    <div className="stack-sm">
+                      {day.meals.map((meal) => {
+                        const checked = meal.status === "cooked" || (meal.batchBacked && meal.eatenFromBatchToday);
+                        const key = meal.batchBacked && meal.batchId != null ? meal.batchId : meal.eventId;
+                        const empty = meal.mealsRemaining != null && meal.mealsRemaining <= 0;
+                        const low = meal.mealsRemaining != null && meal.mealsRemaining <= 1;
+                        return (
+                          <div key={meal.eventId} className="row">
+                            <button
+                              type="button"
+                              className="checkbox"
+                              role="checkbox"
+                              aria-checked={checked}
+                              aria-label={checked ? `${meal.name} eaten` : `Mark ${meal.name} eaten`}
+                              disabled={checked || acting === key}
+                              onClick={() => eatMeal(meal)}
+                            />
+                            <div className="row-main">
+                              <div>{meal.name}</div>
+                              <span className="section-label" style={{ margin: 0, padding: 0, border: "none" }}>
+                                {meal.slotName}
+                              </span>
+                            </div>
+                            {meal.batchBacked && (
+                              <span className={low ? "chip run" : "chip"}>
+                                {empty ? "empty · cook" : low ? "cook soon" : `${meal.mealsRemaining} left`}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {!isToday && !isPast && (
+                    <div className="stack-sm">
+                      {day.cookFlags.map((flag, i) => (
+                        <button
+                          key={`${day.date}-${flag.slotId}-${i}`}
+                          type="button"
+                          className="row"
+                          style={{ width: "100%", textAlign: "left", border: "none", cursor: "pointer" }}
+                          onClick={() => openPack(flag.slotId)}
+                        >
+                          <span className="row-main">🍳 cook {flag.label}</span>
+                          <span className="chip run">{flag.slotName}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -263,7 +353,7 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
         {/* Disabled while loading: opening early locks the default item's
             refId to null (recipes/products not fetched yet), leaving the
             pack form stuck invalid. */}
-        <button type="button" className="btn block" disabled={loading} onClick={openPack}>
+        <button type="button" className="btn block" disabled={loading} onClick={() => openPack()}>
           ＋ Pack a batch
         </button>
 
@@ -358,6 +448,13 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
       </Sheet>
     </>
   );
+}
+
+function dayHeaderLabel(date: string, todayIso: string): string {
+  if (date === todayIso) return "Today";
+  const diffDays = Math.round((localNoon(date).getTime() - localNoon(todayIso).getTime()) / 86_400_000);
+  if (diffDays === -1) return "Yesterday";
+  return localNoon(date).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
 }
 
 // Two bars per nutrient — eaten (solid) then the not-yet-eaten remainder of
