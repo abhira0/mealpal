@@ -115,6 +115,10 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
 
   const [acting, setActing] = useState<number | null>(null);
 
+  // Floating "+" FAB menu (Add meal / Pack a batch), replacing the old
+  // per-day and bottom-of-page add buttons.
+  const [fabOpen, setFabOpen] = useState(false);
+
   async function eatMeal(meal: AgendaMeal, date: string) {
     const key = meal.batchBacked && meal.batchId != null ? meal.batchId : meal.eventId;
     if (acting === key) return;
@@ -442,7 +446,7 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
         {loading ? (
           <p className="loading">Loading…</p>
         ) : days.length === 0 ? (
-          <p className="empty">Nothing on the agenda — pack a batch below.</p>
+          <p className="empty">Nothing on the agenda — tap + to add.</p>
         ) : (
           <div className="stack-sm">
             {days.map((day) => {
@@ -494,10 +498,6 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
                       ) : (
                         day.meals.map((meal) => mealRow(meal, day.date))
                       )}
-
-                      <button type="button" className="btn-add" onClick={() => openAddMeal(day.date)}>
-                        + add meal
-                      </button>
                     </div>
                   )}
                 </div>
@@ -506,18 +506,104 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
           </div>
         )}
 
-        {/* Disabled while loading: opening early locks the default item's
-            refId to null (recipes/products not fetched yet), leaving the
-            forms stuck invalid. */}
-        <div style={{ display: "flex", gap: 8 }}>
-          <button type="button" className="btn block" style={{ flex: 1 }} disabled={loading} onClick={() => openAddMeal()}>
-            ＋ Meal
-          </button>
-          <button type="button" className="btn block" style={{ flex: 1 }} disabled={loading} onClick={() => openPack()}>
-            ＋ Batch
-          </button>
-        </div>
       </div>
+
+      {/* Floating "+" FAB replaces the old per-day / bottom add buttons.
+          Disabled while loading: opening a sheet early locks the default
+          item's refId to null (recipes/products not fetched yet), leaving
+          the forms stuck invalid. Sits above the bottom nav (z-index 30)
+          but below the Sheet's scrim/panel (z-index 40/41) so an open sheet
+          still covers it. */}
+      <button
+        type="button"
+        aria-label="Add"
+        aria-expanded={fabOpen}
+        disabled={loading}
+        onClick={() => setFabOpen((v) => !v)}
+        style={{
+          position: "fixed",
+          right: 20,
+          bottom: 84,
+          width: 56,
+          height: 56,
+          borderRadius: "50%",
+          background: "var(--paprika)",
+          color: "#fff",
+          border: "none",
+          fontSize: 28,
+          lineHeight: 1,
+          boxShadow: "0 6px 16px rgba(0,0,0,.25)",
+          zIndex: 35,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: loading ? "default" : "pointer",
+        }}
+      >
+        {fabOpen ? "×" : "+"}
+      </button>
+
+      {fabOpen && (
+        <>
+          <button
+            type="button"
+            aria-label="Close menu"
+            onClick={() => setFabOpen(false)}
+            style={{ position: "fixed", inset: 0, background: "transparent", border: "none", zIndex: 34, cursor: "default" }}
+          />
+          <div
+            style={{
+              position: "fixed",
+              right: 20,
+              bottom: 148,
+              zIndex: 35,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-end",
+              gap: 8,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setFabOpen(false);
+                openAddMeal();
+              }}
+              style={{
+                background: "var(--paper-raised)",
+                border: "1px solid var(--line)",
+                borderRadius: 99,
+                padding: "10px 16px",
+                fontSize: 14,
+                fontWeight: 600,
+                boxShadow: "0 4px 12px rgba(0,0,0,.18)",
+                cursor: "pointer",
+              }}
+            >
+              Add meal
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFabOpen(false);
+                openPack();
+              }}
+              style={{
+                background: "var(--paper-raised)",
+                border: "1px solid var(--line)",
+                borderRadius: 99,
+                padding: "10px 16px",
+                fontSize: 14,
+                fontWeight: 600,
+                boxShadow: "0 4px 12px rgba(0,0,0,.18)",
+                cursor: "pointer",
+              }}
+            >
+              Pack a batch
+            </button>
+          </div>
+        </>
+      )}
 
       <Sheet open={packOpen} title="Pack a batch" onClose={() => setPackOpen(false)}>
         <div className="sh-body stack-sm">

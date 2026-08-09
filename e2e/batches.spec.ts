@@ -37,10 +37,11 @@ test.describe("batch tracker (merged Today agenda)", () => {
     await expect(page.locator("p.eb", { hasText: "Today" })).toBeVisible();
     await expect(page.locator("p.section-label", { hasText: /^Today$/ })).toBeVisible();
 
-    // Open the pack-a-batch sheet.
-    const openPackButton = page.getByRole("button", { name: "＋ Batch" });
-    await expect(openPackButton).toBeEnabled();
-    await openPackButton.click();
+    // Open the pack-a-batch sheet via the floating "+" FAB menu.
+    const fab = page.getByRole("button", { name: "Add" });
+    await expect(fab).toBeEnabled();
+    await fab.click();
+    await page.getByRole("button", { name: "Pack a batch" }).click();
     await expect(page.getByText("Pack a batch", { exact: true })).toBeVisible();
 
     // Slot -> Breakfast (that's the slot the demo's "Morning Smoothie" lives in).
