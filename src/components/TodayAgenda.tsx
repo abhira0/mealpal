@@ -253,7 +253,10 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
           </div>
         )}
 
-        <button type="button" className="btn block" onClick={openPack}>
+        {/* Disabled while loading: opening early locks the default item's
+            refId to null (recipes/products not fetched yet), leaving the
+            pack form stuck invalid. */}
+        <button type="button" className="btn block" disabled={loading} onClick={openPack}>
           ＋ Pack a batch
         </button>
 
