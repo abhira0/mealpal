@@ -10,8 +10,9 @@ export async function GET(req: NextRequest) {
   const hid = session.user.householdId;
   const date = req.nextUrl.searchParams.get("date");
   if (!date) return NextResponse.json({ error: "date required" }, { status: 400 });
+  const basis = req.nextUrl.searchParams.get("basis") === "planned" ? "planned" : "served";
   const rows = req.nextUrl.searchParams.get("mode") === "week"
-    ? weekIngredientTable(db, hid, mondayOf(date))
-    : dayIngredientTable(db, hid, date);
+    ? weekIngredientTable(db, hid, mondayOf(date), basis)
+    : dayIngredientTable(db, hid, date, basis);
   return NextResponse.json(rows);
 }

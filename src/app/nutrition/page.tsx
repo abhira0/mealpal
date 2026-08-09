@@ -91,25 +91,35 @@ export default function NutritionPage() {
 const COLS = [{ key: "calories" as const, label: "Cal", unit: "" }, ...FACT_ROWS];
 
 function IngredientsTable({ date, mode }: { date: string; mode: "day" | "week" }) {
-  const key = `${mode}:${date}`;
+  const [basis, setBasis] = useState<"served" | "planned">("served");
+  const key = `${mode}:${date}:${basis}`;
   const [loaded, setLoaded] = useState<{ key: string; rows: IngredientNutritionRow[] } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/nutrition/ingredients?mode=${mode}&date=${date}`, { cache: "no-store" })
+    fetch(`/api/nutrition/ingredients?mode=${mode}&date=${date}&basis=${basis}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : []))
       .then((d) => { if (!cancelled) setLoaded({ key, rows: d }); })
       .catch(() => { if (!cancelled) setLoaded({ key, rows: [] }); });
     return () => { cancelled = true; };
-  }, [key, mode, date]);
+  }, [key, mode, date, basis]);
 
-  if (loaded?.key !== key) return <p style={{ opacity: 0.6 }}>Loading…</p>;
+  const basisPill = (
+    <div className="filter" style={{ marginBottom: 8 }}>
+      <button type="button" aria-pressed={basis === "served"} onClick={() => setBasis("served")}>Served</button>
+      <button type="button" aria-pressed={basis === "planned"} onClick={() => setBasis("planned")}>Planned</button>
+    </div>
+  );
+
+  if (loaded?.key !== key) return <>{basisPill}<p style={{ opacity: 0.6 }}>Loading…</p></>;
   const rows = loaded.rows;
-  if (rows.length === 0) return <p style={{ opacity: 0.6 }}>No ingredients used this {mode === "week" ? "week" : "day"}.</p>;
+  if (rows.length === 0) return <>{basisPill}<p style={{ opacity: 0.6 }}>No ingredients {basis === "served" ? "eaten" : "planned"} this {mode === "week" ? "week" : "day"}.</p></>;
 
   return (
     <>
-      <p className="section-label">Actual quantity used per ingredient this {mode === "week" ? "week" : "day"}.</p>
+      {basisPill}
+      <p className="section-label">
+        {basis === "served" ? "Actual quantity eaten" : "Planned quantity"} per ingredient this {mode === "week" ? "week" : "day"}.</p>
       <div style={{ overflowX: "auto" }}>
         <table className="mono" style={{ borderCollapse: "collapse", fontSize: 12, whiteSpace: "nowrap" }}>
           <thead>
@@ -200,7 +210,7 @@ function OverviewBody({ data, mode, openCard, setOpenCard }: {
   data: AnalysisData; mode: "day" | "week";
   openCard: string | null; setOpenCard: (k: string | null) => void;
 }) {
-  const n = data.nutrients;
+  const n = data.nutrients; // served/eaten total (planned meals contribute 0)
   const goals = data.goals;
   const cal = Math.round(n.calories);
   const pct = goals.calorieGoal > 0 ? Math.round((cal / goals.calorieGoal) * 100) : 0;
@@ -249,7 +259,9 @@ function OverviewBody({ data, mode, openCard, setOpenCard }: {
 // toggled between by-slot and by-ingredient; plus the week macro-trend chart.
 function BreakdownBody({ data, mode, date }: { data: AnalysisData; mode: "day" | "week"; date: string }) {
   const [view, setView] = useState<"meals" | "ingredients">("meals");
+  const [basis, setBasis] = useState<"served" | "planned">("served");
   const dayMeals = mode === "day" && data.meals && data.meals.length > 0 ? data.meals : null;
+  const mealN = basis === "served" ? data.nutrients : data.planned;
   return (
     <>
       {mode === "week" && data.perDay && <WeekTrend perDay={data.perDay} />}
@@ -259,12 +271,16 @@ function BreakdownBody({ data, mode, date }: { data: AnalysisData; mode: "day" |
       </div>
       {view === "meals" ? (
         <>
+          <div className="filter" style={{ marginBottom: 8 }}>
+            <button type="button" aria-pressed={basis === "served"} onClick={() => setBasis("served")}>Served</button>
+            <button type="button" aria-pressed={basis === "planned"} onClick={() => setBasis("planned")}>Planned</button>
+          </div>
           <p className="section-label">
-            Nutrients{dayMeals ? " — total, goal & by slot" : mode === "week" ? " (daily avg) vs goal" : " vs goal"}
+            {basis === "served" ? "Eaten" : "Planned"} nutrients{dayMeals ? " — total, goal & by slot" : mode === "week" ? " (daily avg) vs goal" : " vs goal"}
           </p>
           {dayMeals
-            ? <SlotNutrientTable n={data.nutrients} goals={data.goals} meals={dayMeals} />
-            : <NutrientTable n={data.nutrients} goals={data.goals} />}
+            ? <SlotNutrientTable n={mealN} goals={data.goals} meals={dayMeals} basis={basis} />
+            : <NutrientTable n={mealN} goals={data.goals} />}
         </>
       ) : (
         <IngredientsTable date={date} mode={mode} />
@@ -359,7 +375,7 @@ function NutrientTable({ n, goals }: { n: Nutrients; goals: Goals }) {
 
 // Same table, plus a column per SLOT (day mode) — meals sharing a slot are
 // summed into one column. Horizontal-scrolls; first column sticky.
-function SlotNutrientTable({ n, goals, meals }: { n: Nutrients; goals: Goals; meals: MealLine[] }) {
+function SlotNutrientTable({ n, goals, meals, basis }: { n: Nutrients; goals: Goals; meals: MealLine[]; basis: "served" | "planned" }) {
   // group meals by slot, preserving first-seen order
   const order: string[] = [];
   const bySlot = new Map<string, MealLine[]>();
@@ -371,8 +387,11 @@ function SlotNutrientTable({ n, goals, meals }: { n: Nutrients; goals: Goals; me
     const ms = bySlot.get(slot)!;
     return {
       slot,
-      estimate: ms.every((m) => m.estimate),
-      value: (key: keyof Nutrients) => ms.reduce((a, m) => a + (m.nutrients[key] || 0), 0),
+      // served basis: only eaten meals count, so an all-estimate slot reads 0 (≈).
+      // planned basis: every meal counts, columns sum to the planned Total.
+      estimate: basis === "served" && ms.every((m) => m.estimate),
+      value: (key: keyof Nutrients) =>
+        ms.reduce((a, m) => a + ((basis === "planned" || !m.estimate) ? (m.nutrients[key] || 0) : 0), 0),
     };
   });
   return (

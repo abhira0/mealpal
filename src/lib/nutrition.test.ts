@@ -177,10 +177,19 @@ describe("weekIngredientTable", () => {
     // two planned bread events in the same Mon–Sun week (2026-06-29 .. 07-05)
     db.insert(schema.mealEvents).values({ householdId: hid, date: "2026-06-30", slotId, recipeId: r, servings: 1, status: "planned" }).run();
     db.insert(schema.mealEvents).values({ householdId: hid, date: "2026-07-02", slotId, recipeId: r, servings: 1, status: "planned" }).run();
-    const day = dayIngredientTable(db, hid, "2026-06-30");
+    // planned events only show under the "planned" basis (default is "served")
+    const day = dayIngredientTable(db, hid, "2026-06-30", "planned");
     expect(day.find((x) => x.name === "Flour")!.qty).toBe(500);
-    const week = weekIngredientTable(db, hid, mondayOf("2026-06-30"));
+    const week = weekIngredientTable(db, hid, mondayOf("2026-06-30"), "planned");
     expect(week.find((x) => x.name === "Flour")!.qty).toBe(1000); // 500 + 500
+  });
+
+  it("served basis excludes not-yet-eaten (planned/cooked) meals", () => {
+    flourProduct({ calories: 2 });
+    const r = bread().id;
+    db.insert(schema.mealEvents).values({ householdId: hid, date: "2026-06-30", slotId, recipeId: r, servings: 1, status: "planned" }).run();
+    expect(dayIngredientTable(db, hid, "2026-06-30", "served")).toHaveLength(0);
+    expect(dayIngredientTable(db, hid, "2026-06-30", "planned").length).toBeGreaterThan(0);
   });
 });
 
