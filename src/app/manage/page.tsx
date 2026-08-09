@@ -5,7 +5,9 @@ import { auth } from "@/auth";
 import { SignOutButton } from "@/components/SignOutButton";
 import { PageHeader } from "@/components/PageHeader";
 import { ENTITIES, type EntitySlug } from "@/app/manage/entities";
-import { BookOpen, Camera, ChevronRight, Egg, Store, Tag, Target, Utensils, type LucideIcon } from "lucide-react";
+import { BookOpen, CalendarClock, Camera, ChevronRight, Egg, Store, Tag, Target, Utensils, type LucideIcon } from "lucide-react";
+import { calendarToken } from "@/lib/calendar";
+import { CopyField } from "@/components/CopyField";
 
 // Resolve the app's own origin so server-side fetches to /api hit this app.
 async function origin(): Promise<string> {
@@ -52,6 +54,8 @@ export default async function ManagePage() {
 
   const email = session.user?.email ?? "—";
   const householdName = session.user?.name ?? "Your kitchen";
+  const hid = session.user.householdId;
+  const calendarUrl = `${base}/api/calendar/${hid}/${calendarToken(hid)}`;
 
   return (
     <>
@@ -100,6 +104,15 @@ export default async function ManagePage() {
             </span>
             <ChevronRight className="arrow" size={16} aria-hidden="true" />
           </Link>
+        </section>
+
+        <section className="stack-sm">
+          <p className="section-label">Calendar sync</p>
+          <p className="body" style={{ color: "var(--sage)", fontSize: 13, margin: 0 }}>
+            <CalendarClock size={13} style={{ verticalAlign: "-2px", marginRight: 4 }} aria-hidden="true" />
+            Subscribe by URL in TickTick, Google, or Apple Calendar to sync your meal plan.
+          </p>
+          <CopyField value={calendarUrl} />
         </section>
 
         <section className="stack-sm">
