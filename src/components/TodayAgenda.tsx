@@ -18,7 +18,7 @@ type PackItem = { kind: ItemKind; refId: number | null; amount: string };
 type AddKind = "recipe" | "product" | "ingredient" | "batch";
 
 type AgendaMeal = {
-  eventId: number;
+  eventId: number | null; // null for a synthetic batch-projected row (no meal_event backs it)
   slotId: number;
   slotName: string;
   name: string;
@@ -116,6 +116,10 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
   const [acting, setActing] = useState<number | null>(null);
 
   async function eatMeal(meal: AgendaMeal, date: string) {
+    // Synthetic batch rows (eventId null) share a batchId across every day
+    // they're projected onto, so the optimistic update below must also scope
+    // by date — otherwise eating today's serving would flip every other
+    // day's row for the same batch too.
     const key = meal.batchBacked && meal.batchId != null ? meal.batchId : meal.eventId;
     if (acting === key) return;
     setActing(key);
@@ -123,13 +127,15 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
     setDays((prev) =>
       prev.map((d) => ({
         ...d,
-        meals: d.meals.map((m) =>
-          m.eventId === meal.eventId
-            ? meal.batchBacked
-              ? { ...m, eatenFromBatchToday: true, mealsRemaining: (m.mealsRemaining ?? 1) - 1 }
-              : { ...m, status: "cooked" as const }
-            : m,
-        ),
+        meals: d.meals.map((m) => {
+          const matches = meal.eventId != null
+            ? m.eventId === meal.eventId
+            : d.date === date && m.eventId == null && m.batchId === meal.batchId && m.slotId === meal.slotId;
+          if (!matches) return m;
+          return meal.batchBacked
+            ? { ...m, eatenFromBatchToday: true, status: "cooked" as const, mealsRemaining: (m.mealsRemaining ?? 1) - 1 }
+            : { ...m, status: "cooked" as const };
+        }),
       })),
     );
     try {
@@ -139,7 +145,7 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ date }),
         });
-      } else {
+      } else if (meal.eventId != null) {
         await fetch(`/api/events/${meal.eventId}/cook`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -157,6 +163,7 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
   const [removeTarget, setRemoveTarget] = useState<{ eventId: number; name: string } | null>(null);
 
   function requestRemove(meal: AgendaMeal) {
+    if (meal.eventId == null) return; // synthetic batch row — nothing to remove
     if (meal.ruleId != null) setRemoveTarget({ eventId: meal.eventId, name: meal.name });
     else void removeEvent(meal.eventId, "one");
   }
@@ -347,8 +354,9 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
     const key = meal.batchBacked && meal.batchId != null ? meal.batchId : meal.eventId;
     const empty = meal.mealsRemaining != null && meal.mealsRemaining <= 0;
     const low = meal.mealsRemaining != null && meal.mealsRemaining <= 1;
+    const rowKey = meal.eventId != null ? `ev-${meal.eventId}` : `batch-${meal.batchId}-${meal.slotId}-${date}`;
     return (
-      <div key={meal.eventId} className="row">
+      <div key={rowKey} className="row">
         <button
           type="button"
           className="checkbox"
@@ -369,15 +377,17 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
             {empty ? "empty · cook" : low ? "cook soon" : `${meal.mealsRemaining} left`}
           </span>
         )}
-        <button
-          type="button"
-          className="btn-add"
-          aria-label={`Remove ${meal.name}`}
-          style={{ padding: "4px 10px", minHeight: "auto" }}
-          onClick={() => requestRemove(meal)}
-        >
-          ×
-        </button>
+        {meal.eventId != null && (
+          <button
+            type="button"
+            className="btn-add"
+            aria-label={`Remove ${meal.name}`}
+            style={{ padding: "4px 10px", minHeight: "auto" }}
+            onClick={() => requestRemove(meal)}
+          >
+            ×
+          </button>
+        )}
       </div>
     );
   }
@@ -469,7 +479,12 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
                   )}
 
                   {expanded && (
-                    <div className="stack-sm">
+                    // Not ".stack-sm": the desktop layout turns any stack whose
+                    // direct children are ".row" into a multi-column grid (see
+                    // globals.css), which made a day's cook-flag row and meal
+                    // rows render side-by-side instead of stacked. This day
+                    // section must always stay a single full-width column.
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                       {day.cookFlags.map((flag, i) => (
                         <button
                           key={`${day.date}-${flag.slotId}-${i}`}
