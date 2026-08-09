@@ -41,6 +41,23 @@ describe("recordPurchase", () => {
   });
 });
 
+describe("manual lots", () => {
+  it("recordPurchase({manual:true}) sets the flag and is excluded from pending/history/learnedShelfLife", () => {
+    const manualId = recordPurchase(db, hid, { productId, quantity: 1, expiresAt: "2026-07-01", manual: true }).id;
+    const [row] = db.select().from(schema.purchases).where(eq(schema.purchases.id, manualId)).all();
+    expect(row.manual).toBe(true);
+
+    expect(listPendingPurchases(db, hid)).toHaveLength(0);
+    expect(listPurchaseHistory(db, hid)).toHaveLength(0);
+
+    // give learnedShelfLife enough real (non-manual) data to otherwise report a value
+    recordPurchase(db, hid, { productId, quantity: 1, purchasedAt: new Date("2026-06-01T00:00:00Z"), expiresAt: "2026-06-06" });
+    recordPurchase(db, hid, { productId, quantity: 1, purchasedAt: new Date("2026-06-10T00:00:00Z"), expiresAt: "2026-06-17" });
+    // the manual lot's far-out expiry (2026-07-01, ~day 30 from "now") would skew the median if counted
+    expect(learnedShelfLife(db, hid).get(flourId)).toBe(6); // median of [5,7], manual lot excluded
+  });
+});
+
 describe("deletePurchase", () => {
   it("removes the purchase and reverses its restock", () => {
     const pid = recordPurchase(db, hid, { productId, quantity: 1 }).id;

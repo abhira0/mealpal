@@ -125,4 +125,39 @@ describe("cook product attribution", () => {
     expect(m.productId).toBe(a);
     expect(m.variantId).toBe(variantId);
   });
+
+  it("attributes to the product whose soonest lot expires earlier, over priority", () => {
+    const { a, b } = seedFlourProducts(db, hid, flourId); // a priority 1, b priority 2
+    recordPurchase(db, hid, { productId: a, quantity: 1, expiresAt: "2026-09-01" });
+    recordPurchase(db, hid, { productId: b, quantity: 1, expiresAt: "2026-08-15" }); // expires sooner
+    recordCooked(db, hid, bread().id, 1, null);
+    const s = stockByProduct(db, hid);
+    expect(s.get(a)).toBe(1000); // untouched
+    expect(s.get(b)).toBe(500);  // depleted: soonest-expiring wins over priority
+  });
+
+  it("cook against a product with 2 lots splits movements FEFO across purchaseIds", () => {
+    const { a } = seedFlourProducts(db, hid, flourId);
+    const soon = recordPurchase(db, hid, { productId: a, quantity: 1, expiresAt: "2026-08-10" }); // +1000, expires first
+    const later = recordPurchase(db, hid, { productId: a, quantity: 1, expiresAt: "2026-09-10" }); // +1000
+    recordCooked(db, hid, bread().id, 1, null); // amount 500, less than lot 1 (1000)
+    const movements = db.select().from(schema.stockMovements)
+      .where(eq(schema.stockMovements.reason, "cooked")).all();
+    expect(movements).toHaveLength(1);
+    expect(movements[0].purchaseId).toBe(soon.id);
+    expect(movements[0].delta).toBe(-500);
+
+    recordCooked(db, hid, bread().id, 1, null); // another 500: exhausts lot 1, none needed from lot 2 yet
+    const movements2 = db.select().from(schema.stockMovements)
+      .where(eq(schema.stockMovements.reason, "cooked")).all();
+    expect(movements2).toHaveLength(2);
+    expect(movements2[1].purchaseId).toBe(soon.id);
+
+    recordCooked(db, hid, bread().id, 1, null); // now must draw from lot 2
+    const movements3 = db.select().from(schema.stockMovements)
+      .where(eq(schema.stockMovements.reason, "cooked")).all();
+    expect(movements3).toHaveLength(3);
+    expect(movements3[2].purchaseId).toBe(later.id);
+    expect(stockByProduct(db, hid).get(a)).toBe(500); // 2000 - 1500
+  });
 });

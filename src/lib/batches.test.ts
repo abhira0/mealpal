@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import { makeTestDb, type TestDb } from "@/test/db";
 import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
@@ -63,6 +64,28 @@ describe("packBatch", () => {
     });
 
     expect(currentStock(db, hid, rice)).toBe(400); // 1000 - 200*1*3
+  });
+
+  it("splits a product item's depletion FEFO across the product's lots", () => {
+    const veg = db.insert(schema.ingredients).values({ householdId: hid, name: "Frozen Veg", canonicalUnit: "g" }).returning().all()[0].id;
+    const shop = db.insert(schema.shops).values({ householdId: hid, name: "Costco" }).returning().all()[0].id;
+    const prod = createProduct(db, hid, { ingredientId: veg, shopId: shop, name: "Kirkland Veg", packSize: 300, priority: 1, url: null }).id;
+    const soon = recordPurchase(db, hid, { productId: prod, quantity: 1, expiresAt: "2026-08-10" }); // +300, expires first
+    const later = recordPurchase(db, hid, { productId: prod, quantity: 1, expiresAt: "2026-09-10" }); // +300
+
+    packBatch(db, hid, {
+      slotId, label: "Lunch box", cookedDate: "2026-08-09", mealsTotal: 4,
+      items: [{ productId: prod, amount: 100 }], // 400 total: exhausts lot 1 (300), draws 100 from lot 2
+    });
+
+    const movements = db.select().from(schema.stockMovements)
+      .where(eq(schema.stockMovements.reason, "cooked")).all();
+    expect(movements).toHaveLength(2);
+    expect(movements[0].purchaseId).toBe(soon.id);
+    expect(movements[0].delta).toBe(-300);
+    expect(movements[1].purchaseId).toBe(later.id);
+    expect(movements[1].delta).toBe(-100);
+    expect(currentStock(db, hid, veg)).toBe(200); // 600 - 400
   });
 });
 

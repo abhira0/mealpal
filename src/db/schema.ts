@@ -270,6 +270,8 @@ export const purchases = sqliteTable("purchases", {
   // where it was actually bought; null = fall back to the product's shop
   shopId: integer("shop_id").references(() => shops.id),
   purchasedAt: integer("purchased_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  // true = manual on-hand backfill lot (no shop/price); false = a real buy
+  manual: integer("manual", { mode: "boolean" }).notNull().default(false),
 });
 
 // Manually-added shopping-list lines (not derived from meal plans).

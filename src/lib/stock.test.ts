@@ -2,8 +2,10 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { makeTestDb, type TestDb } from "@/test/db";
 import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
-import { recordMovement, currentStock, stockByIngredient, expiryByIngredient, expiryByProduct, replaceManualExpiry } from "@/lib/stock";
-import { and, eq } from "drizzle-orm";
+import {
+  recordMovement, currentStock, stockByIngredient, expiryByIngredient,
+  lotsByProduct, allocateFEFO, adjustStock, stockByProduct,
+} from "@/lib/stock";
 
 let db: TestDb;
 let hid: number;
@@ -42,13 +44,30 @@ describe("stock ledger", () => {
     const productId = db.insert(schema.products)
       .values({ householdId: hid, ingredientId: flourId, shopId, name: "Flour 1kg", packSize: 1000 })
       .returning().all()[0].id;
-    db.insert(schema.purchases)
-      .values({ householdId: hid, productId, quantity: 1, expiresAt: "2026-07-05" }).run();
+    const purchaseId = db.insert(schema.purchases)
+      .values({ householdId: hid, productId, quantity: 1, expiresAt: "2026-07-05" }).returning().all()[0].id;
+    // A real buy also restocks — that's the lot with units on hand.
+    recordMovement(db, hid, { ingredientId: flourId, productId, delta: 1000, reason: "purchase", purchaseId });
     expect(expiryByIngredient(db, hid).get(flourId)).toBe("2026-07-05");
+  });
+  it("ignores a fully-consumed lot's expiry, keeping the live lot's date", () => {
+    const shopId = db.insert(schema.shops).values({ householdId: hid, name: "Mart" }).returning().all()[0].id;
+    const productId = db.insert(schema.products)
+      .values({ householdId: hid, ingredientId: flourId, shopId, name: "Flour 1kg", packSize: 1000 })
+      .returning().all()[0].id;
+    // Old lot expiring 07-03, fully eaten. New lot expiring 08-19, on hand.
+    const oldLot = db.insert(schema.purchases)
+      .values({ householdId: hid, productId, quantity: 1, expiresAt: "2026-07-03" }).returning().all()[0].id;
+    recordMovement(db, hid, { ingredientId: flourId, productId, delta: 1000, reason: "purchase", purchaseId: oldLot });
+    recordMovement(db, hid, { ingredientId: flourId, productId, delta: -1000, reason: "cooked", purchaseId: oldLot });
+    const newLot = db.insert(schema.purchases)
+      .values({ householdId: hid, productId, quantity: 1, expiresAt: "2026-08-19" }).returning().all()[0].id;
+    recordMovement(db, hid, { ingredientId: flourId, productId, delta: 1000, reason: "purchase", purchaseId: newLot });
+    expect(expiryByIngredient(db, hid).get(flourId)).toBe("2026-08-19");
   });
 });
 
-describe("replaceManualExpiry (pantry edit = replace in place)", () => {
+describe("lotsByProduct / allocateFEFO / adjustStock (per-lot FEFO tracking)", () => {
   let shopId: number;
   let productId: number;
   beforeEach(() => {
@@ -58,51 +77,80 @@ describe("replaceManualExpiry (pantry edit = replace in place)", () => {
       .returning().all()[0].id;
   });
 
-  const manualRows = () =>
-    db.select().from(schema.stockMovements)
-      .where(and(eq(schema.stockMovements.productId, productId), eq(schema.stockMovements.reason, "manual")))
-      .all();
+  const buyLot = (qty: number, expiresAt: string | null, cents: number | null = 200) => {
+    const [purchase] = db.insert(schema.purchases)
+      .values({ householdId: hid, productId, quantity: 1, cents, expiresAt, manual: false })
+      .returning().all();
+    recordMovement(db, hid, { ingredientId: flourId, productId, delta: qty, reason: "purchase", purchaseId: purchase.id });
+    return purchase.id;
+  };
 
-  it("overwrites the on-hand batch's date in place — a later date now shows", () => {
-    recordMovement(db, hid, { ingredientId: flourId, productId, delta: 1800, reason: "manual", expiresAt: "2026-07-02" });
-    replaceManualExpiry(db, hid, flourId, productId, "2026-08-02");
-    expect(expiryByProduct(db, hid).get(productId)).toBe("2026-08-02");
-    expect(manualRows()).toHaveLength(1); // no new row appended
-    expect(currentStock(db, hid, flourId)).toBe(1800); // quantity untouched
+  it("orders lots soonest-expiry first, undated last, and computes remaining per lot", () => {
+    const late = buyLot(500, "2026-08-20");
+    const undated = buyLot(300, null);
+    const soon = buyLot(400, "2026-07-10");
+    recordMovement(db, hid, { ingredientId: flourId, productId, delta: -100, reason: "cooked", purchaseId: soon });
+
+    const lots = lotsByProduct(db, hid).get(productId)!;
+    expect(lots.map((l) => l.purchaseId)).toEqual([soon, late, undated]);
+    expect(lots.find((l) => l.purchaseId === soon)!.remaining).toBe(300);
+    expect(lots.find((l) => l.purchaseId === late)!.remaining).toBe(500);
+    expect(lots.find((l) => l.purchaseId === undated)!.remaining).toBe(300);
   });
 
-  it("collapses stale duplicate expiry rows down to one", () => {
-    recordMovement(db, hid, { ingredientId: flourId, productId, delta: 1800, reason: "manual", expiresAt: "2026-07-02" });
-    recordMovement(db, hid, { ingredientId: flourId, productId, delta: 0, reason: "manual", expiresAt: "2026-08-02" });
-    recordMovement(db, hid, { ingredientId: flourId, productId, delta: 0, reason: "manual", expiresAt: "2026-08-02" });
-    replaceManualExpiry(db, hid, flourId, productId, "2026-09-01");
-    expect(expiryByProduct(db, hid).get(productId)).toBe("2026-09-01");
-    // the two bare delta-0 carriers are gone; only the real batch (delta 1800) remains
-    const rows = manualRows();
-    expect(rows).toHaveLength(1);
-    expect(rows[0].delta).toBe(1800);
+  it("drops zero-remaining lots but keeps negative ones; Σ lots == stockByProduct", () => {
+    const drained = buyLot(200, "2026-07-01");
+    const negative = buyLot(100, "2026-07-05");
+    buyLot(50, "2026-07-15");
+    recordMovement(db, hid, { ingredientId: flourId, productId, delta: -200, reason: "cooked", purchaseId: drained });
+    recordMovement(db, hid, { ingredientId: flourId, productId, delta: -150, reason: "cooked", purchaseId: negative });
+
+    const lots = lotsByProduct(db, hid).get(productId)!;
+    expect(lots.some((l) => l.purchaseId === drained)).toBe(false); // 0 remaining, dropped
+    const neg = lots.find((l) => l.purchaseId === negative)!;
+    expect(neg.remaining).toBe(-50); // kept, negative
+    const total = lots.reduce((s, l) => s + l.remaining, 0);
+    expect(total).toBe(stockByProduct(db, hid).get(productId));
   });
 
-  it("records a single carrier when the product has no manual movement yet", () => {
-    replaceManualExpiry(db, hid, flourId, productId, "2026-09-01");
-    expect(expiryByProduct(db, hid).get(productId)).toBe("2026-09-01");
-    expect(manualRows()).toHaveLength(1);
-    expect(currentStock(db, hid, flourId)).toBe(0); // delta-0 carrier adds no stock
+  it("allocateFEFO splits a single deplete across two lots, soonest first", () => {
+    const soon = buyLot(100, "2026-07-01");
+    const later = buyLot(200, "2026-08-01");
+    const moves = allocateFEFO(db, hid, flourId, productId, 150, { reason: "cooked" });
+    expect(moves).toHaveLength(2);
+    expect(moves[0]).toMatchObject({ purchaseId: soon, delta: -100 });
+    expect(moves[1]).toMatchObject({ purchaseId: later, delta: -50 });
+    expect(stockByProduct(db, hid).get(productId)).toBe(150);
   });
 
-  it("still lets an earlier purchase win via min() across batches", () => {
-    recordMovement(db, hid, { ingredientId: flourId, productId, delta: 1800, reason: "manual", expiresAt: "2026-07-02" });
-    db.insert(schema.purchases).values({ householdId: hid, productId, quantity: 1, expiresAt: "2026-07-20" }).run();
-    // push the manual date out past the purchase; the purchase is now soonest
-    replaceManualExpiry(db, hid, flourId, productId, "2026-08-02");
-    expect(expiryByProduct(db, hid).get(productId)).toBe("2026-07-20");
+  it("allocateFEFO overflow beyond on-hand drives the soonest lot negative", () => {
+    const soon = buyLot(50, "2026-07-01");
+    const moves = allocateFEFO(db, hid, flourId, productId, 80, { reason: "cooked" });
+    expect(moves).toHaveLength(2);
+    expect(moves[1]).toMatchObject({ purchaseId: soon, delta: -30 });
+    const lots = lotsByProduct(db, hid).get(productId)!;
+    expect(lots.find((l) => l.purchaseId === soon)!.remaining).toBe(-30);
   });
 
-  it("clearing the manual date drops it without touching purchases", () => {
-    recordMovement(db, hid, { ingredientId: flourId, productId, delta: 0, reason: "manual", expiresAt: "2026-07-02" });
-    db.insert(schema.purchases).values({ householdId: hid, productId, quantity: 1, expiresAt: "2026-07-20" }).run();
-    replaceManualExpiry(db, hid, flourId, productId, null);
-    expect(expiryByProduct(db, hid).get(productId)).toBe("2026-07-20");
-    expect(manualRows()).toHaveLength(0);
+  it("allocateFEFO with no lots at all falls back to one unattributed negative movement", () => {
+    const moves = allocateFEFO(db, hid, flourId, productId, 40, { reason: "cooked" });
+    expect(moves).toHaveLength(1);
+    expect(moves[0].purchaseId).toBeNull();
+    expect(moves[0].delta).toBe(-40);
+  });
+
+  it("adjustStock with a negative delta depletes the soonest-expiring lot first", () => {
+    const soon = buyLot(100, "2026-07-01");
+    buyLot(200, "2026-08-01");
+    adjustStock(db, hid, flourId, -60, null, productId);
+    const lots = lotsByProduct(db, hid).get(productId)!;
+    expect(lots.find((l) => l.purchaseId === soon)!.remaining).toBe(40);
+  });
+
+  it("adjustStock with a positive delta and expiry creates a new manual lot", () => {
+    adjustStock(db, hid, flourId, 500, "2026-09-01", productId);
+    const lots = lotsByProduct(db, hid).get(productId)!;
+    expect(lots).toHaveLength(1);
+    expect(lots[0]).toMatchObject({ expiresAt: "2026-09-01", remaining: 500, manual: true, pricePaidCents: null });
   });
 });

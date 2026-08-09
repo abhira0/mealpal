@@ -2,7 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
 import { recordCooked } from "@/lib/consumption";
-import { recordMovement } from "@/lib/stock";
+import { allocateFEFO } from "@/lib/stock";
 
 type Db = BetterSQLite3Database<typeof schema>;
 
@@ -44,10 +44,8 @@ export function packBatch(db: Db, householdId: number, input: PackBatchInput) {
         const [p] = tx.select({ ingredientId: schema.products.ingredientId })
           .from(schema.products).where(and(eq(schema.products.id, item.productId), eq(schema.products.householdId, householdId))).all();
         if (p) {
-          recordMovement(tx as unknown as Db, householdId, {
-            ingredientId: p.ingredientId, productId: item.productId, variantId: item.variantId ?? null,
-            delta: -(item.amount ?? 0) * input.mealsTotal, reason: "cooked", mealEventId: null,
-          });
+          allocateFEFO(tx as unknown as Db, householdId, p.ingredientId, item.productId,
+            (item.amount ?? 0) * input.mealsTotal, { reason: "cooked", variantId: item.variantId ?? null, mealEventId: null });
         }
       }
       // ponytail: raw-ingredient batch items deferred to a later plan; components

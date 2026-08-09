@@ -85,6 +85,15 @@ button{font-family:inherit}
 .pantry-prod-row2{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .pantry-row .p-right{flex:none;display:flex;align-items:center;gap:8px;white-space:nowrap}
 .pantry-row.out{opacity:.5}
+/* per-lot rows (FEFO): flat list under a product, no accordion */
+.pantry-lots{display:flex;flex-direction:column;gap:4px;width:100%}
+.lot-row{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%}
+.lot-row.neg .val.qty{color:var(--run-ink);border-bottom-color:var(--run-ink)}
+/* add-on-hand draft row: blank image + the title-as-dropdown reads as plain text */
+.onhand-blank{background:var(--line-soft);border:1px dashed var(--line)}
+.onhand-title .trigger{border:none;background:none;padding:0;min-height:0;font-family:var(--body);color:var(--sage)}
+.onhand-title .trigger .placeholder{color:var(--sage);opacity:.7}
+.onhand-title .trigger .caret{margin-left:6px}
 .pantry-row.out .chip.qty{color:var(--sage)}
 
 /* ---------- form fields ---------- */

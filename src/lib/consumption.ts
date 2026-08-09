@@ -2,7 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
 import { getRecipe } from "@/lib/recipes";
-import { recordMovement, stockByProduct } from "@/lib/stock";
+import { allocateFEFO, lotsByProduct, recordMovement, stockByProduct } from "@/lib/stock";
 
 type Db = BetterSQLite3Database<typeof schema>;
 
@@ -39,25 +39,41 @@ export function consumptionLinesForEvent(db: Db, householdId: number, ev: MealEv
 }
 
 /**
- * Products of an ingredient that currently have stock on hand, preferred
- * (lowest priority) first. Used to attribute a cook to a specific product.
+ * Products of an ingredient that currently have stock on hand, soonest lot
+ * expiry first (FEFO), falling back to priority for undated products / ties.
+ * Used to attribute a cook to a specific product.
  */
 function inStockProductsByIngredient(db: Db, householdId: number): Map<number, number[]> {
   const onHand = stockByProduct(db, householdId);
+  const lots = lotsByProduct(db, householdId);
   const products = db.select({
-    id: schema.products.id, ingredientId: schema.products.ingredientId,
+    id: schema.products.id, ingredientId: schema.products.ingredientId, priority: schema.products.priority,
   })
     .from(schema.products)
     .where(eq(schema.products.householdId, householdId))
     .orderBy(asc(schema.products.priority)).all();
-  const out = new Map<number, number[]>();
+  const out = new Map<number, (typeof products[number])[]>();
   for (const p of products) {
     if ((onHand.get(p.id) ?? 0) <= 0) continue;
     const list = out.get(p.ingredientId) ?? [];
-    list.push(p.id);
+    list.push(p);
     out.set(p.ingredientId, list);
   }
-  return out;
+  const soonestExpiry = (productId: number) => {
+    const dated = (lots.get(productId) ?? []).map((l) => l.expiresAt).filter((e): e is string => e != null);
+    return dated.length ? dated.sort()[0] : null; // undated last
+  };
+  const result = new Map<number, number[]>();
+  for (const [ingredientId, list] of out) {
+    const sorted = [...list].sort((a, b) => {
+      const ae = soonestExpiry(a.id) ?? "￿";
+      const be = soonestExpiry(b.id) ?? "￿";
+      if (ae !== be) return ae < be ? -1 : 1;
+      return a.priority - b.priority;
+    });
+    result.set(ingredientId, sorted.map((p) => p.id));
+  }
+  return result;
 }
 
 export interface CookChoice {
@@ -193,9 +209,13 @@ export function recordCooked(
     const useChosen = chosen != null && ids.includes(chosen.productId);
     const productId = useChosen ? chosen.productId : (ids[0] ?? null);
     const variantId = useChosen ? chosen.variantId : null;
-    recordMovement(db, householdId, {
-      ingredientId: line.ingredientId, productId, variantId, delta: -line.amount, reason: "cooked", mealEventId,
-    });
+    if (productId == null) {
+      recordMovement(db, householdId, {
+        ingredientId: line.ingredientId, productId: null, variantId, delta: -line.amount, reason: "cooked", mealEventId,
+      });
+    } else {
+      allocateFEFO(db, householdId, line.ingredientId, productId, line.amount, { reason: "cooked", variantId, mealEventId });
+    }
   }
   return lines;
 }
@@ -225,9 +245,13 @@ export function recordCookedForEvent(
       productId = useChosen ? chosen.productId : (ids[0] ?? null);
       variantId = useChosen ? chosen.variantId : null;
     }
-    recordMovement(db, householdId, {
-      ingredientId: line.ingredientId, productId, variantId, delta: -line.amount, reason: "cooked", mealEventId: ev.id,
-    });
+    if (productId == null) {
+      recordMovement(db, householdId, {
+        ingredientId: line.ingredientId, productId: null, variantId, delta: -line.amount, reason: "cooked", mealEventId: ev.id,
+      });
+    } else {
+      allocateFEFO(db, householdId, line.ingredientId, productId, line.amount, { reason: "cooked", variantId, mealEventId: ev.id });
+    }
   }
   return lines;
 }
