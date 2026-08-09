@@ -142,6 +142,11 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
   const todayRef = useRef<HTMLDivElement | null>(null);
 
   const [acting, setActing] = useState<number | null>(null);
+  // When serving a product/ingredient meal whose ingredient has >1 in-stock
+  // product or has variants, ask which one was actually eaten before cooking.
+  const [cookChoice, setCookChoice] = useState<
+    { meal: AgendaMeal; date: string; choices: CookChoice[]; picked: Record<number, CookPick> } | null
+  >(null);
 
   async function toggleMeal(meal: AgendaMeal, date: string) {
     // Synthetic batch rows (eventId null) share a batchId across every day
@@ -152,6 +157,22 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
     if (acting === key) return;
     // Currently served? Then this tap UNDOES it (un-serve); otherwise it serves.
     const served = meal.status === "cooked" || (meal.batchBacked && meal.eatenFromBatchToday);
+    // Serving a non-batch meal: if its ingredient(s) need a product/variant pick
+    // (e.g. a trail mix with variants), ask first, then serve via confirmCook.
+    if (!served && !meal.batchBacked && meal.eventId != null) {
+      const res = await fetch(`/api/events/${meal.eventId}/cook`);
+      const choices = res.ok ? ((await res.json()) as CookChoice[]) : [];
+      if (choices.length > 0) {
+        const picked: Record<number, CookPick> = Object.fromEntries(
+          choices.map((c) => {
+            const p = c.products[0];
+            return [c.ingredientId, { productId: p.id, variantId: p.variants[0]?.id ?? null }];
+          }),
+        );
+        setCookChoice({ meal, date, choices, picked });
+        return;
+      }
+    }
     setActing(key);
     // optimistic toggle
     setDays((prev) =>
@@ -200,6 +221,33 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
           ...(served ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ force: true }) }),
         });
       }
+    } finally {
+      await Promise.all([loadAgenda(), loadAnalysis()]);
+      setActing(null);
+    }
+  }
+
+  // Confirm the variant/product pick, then serve (cook the event with allocations).
+  async function confirmCook() {
+    if (!cookChoice) return;
+    const { meal, picked } = cookChoice;
+    setCookChoice(null);
+    if (meal.eventId == null) return;
+    setActing(meal.eventId);
+    setDays((prev) =>
+      prev.map((d) => ({
+        ...d,
+        meals: d.meals.map((m) =>
+          m.eventId === meal.eventId ? { ...m, status: "cooked" as const, phase: "served" as const } : m,
+        ),
+      })),
+    );
+    try {
+      await fetch(`/api/events/${meal.eventId}/cook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ allocations: picked, force: true }),
+      });
     } finally {
       await Promise.all([loadAgenda(), loadAnalysis()]);
       setActing(null);
@@ -916,6 +964,52 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
           <button type="button" className="btn block" disabled={!addValid || addSaving} onClick={submitAdd}>
             {addSaving ? "Adding…" : "Add"}
           </button>
+        </div>
+      </Sheet>
+
+      <Sheet open={cookChoice !== null} title="Which did you have?" onClose={() => setCookChoice(null)}>
+        <div className="sh-body stack-sm">
+          {cookChoice?.choices.map((c) => {
+            const sel = cookChoice.picked[c.ingredientId];
+            const selProduct = c.products.find((p) => p.id === sel?.productId) ?? c.products[0];
+            return (
+              <div key={c.ingredientId} style={{ marginBottom: 12 }}>
+                <p className="body" style={{ color: "var(--sage)" }}>{c.ingredientName}</p>
+                {c.products.length > 1 && (
+                  <div className="field">
+                    <span className="field-label">Product</span>
+                    <Dropdown
+                      label="Product"
+                      value={sel?.productId ?? null}
+                      options={c.products.map((p) => ({ id: p.id, label: p.name }))}
+                      onChange={(id) => {
+                        const p = c.products.find((x) => x.id === Number(id))!;
+                        setCookChoice((cc) =>
+                          cc && { ...cc, picked: { ...cc.picked, [c.ingredientId]: { productId: p.id, variantId: p.variants[0]?.id ?? null } } },
+                        );
+                      }}
+                    />
+                  </div>
+                )}
+                {selProduct.variants.length > 0 && (
+                  <div className="field">
+                    <span className="field-label">Variant</span>
+                    <Dropdown
+                      label="Variant"
+                      value={sel?.variantId ?? null}
+                      options={selProduct.variants.map((v) => ({ id: v.id, label: v.name }))}
+                      onChange={(id) =>
+                        setCookChoice((cc) =>
+                          cc && { ...cc, picked: { ...cc.picked, [c.ingredientId]: { productId: selProduct.id, variantId: Number(id) } } },
+                        )
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          <button type="button" className="btn block" onClick={confirmCook}>Serve it</button>
         </div>
       </Sheet>
 
