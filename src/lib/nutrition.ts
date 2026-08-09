@@ -215,6 +215,32 @@ export function dayNutrition(
   return { date, meals, total, planned, missing: [...missing] };
 }
 
+/** Nutrition of ONE serving of a batch = sum of its item lines. */
+export function batchServingNutrients(db: Db, householdId: number, batchId: number): Nutrients {
+  const items = db.select().from(schema.batchItems)
+    .where(eq(schema.batchItems.batchId, batchId)).all();
+  const out = zeroNutrients();
+  for (const it of items) {
+    if (it.recipeId != null) {
+      const recipe = getRecipe(db, householdId, it.recipeId);
+      if (!recipe) continue;
+      for (const line of consumptionForRecipe(recipe, it.amount ?? 1)) {
+        const pn = preferredNutrients(db, householdId, line.ingredientId);
+        if (pn) addScaled(out, pn, line.amount);
+      }
+    } else if (it.productId != null) {
+      const p = db.select().from(schema.products)
+        .where(and(eq(schema.products.id, it.productId), eq(schema.products.householdId, householdId))).all()[0];
+      const v = it.variantId != null
+        ? db.select().from(schema.productVariants).where(eq(schema.productVariants.id, it.variantId)).all()[0]
+        : undefined;
+      const src = v ? variantNutrients(v) : (p ? productNutrients(p) : null);
+      if (src) addScaled(out, src, it.amount ?? 0);
+    }
+  }
+  return out;
+}
+
 /** Preferred available product (lowest priority) that has nutrition filled in. */
 function preferredNutrients(db: Db, householdId: number, ingredientId: number): Nutrients | null {
   const products = db.select().from(schema.products)

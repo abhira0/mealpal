@@ -5,11 +5,12 @@ import { schema } from "@/db";
 import { createRecipe } from "@/lib/recipes";
 import { recordPurchase } from "@/lib/shopping";
 import { recordCooked, unstockedIngredients } from "@/lib/consumption";
-import { dayNutrition, scorecards, zeroNutrients, mondayOf, macroSplit, dayIngredientTable, weekIngredientTable } from "@/lib/nutrition";
+import { dayNutrition, scorecards, zeroNutrients, mondayOf, macroSplit, dayIngredientTable, weekIngredientTable, batchServingNutrients } from "@/lib/nutrition";
 import { createVariant } from "@/lib/variants";
 import { logEaten } from "@/lib/eaten";
 import { createProduct } from "@/lib/products";
 import { addEvent } from "@/lib/plan";
+import { packBatch, eatFromBatch } from "@/lib/batches";
 
 let db: TestDb;
 let hid: number;
@@ -202,6 +203,18 @@ describe("dayNutrition includes the eat-log", () => {
     const day = dayNutrition(eatDb, eatHid, "2026-06-29");
     expect(day.total.calories).toBe(360); // 180 × 2
     expect(day.total.proteinG).toBe(12);
+  });
+});
+
+describe("batchServingNutrients", () => {
+  it("sums the nutrition of one serving from a batch's product item", () => {
+    const pid = flourProduct({ calories: 2 }); // 2 kcal/g preferred product
+    recordPurchase(db, hid, { productId: pid, quantity: 1 }); // stock for packing
+    const batch = packBatch(db, hid, {
+      slotId, label: "Dal", cookedDate: "2026-07-01", mealsTotal: 4,
+      items: [{ productId: pid, amount: 100 }], // 100g per serving
+    });
+    expect(batchServingNutrients(db, hid, batch.id).calories).toBe(200); // 2 × 100
   });
 });
 
