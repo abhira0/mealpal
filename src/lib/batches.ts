@@ -39,19 +39,38 @@ export function packBatch(db: Db, householdId: number, input: PackBatchInput) {
 
       if (item.recipeId != null) {
         const servings = (item.amount ?? 1) * input.mealsTotal;
-        recordCooked(tx as unknown as Db, householdId, item.recipeId, servings, null);
+        recordCooked(tx as unknown as Db, householdId, item.recipeId, servings, null, undefined, batch.id);
       } else if (item.productId != null) {
         const [p] = tx.select({ ingredientId: schema.products.ingredientId })
           .from(schema.products).where(and(eq(schema.products.id, item.productId), eq(schema.products.householdId, householdId))).all();
         if (p) {
           allocateFEFO(tx as unknown as Db, householdId, p.ingredientId, item.productId,
-            (item.amount ?? 0) * input.mealsTotal, { reason: "cooked", variantId: item.variantId ?? null, mealEventId: null });
+            (item.amount ?? 0) * input.mealsTotal, { reason: "cooked", variantId: item.variantId ?? null, mealEventId: null, batchId: batch.id });
         }
       }
       // ponytail: raw-ingredient batch items deferred to a later plan; components
       // in practice are recipes (biryani/sabji) or products (frozen veg/chapathi).
     }
     return batch;
+  });
+}
+
+/**
+ * Delete a batch and reverse its pack-time depletion. The negative stock
+ * movements tagged with this batch are deleted (restoring the exact FEFO lots),
+ * then its item/eaten rows and the batch itself. No-op if not in the household.
+ */
+export function unpackBatch(db: Db, householdId: number, batchId: number) {
+  return db.transaction((tx) => {
+    const [batch] = tx.select().from(schema.batches)
+      .where(and(eq(schema.batches.id, batchId), eq(schema.batches.householdId, householdId))).all();
+    if (!batch) return false;
+    tx.delete(schema.stockMovements)
+      .where(and(eq(schema.stockMovements.householdId, householdId), eq(schema.stockMovements.batchId, batchId))).run();
+    tx.delete(schema.batchEaten).where(eq(schema.batchEaten.batchId, batchId)).run();
+    tx.delete(schema.batchItems).where(eq(schema.batchItems.batchId, batchId)).run();
+    tx.delete(schema.batches).where(eq(schema.batches.id, batchId)).run();
+    return true;
   });
 }
 

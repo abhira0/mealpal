@@ -16,6 +16,7 @@ test.describe("batch tracker (merged Today agenda)", () => {
       db.exec(`
         DELETE FROM batch_eaten WHERE batch_id IN (SELECT id FROM batches WHERE label LIKE 'E2E%');
         DELETE FROM batch_items WHERE batch_id IN (SELECT id FROM batches WHERE label LIKE 'E2E%');
+        DELETE FROM stock_movements WHERE batch_id IN (SELECT id FROM batches WHERE label LIKE 'E2E%');
         DELETE FROM batches WHERE label LIKE 'E2E%';
       `);
     } finally {
@@ -88,5 +89,43 @@ test.describe("batch tracker (merged Today agenda)", () => {
     // disappears from every day's row (rather than showing "empty · cook").
     await page.getByRole("checkbox", { name: "Mark Morning Smoothie eaten" }).first().click();
     await expect(chip).toHaveCount(0);
+  });
+
+  test("edit a batch in place: prefills the sheet and persists the change", async ({ page }) => {
+    const editLabel = `${LABEL}-edit`;
+    await page.goto("/login");
+    await page.getByLabel("Email").fill("demo@demo.com");
+    await page.getByLabel("Password").fill("demo1234");
+    await page.getByRole("button", { name: "Log in" }).click();
+    await expect(page).toHaveURL("/");
+    await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
+
+    // Pack a fresh batch (meals=4) so a batch-backed row exists to edit.
+    const fab = page.getByRole("button", { name: "Add" });
+    await expect(fab).toBeEnabled();
+    await fab.click();
+    await page.getByRole("button", { name: "Batch", exact: true }).click();
+    await page.getByPlaceholder("e.g. Chicken & rice").fill(editLabel);
+    await page.locator(".sheet").getByRole("button", { name: "Add", exact: true }).click();
+    await expect(page.locator(".sh-title", { hasText: "Add" })).toBeHidden();
+
+    // Tap the ✎ on the batch-backed Morning Smoothie row.
+    const todayDay = page.locator("p.section-label", { hasText: /^Today$/ }).locator("..");
+    const smoothieRow = todayDay.locator(".row", { hasText: "Morning Smoothie" });
+    await smoothieRow.getByRole("button", { name: "Edit Morning Smoothie" }).click();
+
+    // Edit sheet opens pre-filled with this batch's label + meal count.
+    await expect(page.locator(".sh-title", { hasText: "Edit batch" })).toBeVisible();
+    await expect(page.getByPlaceholder("e.g. Chicken & rice")).toHaveValue(editLabel);
+    await expect(page.locator(".stepper .val")).toHaveText("4");
+
+    // Bump meals 4 → 6 and save (full re-pack under the hood). A clean close
+    // means the PATCH re-pack succeeded; stock/persistence is covered in
+    // batches.test.ts (unpack restores exact lots, then packs the new count).
+    const increase = page.getByRole("button", { name: "Increase" });
+    await increase.click();
+    await increase.click();
+    await page.locator(".sheet").getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.locator(".sh-title", { hasText: "Edit batch" })).toBeHidden();
   });
 });

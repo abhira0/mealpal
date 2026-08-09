@@ -4,7 +4,7 @@ import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
 import { createRecipe } from "@/lib/recipes";
 import { createSlot } from "@/lib/slots";
-import { addEvent, listEvents, cookEvent, uncookEvent, serveEvent, unserveEvent, deleteEvent, plannedConsumption, runOutDates } from "@/lib/plan";
+import { addEvent, updateEvent, listEvents, cookEvent, uncookEvent, serveEvent, unserveEvent, deleteEvent, plannedConsumption, runOutDates } from "@/lib/plan";
 import { currentStock } from "@/lib/stock";
 import { createProduct } from "@/lib/products";
 import { createVariant } from "@/lib/variants";
@@ -34,6 +34,24 @@ describe("meal plan", () => {
     const events = listEvents(db, hid, "2026-07-01", "2026-07-01");
     expect(events).toHaveLength(1);
     expect(events[0].status).toBe("planned");
+  });
+
+  it("edits a planned event's servings, slot, and date in place", () => {
+    const ev = addEvent(db, hid, { date: "2026-07-01", slotId, recipeId, servings: 2 });
+    const other = createSlot(db, hid, "Lunch", "12:00").id;
+    const updated = updateEvent(db, hid, ev.id, { date: "2026-07-05", slotId: other, recipeId, servings: 6 });
+    expect(updated?.date).toBe("2026-07-05");
+    expect(updated?.slotId).toBe(other);
+    expect(updated?.servings).toBe(6);
+    expect(listEvents(db, hid, "2026-07-01", "2026-07-01")).toHaveLength(0);
+    expect(listEvents(db, hid, "2026-07-05", "2026-07-05")).toHaveLength(1);
+  });
+
+  it("refuses to edit a cooked/served event (returns null)", () => {
+    const ev = addEvent(db, hid, { date: "2026-07-01", slotId, recipeId, servings: 2 });
+    cookEvent(db, hid, ev.id);
+    expect(updateEvent(db, hid, ev.id, { date: "2026-07-01", slotId, recipeId, servings: 4 })).toBeNull();
+    expect(listEvents(db, hid, "2026-07-01", "2026-07-01")[0].servings).toBe(2); // unchanged
   });
 
   it("sums planned consumption across the horizon (scaled by servings)", () => {

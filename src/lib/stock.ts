@@ -11,6 +11,7 @@ export interface MovementInput {
   delta: number;
   reason: "purchase" | "cooked" | "manual" | "eaten";
   mealEventId?: number | null;
+  batchId?: number | null;
   purchaseId?: number | null;
   expiresAt?: string | null;
 }
@@ -21,7 +22,7 @@ export function recordMovement(db: Db, householdId: number, m: MovementInput) {
       householdId, ingredientId: m.ingredientId, productId: m.productId ?? null,
       variantId: m.variantId ?? null,
       delta: m.delta, reason: m.reason,
-      mealEventId: m.mealEventId ?? null, purchaseId: m.purchaseId ?? null,
+      mealEventId: m.mealEventId ?? null, batchId: m.batchId ?? null, purchaseId: m.purchaseId ?? null,
       expiresAt: m.expiresAt ?? null,
     }).returning().all();
   return row;
@@ -145,6 +146,7 @@ export interface FEFOContext {
   reason: "cooked" | "eaten" | "manual";
   variantId?: number | null;
   mealEventId?: number | null;
+  batchId?: number | null;
 }
 
 /**
@@ -164,7 +166,7 @@ export function allocateFEFO(
   const write = (delta: number, purchaseId?: number | null) =>
     written.push(recordMovement(tx, householdId, {
       ingredientId, productId, delta, reason: ctx.reason,
-      variantId: ctx.variantId, mealEventId: ctx.mealEventId, purchaseId,
+      variantId: ctx.variantId, mealEventId: ctx.mealEventId, batchId: ctx.batchId, purchaseId,
     }));
 
   if (lots.length === 0) {

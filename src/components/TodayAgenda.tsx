@@ -371,6 +371,10 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
   const [addUnit, setAddUnit] = useState<"day" | "week">("day");
   const [addUntil, setAddUntil] = useState("");
   const [addSaving, setAddSaving] = useState(false);
+  // When set, the Add sheet is editing an existing meal/batch (PATCH, not POST).
+  const [editEventId, setEditEventId] = useState<number | null>(null);
+  const [editBatchId, setEditBatchId] = useState<number | null>(null);
+  const isEditing = editEventId != null || editBatchId != null;
 
   // Batch-only fields (addKind === "batch").
   const [addLabel, setAddLabel] = useState("");
@@ -390,6 +394,8 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
   }
 
   function openAdd(opts?: { date?: string; slotId?: number; type?: AddKind }) {
+    setEditEventId(null);
+    setEditBatchId(null);
     setAddDate(opts?.date ?? todayIso);
     setAddSlotId(opts?.slotId ?? slots[0]?.id ?? null);
     setAddKind(opts?.type ?? "recipe");
@@ -409,6 +415,69 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
     setAddLabel("");
     setAddMeals(4);
     setAddItems([{ kind: "recipe", refId: recipes[0]?.id ?? null, amount: "" }]);
+    setAddOpen(true);
+  }
+
+  // Open the Add sheet pre-filled to edit a still-planned meal. Fetches the
+  // full event row (the agenda row lacks servings/amount/variant).
+  async function openEditMeal(meal: AgendaMeal) {
+    if (meal.eventId == null) return;
+    const res = await fetch(`/api/events/${meal.eventId}`);
+    if (!res.ok) return;
+    const ev = (await res.json()) as {
+      date: string; slotId: number; servings: number; amount: number | null;
+      recipeId: number | null; productId: number | null; variantId: number | null; ingredientId: number | null;
+    };
+    setEditBatchId(null);
+    setEditEventId(meal.eventId);
+    setAddDate(ev.date);
+    setAddSlotId(ev.slotId);
+    setAddRepeat(false);
+    setAddProductAmount("");
+    setAddAmount("");
+    if (ev.recipeId != null) {
+      setAddKind("recipe");
+      setAddRecipeId(ev.recipeId);
+      setAddServings(Math.max(1, Math.round(ev.servings)));
+    } else if (ev.productId != null) {
+      setAddKind("product");
+      setAddProductId(ev.productId);
+      setAddServings(Math.max(1, Math.round(ev.servings)));
+      const vres = await fetch(`/api/products/${ev.productId}/variants`);
+      setAddVariants(vres.ok ? ((await vres.json()) as { id: number; name: string }[]) : []);
+      setAddVariantId(ev.variantId);
+    } else if (ev.ingredientId != null) {
+      setAddKind("ingredient");
+      setAddIngredientId(ev.ingredientId);
+      setAddAmount(ev.amount != null ? String(ev.amount) : "");
+    }
+    setAddOpen(true);
+  }
+
+  // Open the Add sheet pre-filled to edit a batch (full re-pack on save).
+  async function openEditBatch(batchId: number) {
+    const res = await fetch(`/api/batches/${batchId}`);
+    if (!res.ok) return;
+    const batch = (await res.json()) as {
+      slotId: number; label: string; cookedDate: string; mealsTotal: number;
+      items: { recipeId: number | null; productId: number | null; amount: number | null }[];
+    };
+    setEditEventId(null);
+    setEditBatchId(batchId);
+    setAddKind("batch");
+    setAddDate(batch.cookedDate);
+    setAddSlotId(batch.slotId);
+    setAddLabel(batch.label);
+    setAddMeals(batch.mealsTotal);
+    setAddItems(
+      batch.items.length
+        ? batch.items.map((it) => ({
+            kind: it.recipeId != null ? ("recipe" as const) : ("product" as const),
+            refId: it.recipeId ?? it.productId ?? null,
+            amount: it.amount != null ? String(it.amount) : "",
+          }))
+        : [{ kind: "recipe", refId: recipes[0]?.id ?? null, amount: "" }],
+    );
     setAddOpen(true);
   }
 
@@ -444,8 +513,8 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
     setAddSaving(true);
     try {
       if (addKind === "batch") {
-        const res = await fetch("/api/batches", {
-          method: "POST",
+        const res = await fetch(editBatchId != null ? `/api/batches/${editBatchId}` : "/api/batches", {
+          method: editBatchId != null ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             slotId: addSlotId,
@@ -481,6 +550,19 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
         const amount = Number(addAmount);
         if (addIngredientId == null || !Number.isFinite(amount) || amount <= 0) return;
         item = { ingredientId: addIngredientId, amount };
+      }
+
+      // Editing a single planned meal: PATCH it in place (recurrence unchanged).
+      if (editEventId != null) {
+        const res = await fetch(`/api/events/${editEventId}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date: addDate, slotId: addSlotId, ...item }),
+        });
+        if (res.ok) {
+          setAddOpen(false);
+          await Promise.all([loadAgenda(), loadAnalysis()]);
+        }
+        return;
       }
 
       const url = addRepeat ? "/api/rules" : "/api/events";
@@ -612,6 +694,19 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
         >
           {meal.phase}
         </span>
+        {/* Edit: planned meals (in place) and batches (full re-pack). */}
+        {((!meal.batchBacked && meal.phase === "planned" && meal.eventId != null) ||
+          (meal.batchBacked && meal.batchId != null)) && (
+          <button
+            type="button"
+            className="btn-add"
+            aria-label={`Edit ${meal.name}`}
+            style={{ padding: "4px 8px", minHeight: "auto" }}
+            onClick={() => (meal.batchBacked ? openEditBatch(meal.batchId!) : openEditMeal(meal))}
+          >
+            ✎
+          </button>
+        )}
         {meal.eventId != null && (
           <button
             type="button"
@@ -843,7 +938,11 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
         +
       </button>
 
-      <Sheet open={addOpen} title="Add" onClose={() => setAddOpen(false)}>
+      <Sheet
+        open={addOpen}
+        title={isEditing ? (editBatchId != null ? "Edit batch" : "Edit meal") : "Add"}
+        onClose={() => setAddOpen(false)}
+      >
         <div className="sh-body stack-sm">
           <div className="field">
             <span className="field-label">Day</span>
@@ -1034,7 +1133,7 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
             </>
           )}
 
-          {addKind !== "batch" && (
+          {addKind !== "batch" && !isEditing && (
             <>
               <div className="servings-row">
                 <span className="field-label" style={{ marginBottom: 0 }}>Repeat</span>
@@ -1095,7 +1194,7 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
           )}
 
           <button type="button" className="btn block" disabled={!addValid || addSaving} onClick={submitAdd}>
-            {addSaving ? "Adding…" : "Add"}
+            {addSaving ? "Saving…" : isEditing ? "Save" : "Add"}
           </button>
         </div>
       </Sheet>

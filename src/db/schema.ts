@@ -258,6 +258,9 @@ export const stockMovements = sqliteTable("stock_movements", {
   delta: integer("delta").notNull(),
   reason: text("reason").notNull(), // 'purchase' | 'cooked' | 'manual' | 'eaten'
   mealEventId: integer("meal_event_id").references(() => mealEvents.id),
+  // which batch pack wrote this movement; null = not a batch pack. Lets a batch
+  // edit/delete reverse its exact depletion by deleting these rows.
+  batchId: integer("batch_id").references(() => batches.id),
   purchaseId: integer("purchase_id"),
   at: integer("at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   // date-only YYYY-MM-DD for manual backfill of on-hand stock; null = no expiry

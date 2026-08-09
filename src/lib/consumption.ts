@@ -197,7 +197,7 @@ export function consumptionForRecipe(
  */
 export function recordCooked(
   db: Db, householdId: number, recipeId: number, servings: number, mealEventId: number | null,
-  allocations?: CookAllocations,
+  allocations?: CookAllocations, batchId?: number | null,
 ) {
   const recipe = getRecipe(db, householdId, recipeId);
   if (!recipe) throw new Error("recipe not found in household");
@@ -211,10 +211,10 @@ export function recordCooked(
     const variantId = useChosen ? chosen.variantId : null;
     if (productId == null) {
       recordMovement(db, householdId, {
-        ingredientId: line.ingredientId, productId: null, variantId, delta: -line.amount, reason: "cooked", mealEventId,
+        ingredientId: line.ingredientId, productId: null, variantId, delta: -line.amount, reason: "cooked", mealEventId, batchId,
       });
     } else {
-      allocateFEFO(db, householdId, line.ingredientId, productId, line.amount, { reason: "cooked", variantId, mealEventId });
+      allocateFEFO(db, householdId, line.ingredientId, productId, line.amount, { reason: "cooked", variantId, mealEventId, batchId });
     }
   }
   return lines;

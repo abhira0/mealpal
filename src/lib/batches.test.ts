@@ -7,7 +7,7 @@ import { createProduct } from "@/lib/products";
 import { createRecipe } from "@/lib/recipes";
 import { recordPurchase } from "@/lib/shopping";
 import { currentStock } from "@/lib/stock";
-import { packBatch, listBatches, getBatch, eatFromBatch, uneatFromBatch } from "@/lib/batches";
+import { packBatch, listBatches, getBatch, eatFromBatch, uneatFromBatch, unpackBatch } from "@/lib/batches";
 
 let db: TestDb; let hid: number; let slotId: number;
 beforeEach(() => {
@@ -97,6 +97,69 @@ describe("listBatches / getBatch", () => {
     const full = getBatch(db, hid, b.id);
     expect(full?.label).toBe("Dinner");
     expect(Array.isArray(full?.items)).toBe(true);
+  });
+});
+
+describe("unpackBatch", () => {
+  it("restores the exact stock the pack depleted and removes the batch + its rows", () => {
+    const veg = db.insert(schema.ingredients).values({ householdId: hid, name: "Frozen Veg", canonicalUnit: "g" }).returning().all()[0].id;
+    const shop = db.insert(schema.shops).values({ householdId: hid, name: "Costco" }).returning().all()[0].id;
+    const prod = createProduct(db, hid, { ingredientId: veg, shopId: shop, name: "Kirkland Veg", packSize: 1000, priority: 1, url: null }).id;
+    recordPurchase(db, hid, { productId: prod, quantity: 1 }); // +1000 g
+
+    const b = packBatch(db, hid, {
+      slotId, label: "Lunch box", cookedDate: "2026-08-09", mealsTotal: 4,
+      items: [{ productId: prod, amount: 100 }],
+    });
+    eatFromBatch(db, hid, b.id, "2026-08-09");
+    expect(currentStock(db, hid, veg)).toBe(600); // 1000 - 100*4
+
+    expect(unpackBatch(db, hid, b.id)).toBe(true);
+    expect(currentStock(db, hid, veg)).toBe(1000); // fully restored
+    expect(getBatch(db, hid, b.id)).toBeNull();
+    expect(db.select().from(schema.batchItems).all()).toHaveLength(0);
+    expect(db.select().from(schema.batchEaten).all()).toHaveLength(0);
+  });
+
+  it("only reverses its own batch's movements when two batches coexist", () => {
+    const veg = db.insert(schema.ingredients).values({ householdId: hid, name: "Veg", canonicalUnit: "g" }).returning().all()[0].id;
+    const shop = db.insert(schema.shops).values({ householdId: hid, name: "Costco" }).returning().all()[0].id;
+    const prod = createProduct(db, hid, { ingredientId: veg, shopId: shop, name: "Veg bag", packSize: 1000, priority: 1, url: null }).id;
+    recordPurchase(db, hid, { productId: prod, quantity: 1 }); // +1000 g
+
+    const a = packBatch(db, hid, { slotId, label: "A", cookedDate: "2026-08-09", mealsTotal: 2, items: [{ productId: prod, amount: 100 }] }); // -200
+    packBatch(db, hid, { slotId, label: "B", cookedDate: "2026-08-09", mealsTotal: 3, items: [{ productId: prod, amount: 100 }] }); // -300
+    expect(currentStock(db, hid, veg)).toBe(500);
+
+    unpackBatch(db, hid, a.id); // restores only A's 200
+    expect(currentStock(db, hid, veg)).toBe(700);
+  });
+
+  it("returns false for a batch in another household", () => {
+    const b = packBatch(db, hid, { slotId, label: "Mine", cookedDate: "2026-08-09", mealsTotal: 2, items: [] });
+    expect(unpackBatch(db, hid + 999, b.id)).toBe(false);
+    expect(getBatch(db, hid, b.id)).not.toBeNull();
+  });
+
+  // The PATCH /api/batches/[id] re-pack path: unpack + pack nested in one txn.
+  it("re-packs (unpack then pack) in a single outer transaction with the right net stock", () => {
+    const veg = db.insert(schema.ingredients).values({ householdId: hid, name: "Veg", canonicalUnit: "g" }).returning().all()[0].id;
+    const shop = db.insert(schema.shops).values({ householdId: hid, name: "Costco" }).returning().all()[0].id;
+    const prod = createProduct(db, hid, { ingredientId: veg, shopId: shop, name: "Veg bag", packSize: 1000, priority: 1, url: null }).id;
+    recordPurchase(db, hid, { productId: prod, quantity: 1 }); // +1000 g
+
+    const b = packBatch(db, hid, { slotId, label: "Old", cookedDate: "2026-08-09", mealsTotal: 4, items: [{ productId: prod, amount: 100 }] }); // -400
+    expect(currentStock(db, hid, veg)).toBe(600);
+
+    const repacked = db.transaction(() => {
+      expect(unpackBatch(db, hid, b.id)).toBe(true);
+      return packBatch(db, hid, { slotId, label: "New", cookedDate: "2026-08-10", mealsTotal: 6, items: [{ productId: prod, amount: 100 }] }); // -600
+    });
+
+    expect(repacked.label).toBe("New");
+    expect(currentStock(db, hid, veg)).toBe(400); // 1000 - 600, old 400 restored first
+    expect(getBatch(db, hid, b.id)).toBeNull();
+    expect(listBatches(db, hid).map((x) => x.label)).toEqual(["New"]);
   });
 });
 

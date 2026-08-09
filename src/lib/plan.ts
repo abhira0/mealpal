@@ -19,11 +19,13 @@ export interface EventInput {
   amount?: number | null;
 }
 
-export function addEvent(db: Db, householdId: number, input: EventInput) {
+// Resolve the stored servings + canonical amount for an event's item kind,
+// mirroring the plan wizard: recipe/ingredient keep servings/amount as given;
+// a direct product converts between servings and amount via its serving size.
+function resolveQuantity(db: Db, householdId: number, input: EventInput): { servings: number; amount: number | null } {
   let servings = input.servings || 1;
   let amount: number | null = null;
   if (input.productId != null) {
-    // canonical units = servings × packet/serving size (variant overrides product)
     const [p] = db.select({ s: schema.products.servingSize }).from(schema.products)
       .where(and(eq(schema.products.id, input.productId), eq(schema.products.householdId, householdId))).all();
     let perServing = p?.s && p.s > 0 ? p.s : 1;
@@ -42,12 +44,44 @@ export function addEvent(db: Db, householdId: number, input: EventInput) {
   } else if (input.ingredientId != null) {
     amount = input.amount ?? 0;
   }
+  return { servings, amount };
+}
+
+export function addEvent(db: Db, householdId: number, input: EventInput) {
+  const { servings, amount } = resolveQuantity(db, householdId, input);
   const [row] = db.insert(schema.mealEvents)
     .values({
       householdId, date: input.date, slotId: input.slotId, servings, status: "planned",
       recipeId: input.recipeId ?? null, ingredientId: input.ingredientId ?? null,
       productId: input.productId ?? null, variantId: input.variantId ?? null, amount,
     }).returning().all();
+  return row;
+}
+
+/** One event, or null. */
+export function getEvent(db: Db, householdId: number, eventId: number) {
+  const [row] = db.select().from(schema.mealEvents)
+    .where(and(eq(schema.mealEvents.id, eventId), eq(schema.mealEvents.householdId, householdId))).all();
+  return row ?? null;
+}
+
+/**
+ * Edit a still-planned event in place: swap its item (recipe/product/ingredient),
+ * slot, date, or quantity. Refuses once cooked/served (stock is committed then —
+ * undo first). Returns the updated row, or null if missing / not planned.
+ */
+export function updateEvent(db: Db, householdId: number, eventId: number, input: EventInput) {
+  const existing = getEvent(db, householdId, eventId);
+  if (!existing || existing.status !== "planned") return null;
+  const { servings, amount } = resolveQuantity(db, householdId, input);
+  const [row] = db.update(schema.mealEvents)
+    .set({
+      date: input.date, slotId: input.slotId, servings,
+      recipeId: input.recipeId ?? null, ingredientId: input.ingredientId ?? null,
+      productId: input.productId ?? null, variantId: input.variantId ?? null, amount,
+    })
+    .where(and(eq(schema.mealEvents.id, eventId), eq(schema.mealEvents.householdId, householdId)))
+    .returning().all();
   return row;
 }
 
