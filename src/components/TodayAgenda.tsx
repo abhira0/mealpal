@@ -84,23 +84,30 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
     return () => { cancelled = true; };
   }, [mounted, batches]);
 
+  const [acting, setActing] = useState<number | null>(null);
+
   async function eatOne(batch: Batch) {
-    if (batch.mealsRemaining <= 0) return;
+    if (batch.mealsRemaining <= 0 || acting === batch.id) return;
+    setActing(batch.id);
     // optimistic decrement, then reconcile from the response
     setBatches((prev) =>
       prev.map((b) => (b.id === batch.id ? { ...b, mealsRemaining: b.mealsRemaining - 1 } : b)),
     );
-    const res = await fetch(`/api/batches/${batch.id}/eat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date: todayISO() }),
-    });
-    if (res.ok) {
-      const updated = (await res.json()) as Batch;
-      setBatches((prev) => prev.map((b) => (b.id === batch.id ? updated : b)));
-    } else {
-      // reconcile from the server on failure too
-      await loadBatches();
+    try {
+      const res = await fetch(`/api/batches/${batch.id}/eat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: todayISO() }),
+      });
+      if (res.ok) {
+        const updated = (await res.json()) as Batch;
+        setBatches((prev) => prev.map((b) => (b.id === batch.id ? updated : b)));
+      } else {
+        // reconcile from the server on failure too
+        await loadBatches();
+      }
+    } finally {
+      setActing(null);
     }
   }
 
@@ -243,7 +250,7 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
                   </div>
                   <div className="card-row" style={{ marginTop: 12 }}>
                     <span className="slot">{slotName.get(b.slotId) ?? ""}</span>
-                    <button type="button" className="btn" disabled={empty} onClick={() => eatOne(b)}>
+                    <button type="button" className="btn" disabled={empty || acting === b.id} onClick={() => eatOne(b)}>
                       Ate one
                     </button>
                   </div>
