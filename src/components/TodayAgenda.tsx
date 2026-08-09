@@ -25,7 +25,7 @@ type AgendaMeal = {
   recipeId: number | null;
   productId: number | null;
   ingredientId: number | null;
-  status: "planned" | "cooked";
+  status: "planned" | "cooked" | "served";
   phase: "planned" | "cooked" | "served";
   batchBacked: boolean;
   batchId: number | null;
@@ -152,6 +152,10 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
   const [cookChoice, setCookChoice] = useState<
     { meal: AgendaMeal; date: string; choices: CookChoice[]; picked: Record<number, CookPick> } | null
   >(null);
+  // Remember the last product/variant pick per event so undo → re-serve reuses
+  // it instead of re-asking. ponytail: session-only (lost on reload); persist on
+  // the event if it needs to survive reloads.
+  const [lastPicks, setLastPicks] = useState<Record<number, Record<number, CookPick>>>({});
 
   async function toggleMeal(meal: AgendaMeal, date: string) {
     // Synthetic batch rows (eventId null) share a batchId across every day
@@ -161,13 +165,18 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
     const key = meal.batchBacked && meal.batchId != null ? meal.batchId : meal.eventId;
     if (acting === key) return;
     // Currently served? Then this tap UNDOES it (un-serve); otherwise it serves.
-    const served = meal.status === "cooked" || (meal.batchBacked && meal.eatenFromBatchToday);
+    const served = meal.phase === "served";
     // Serving a non-batch meal: if its ingredient(s) need a product/variant pick
     // (e.g. a trail mix with variants), ask first, then serve via confirmCook.
     if (!served && !meal.batchBacked && meal.eventId != null) {
       const res = await fetch(`/api/events/${meal.eventId}/cook`);
       const choices = res.ok ? ((await res.json()) as CookChoice[]) : [];
       if (choices.length > 0) {
+        const remembered = lastPicks[meal.eventId];
+        if (remembered) {
+          void serveWithPicks(meal, date, remembered);
+          return;
+        }
         const picked: Record<number, CookPick> = Object.fromEntries(
           choices.map((c) => {
             const p = c.products[0];
@@ -189,7 +198,9 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
             : d.date === date && m.eventId == null && m.batchId === meal.batchId && m.slotId === meal.slotId;
           if (!matches) return m;
           if (served) {
-            // undo: back to cooked (batch still has the serving) or planned (rotation meal)
+            // undo: back to cooked (batch still has the serving, stock stays
+            // depleted) either way — a rotation meal's un-serve keeps its
+            // stock movements too, just flips status back to 'cooked'.
             return meal.batchBacked
               ? {
                   ...m,
@@ -198,7 +209,7 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
                   phase: "cooked" as const,
                   mealsRemaining: (m.mealsRemaining ?? 0) + 1,
                 }
-              : { ...m, status: "planned" as const, phase: "planned" as const };
+              : { ...m, status: "cooked" as const, phase: "cooked" as const };
           }
           return meal.batchBacked
             ? {
@@ -208,7 +219,7 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
                 phase: "served" as const,
                 mealsRemaining: (m.mealsRemaining ?? 1) - 1,
               }
-            : { ...m, status: "cooked" as const, phase: "served" as const };
+            : { ...m, status: "served" as const, phase: "served" as const };
         }),
       })),
     );
@@ -221,7 +232,7 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
           body: JSON.stringify({ date }),
         });
       } else if (meal.eventId != null) {
-        await fetch(`/api/events/${meal.eventId}/cook`, {
+        await fetch(`/api/events/${meal.eventId}/serve`, {
           method,
           ...(served ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ force: true }) }),
         });
@@ -232,27 +243,85 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
     }
   }
 
-  // Confirm the variant/product pick, then serve (cook the event with allocations).
-  async function confirmCook() {
-    if (!cookChoice) return;
-    const { meal, picked } = cookChoice;
-    setCookChoice(null);
+  // Serve an event with a known product/variant pick (from the sheet or a
+  // remembered pick), and remember the pick for next time.
+  async function serveWithPicks(meal: AgendaMeal, _date: string, picked: Record<number, CookPick>) {
     if (meal.eventId == null) return;
-    setActing(meal.eventId);
+    const eventId = meal.eventId;
+    setLastPicks((prev) => ({ ...prev, [eventId]: picked }));
+    setActing(eventId);
     setDays((prev) =>
       prev.map((d) => ({
         ...d,
         meals: d.meals.map((m) =>
-          m.eventId === meal.eventId ? { ...m, status: "cooked" as const, phase: "served" as const } : m,
+          m.eventId === eventId ? { ...m, status: "served" as const, phase: "served" as const } : m,
         ),
       })),
     );
     try {
-      await fetch(`/api/events/${meal.eventId}/cook`, {
+      await fetch(`/api/events/${eventId}/serve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ allocations: picked, force: true }),
       });
+    } finally {
+      await Promise.all([loadAgenda(), loadAnalysis()]);
+      setActing(null);
+    }
+  }
+
+  // Confirm the variant/product pick from the sheet, then serve.
+  function confirmCook() {
+    if (!cookChoice) return;
+    const { meal, date, picked } = cookChoice;
+    setCookChoice(null);
+    void serveWithPicks(meal, date, picked);
+  }
+
+  // "Cook ahead" on a planned (non-batch) row: deplete stock now without
+  // marking it eaten yet — the row becomes 'cooked' (amber), no nutrition
+  // change until it's later served.
+  async function cookAhead(meal: AgendaMeal) {
+    if (meal.eventId == null || meal.batchBacked) return;
+    const eventId = meal.eventId;
+    if (acting === eventId) return;
+    setActing(eventId);
+    setDays((prev) =>
+      prev.map((d) => ({
+        ...d,
+        meals: d.meals.map((m) =>
+          m.eventId === eventId ? { ...m, status: "cooked" as const, phase: "cooked" as const } : m,
+        ),
+      })),
+    );
+    try {
+      await fetch(`/api/events/${eventId}/cook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force: true }),
+      });
+    } finally {
+      await Promise.all([loadAgenda(), loadAnalysis()]);
+      setActing(null);
+    }
+  }
+
+  // Undo a cook-ahead: back to 'planned', backing out the stock it depleted.
+  async function uncookAhead(meal: AgendaMeal) {
+    if (meal.eventId == null || meal.batchBacked) return;
+    const eventId = meal.eventId;
+    if (acting === eventId) return;
+    setActing(eventId);
+    setDays((prev) =>
+      prev.map((d) => ({
+        ...d,
+        meals: d.meals.map((m) =>
+          m.eventId === eventId ? { ...m, status: "planned" as const, phase: "planned" as const } : m,
+        ),
+      })),
+    );
+    try {
+      await fetch(`/api/events/${eventId}/cook`, { method: "DELETE" });
     } finally {
       await Promise.all([loadAgenda(), loadAnalysis()]);
       setActing(null);
@@ -451,8 +520,13 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
 
   // One meal row: checkbox (eat/cook), name + slot, batch chip, remove.
   function mealRow(meal: AgendaMeal, date: string) {
-    const checked = meal.status === "cooked" || (meal.batchBacked && meal.eatenFromBatchToday);
+    const checked = meal.phase === "served";
     const key = meal.batchBacked && meal.batchId != null ? meal.batchId : meal.eventId;
+    // "Cook ahead" only makes sense for a real, not-yet-touched rotation meal —
+    // batch rows already consumed their stock at pack time.
+    const showCook = !meal.batchBacked && meal.phase === "planned" && meal.eventId != null;
+    // Undo a cook-ahead (optional per spec): only on a cooked, non-batch row.
+    const showUncook = !meal.batchBacked && meal.phase === "cooked" && meal.eventId != null;
     const empty = meal.mealsRemaining != null && meal.mealsRemaining <= 0;
     const low = meal.mealsRemaining != null && meal.mealsRemaining <= 1;
     const rowKey = meal.eventId != null ? `ev-${meal.eventId}` : `batch-${meal.batchId}-${meal.slotId}-${date}`;
@@ -504,6 +578,30 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
           <span className={low ? "chip run" : "chip"}>
             {empty ? "empty · cook" : low ? "cook soon" : `${meal.mealsRemaining} left`}
           </span>
+        )}
+        {showCook && (
+          <button
+            type="button"
+            className="btn-add"
+            aria-label={`Cook ${meal.name} ahead`}
+            disabled={acting === key}
+            style={{ padding: "3px 9px", minHeight: "auto", fontSize: 11 }}
+            onClick={() => cookAhead(meal)}
+          >
+            Cook
+          </button>
+        )}
+        {showUncook && (
+          <button
+            type="button"
+            className="btn-add"
+            aria-label={`Undo cooking ${meal.name}`}
+            disabled={acting === key}
+            style={{ padding: "3px 9px", minHeight: "auto", fontSize: 11 }}
+            onClick={() => uncookAhead(meal)}
+          >
+            Undo
+          </button>
         )}
         <span
           aria-label={`Status: ${meal.phase}`}
@@ -567,11 +665,20 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
       </header>
 
       <div className="content stack">
-        {mounted && nextCooks.length > 0 && (
+        {mounted && nextCooks.length > 0 && (() => {
+          // ponytail: hardcoded to what the user cares about right now; revisit if this needs to be configurable
+          const visibleCooks = nextCooks.filter(
+            (nc) =>
+              nc.slotName === "Lunch" ||
+              nc.slotName === "Dinner" ||
+              nc.label.toLowerCase().includes("overnight oats"),
+          );
+          if (visibleCooks.length === 0) return null;
+          return (
           <div>
             <p className="section-label">🍳 Next cooking</p>
             <div style={{ display: "flex", gap: 10, overflowX: "auto" }}>
-              {nextCooks.map((nc) => {
+              {visibleCooks.map((nc) => {
                 const accent = slotAccent(nc.slotName);
                 const dateLabel = localNoon(nc.cookDate)
                   .toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
@@ -614,7 +721,8 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
               })}
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {analysis && (
           <div>
@@ -1085,7 +1193,7 @@ function MacroBar({ label, cooked, planned, goal, unit, color }: {
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 3 }}>
         <b>{label}</b>
         <span className="mono" style={{ fontSize: 11, color: "var(--sage)" }}>
-          {Math.round(planned)} / {goal}{unit}
+          {Math.round(cooked)} / {goal}{unit}
         </span>
       </div>
       <div style={{ display: "flex", height: 8, borderRadius: 99, background: "#e3ddcc", overflow: "hidden" }}>
