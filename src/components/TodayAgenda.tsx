@@ -32,6 +32,16 @@ type AgendaMeal = {
 };
 type CookFlag = { slotId: number; slotName: string; label: string };
 type AgendaDay = { date: string; meals: AgendaMeal[]; cookFlags: CookFlag[]; eatenCount: number; totalCount: number };
+type NextCook = { slotId: number; slotName: string; label: string; cookDate: string; daysAway: number };
+type AgendaResponse = { days: AgendaDay[]; nextCooks: NextCook[] };
+
+// Slot-name accent colors for the "Next cooking" cards.
+function slotAccent(slotName: string): string {
+  const n = slotName.toLowerCase();
+  if (n.includes("lunch")) return "#c65a3a";
+  if (n.includes("dinner")) return "#2f6b64";
+  return "#7a6f57";
+}
 
 // Subset of GET /api/nutrition/analysis?mode=day&date=... used here — eaten
 // ("nutrients") vs planned ("planned") totals, scaled to the household goal.
@@ -75,6 +85,7 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
   const to = useMemo(() => addDays(todayIso, 5), [todayIso]);
 
   const [days, setDays] = useState<AgendaDay[]>([]);
+  const [nextCooks, setNextCooks] = useState<NextCook[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -84,7 +95,11 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
 
   const loadAgenda = useCallback(async () => {
     const res = await fetch(`/api/agenda?from=${from}&to=${to}&today=${todayIso}`, { cache: "no-store" });
-    if (res.ok) setDays((await res.json()) as AgendaDay[]);
+    if (res.ok) {
+      const data = (await res.json()) as AgendaResponse;
+      setDays(data.days);
+      setNextCooks(data.nextCooks);
+    }
   }, [from, to, todayIso]);
 
   const loadAnalysis = useCallback(async () => {
@@ -455,6 +470,55 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
       </header>
 
       <div className="content stack">
+        {mounted && nextCooks.length > 0 && (
+          <div>
+            <p className="section-label">🍳 Next cooking</p>
+            <div style={{ display: "flex", gap: 10, overflowX: "auto" }}>
+              {nextCooks.map((nc) => {
+                const accent = slotAccent(nc.slotName);
+                const dateLabel = localNoon(nc.cookDate)
+                  .toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+                  .replace(/^(\w{3})\./, "$1"); // strip a trailing period on the weekday, if any
+                const inLabel = nc.daysAway === 0 ? "today" : nc.daysAway === 1 ? "tomorrow" : `in ${nc.daysAway} days`;
+                return (
+                  <div
+                    key={nc.slotId}
+                    style={{
+                      flex: "1 1 0",
+                      minWidth: 140,
+                      background: "#fbf8f0",
+                      border: "1px solid #e2dac7",
+                      borderTop: `4px solid ${accent}`,
+                      borderRadius: 14,
+                      padding: 12,
+                    }}
+                  >
+                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: accent }}>
+                      {nc.slotName.toLowerCase()} prep
+                    </div>
+                    <div style={{ fontSize: 13, color: "var(--sage)", margin: "2px 0 6px" }}>{nc.label}</div>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>{dateLabel}</div>
+                    <span
+                      style={{
+                        display: "inline-block",
+                        marginTop: 6,
+                        background: accent,
+                        color: "#fff",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        borderRadius: 99,
+                        padding: "3px 8px",
+                      }}
+                    >
+                      {inLabel}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {analysis && (
           <div>
             <p className="section-label">Today vs goal</p>

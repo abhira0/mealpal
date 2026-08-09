@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { agendaDays } from "@/lib/agenda";
+import { agendaDays, nextCooks } from "@/lib/agenda";
 import { topUpRules } from "@/lib/rules";
 import { todayISO } from "@/lib/dates";
 
@@ -14,5 +14,8 @@ export async function GET(req: Request) {
   const today = url.searchParams.get("today") ?? todayISO();
   if (!from || !to) return NextResponse.json({ error: "from & to required" }, { status: 400 });
   topUpRules(db, session.user.householdId, todayISO());
-  return NextResponse.json(agendaDays(db, session.user.householdId, from, to, today));
+  return NextResponse.json({
+    days: agendaDays(db, session.user.householdId, from, to, today),
+    nextCooks: nextCooks(db, session.user.householdId, today),
+  });
 }
