@@ -22,6 +22,9 @@ type AgendaMeal = {
   slotId: number;
   slotName: string;
   name: string;
+  recipeId: number | null;
+  productId: number | null;
+  ingredientId: number | null;
   status: "planned" | "cooked";
   phase: "planned" | "cooked" | "served";
   batchBacked: boolean;
@@ -29,6 +32,8 @@ type AgendaMeal = {
   mealsRemaining: number | null;
   eatenFromBatchToday: boolean;
   ruleId: number | null;
+  outOfStock: boolean;
+  missingItems: string[];
 };
 type CookFlag = { slotId: number; slotName: string; label: string };
 type AgendaDay = { date: string; meals: AgendaMeal[]; cookFlags: CookFlag[]; eatenCount: number; totalCount: number };
@@ -452,7 +457,11 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
     const low = meal.mealsRemaining != null && meal.mealsRemaining <= 1;
     const rowKey = meal.eventId != null ? `ev-${meal.eventId}` : `batch-${meal.batchId}-${meal.slotId}-${date}`;
     return (
-      <div key={rowKey} className="row">
+      <div
+        key={rowKey}
+        className="row"
+        style={meal.outOfStock ? { background: "#fbeeeb", borderColor: "#e6b3a8" } : undefined}
+      >
         <button
           type="button"
           className="checkbox"
@@ -463,10 +472,33 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
           onClick={() => toggleMeal(meal, date)}
         />
         <div className="row-main">
-          <div>{meal.name}</div>
+          {(() => {
+            // Link the name to its recipe/product/ingredient page. Batch rows
+            // (synthetic — all ids null) stay plain text: no redirect.
+            const href =
+              meal.recipeId != null
+                ? `/recipes/${meal.recipeId}`
+                : meal.productId != null
+                  ? `/manage/products/${meal.productId}`
+                  : meal.ingredientId != null
+                    ? `/manage/ingredients/${meal.ingredientId}`
+                    : null;
+            return href ? (
+              <Link href={href} className="title">
+                {meal.name}
+              </Link>
+            ) : (
+              <div>{meal.name}</div>
+            );
+          })()}
           <span className="section-label" style={{ margin: 0, padding: 0, border: "none" }}>
             {meal.slotName}
           </span>
+          {meal.outOfStock && (
+            <div style={{ color: "#c0392b", fontSize: "0.66em", fontWeight: 700 }}>
+              ⚠ out of stock: {meal.missingItems.join(", ")}
+            </div>
+          )}
         </div>
         {meal.batchBacked && (
           <span className={low ? "chip run" : "chip"}>
@@ -476,8 +508,8 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
         <span
           aria-label={`Status: ${meal.phase}`}
           style={{
-            background: PHASE_CHIP[meal.phase].bg,
-            color: PHASE_CHIP[meal.phase].fg,
+            background: meal.outOfStock ? "#c0392b" : PHASE_CHIP[meal.phase].bg,
+            color: meal.outOfStock ? "#fff" : PHASE_CHIP[meal.phase].fg,
             fontSize: 10,
             fontWeight: 700,
             letterSpacing: "0.04em",
