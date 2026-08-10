@@ -49,6 +49,7 @@ next-env.d.ts
 *.db-shm
 
 .superpowers/
+.claude/skills/
 
 # uploaded nutrition-facts label photos (user data)
 /public/nutrition/
