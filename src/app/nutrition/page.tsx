@@ -90,19 +90,21 @@ export default function NutritionPage() {
 // Columns: Calories + the standard label rows (reused so labels/units match).
 const COLS = [{ key: "calories" as const, label: "Cal", unit: "" }, ...FACT_ROWS];
 
-function IngredientsTable({ date, mode }: { date: string; mode: "day" | "week" }) {
+function IngredientsTable({ date, mode, eventIds }: { date: string; mode: "day" | "week"; eventIds?: number[] }) {
   const [basis, setBasis] = useState<"served" | "planned">("served");
-  const key = `${mode}:${date}:${basis}`;
+  const idsParam = eventIds ? eventIds.join(",") : "";
+  const key = `${mode}:${date}:${basis}:${idsParam}`;
   const [loaded, setLoaded] = useState<{ key: string; rows: IngredientNutritionRow[] } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/nutrition/ingredients?mode=${mode}&date=${date}&basis=${basis}`, { cache: "no-store" })
+    const eventIdsQS = idsParam ? `&eventIds=${idsParam}` : "";
+    fetch(`/api/nutrition/ingredients?mode=${mode}&date=${date}&basis=${basis}${eventIdsQS}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : []))
       .then((d) => { if (!cancelled) setLoaded({ key, rows: d }); })
       .catch(() => { if (!cancelled) setLoaded({ key, rows: [] }); });
     return () => { cancelled = true; };
-  }, [key, mode, date, basis]);
+  }, [key, mode, date, basis, idsParam]);
 
   const basisPill = (
     <div className="filter" style={{ marginBottom: 8 }}>
@@ -167,7 +169,7 @@ function IngredientsTable({ date, mode }: { date: string; mode: "day" | "week" }
 
 // ---------- Analysis tab ----------
 
-interface MealLine { slotName: string; recipeName: string; estimate: boolean; calories: number; nutrients: Nutrients; }
+interface MealLine { eventId: number; slotName: string; recipeName: string; estimate: boolean; calories: number; nutrients: Nutrients; }
 
 interface AnalysisData {
   mode: "day" | "week";
@@ -258,32 +260,43 @@ function OverviewBody({ data, mode, openCard, setOpenCard }: {
 // Breakdown lens: nutrient table (Total/Goal/%) with the contribution columns
 // toggled between by-slot and by-ingredient; plus the week macro-trend chart.
 function BreakdownBody({ data, mode, date }: { data: AnalysisData; mode: "day" | "week"; date: string }) {
-  const [view, setView] = useState<"meals" | "ingredients">("meals");
+  const [view, setView] = useState<"meals" | "items" | "ingredients">("meals");
   const [basis, setBasis] = useState<"served" | "planned">("served");
+  const [drill, setDrill] = useState<{ label: string; eventIds: number[] } | null>(null);
+  useEffect(() => { setDrill(null); }, [date]);
   const dayMeals = mode === "day" && data.meals && data.meals.length > 0 ? data.meals : null;
   const mealN = basis === "served" ? data.nutrients : data.planned;
   return (
     <>
       {mode === "week" && data.perDay && <WeekTrend perDay={data.perDay} />}
       <div className="filter">
-        <button type="button" aria-pressed={view === "meals"} onClick={() => setView("meals")}>Meals</button>
-        <button type="button" aria-pressed={view === "ingredients"} onClick={() => setView("ingredients")}>Ingredients</button>
+        <button type="button" aria-pressed={view === "meals"} onClick={() => { setView("meals"); setDrill(null); }}>Meals</button>
+        <button type="button" aria-pressed={view === "items"} onClick={() => { setView("items"); setDrill(null); }}>Items</button>
+        <button type="button" aria-pressed={view === "ingredients"} onClick={() => { setView("ingredients"); setDrill(null); }}>Ingredients</button>
       </div>
-      {view === "meals" ? (
+      {view === "ingredients" ? (
+        <IngredientsTable date={date} mode={mode} />
+      ) : (
         <>
           <div className="filter" style={{ marginBottom: 8 }}>
             <button type="button" aria-pressed={basis === "served"} onClick={() => setBasis("served")}>Served</button>
             <button type="button" aria-pressed={basis === "planned"} onClick={() => setBasis("planned")}>Planned</button>
           </div>
           <p className="section-label">
-            {basis === "served" ? "Eaten" : "Planned"} nutrients{dayMeals ? " — total, goal & by slot" : mode === "week" ? " (daily avg) vs goal" : " vs goal"}
+            {basis === "served" ? "Eaten" : "Planned"} nutrients{dayMeals ? ` — total, goal & by ${view === "items" ? "meal" : "slot"}` : mode === "week" ? " (daily avg) vs goal" : " vs goal"}
           </p>
           {dayMeals
-            ? <SlotNutrientTable n={mealN} goals={data.goals} meals={dayMeals} basis={basis} />
+            ? <GroupedNutrientTable n={mealN} goals={data.goals} meals={dayMeals} basis={basis}
+                groupBy={view === "items" ? (m) => m.recipeName : (m) => m.slotName}
+                onGroupClick={view === "items" ? setDrill : undefined} />
             : <NutrientTable n={mealN} goals={data.goals} />}
+          {view === "items" && drill && (
+            <>
+              <p className="section-label">Ingredients — {drill.label}</p>
+              <IngredientsTable date={date} mode={mode} eventIds={drill.eventIds} />
+            </>
+          )}
         </>
-      ) : (
-        <IngredientsTable date={date} mode={mode} />
       )}
       <MissingNotice missing={data.missing} />
     </>
@@ -373,20 +386,25 @@ function NutrientTable({ n, goals }: { n: Nutrients; goals: Goals }) {
   );
 }
 
-// Same table, plus a column per SLOT (day mode) — meals sharing a slot are
-// summed into one column. Horizontal-scrolls; first column sticky.
-function SlotNutrientTable({ n, goals, meals, basis }: { n: Nutrients; goals: Goals; meals: MealLine[]; basis: "served" | "planned" }) {
-  // group meals by slot, preserving first-seen order
+// Same table, plus a column per group (by slot, or by individual meal name) —
+// meals sharing a group key are summed into one column. Horizontal-scrolls;
+// first column sticky.
+function GroupedNutrientTable({ n, goals, meals, basis, groupBy, onGroupClick }: {
+  n: Nutrients; goals: Goals; meals: MealLine[]; basis: "served" | "planned"; groupBy: (m: MealLine) => string;
+  onGroupClick?: (group: { label: string; eventIds: number[] }) => void;
+}) {
   const order: string[] = [];
   const bySlot = new Map<string, MealLine[]>();
   for (const m of meals) {
-    if (!bySlot.has(m.slotName)) { bySlot.set(m.slotName, []); order.push(m.slotName); }
-    bySlot.get(m.slotName)!.push(m);
+    const key = groupBy(m);
+    if (!bySlot.has(key)) { bySlot.set(key, []); order.push(key); }
+    bySlot.get(key)!.push(m);
   }
   const slots = order.map((slot) => {
     const ms = bySlot.get(slot)!;
     return {
       slot,
+      eventIds: ms.map((m) => m.eventId),
       // served basis: only eaten meals count, so an all-estimate slot reads 0 (≈).
       // planned basis: every meal counts, columns sum to the planned Total.
       estimate: basis === "served" && ms.every((m) => m.estimate),
@@ -405,7 +423,11 @@ function SlotNutrientTable({ n, goals, meals, basis }: { n: Nutrients; goals: Go
             <th style={{ textAlign: "right", padding: "4px 8px", fontWeight: 600 }}>%</th>
             {slots.map((s) => (
               <th key={s.slot} style={{ textAlign: "right", padding: "4px 8px", fontWeight: 600 }}>
-                {s.estimate ? "≈ " : ""}{s.slot}
+                {s.estimate ? "≈ " : ""}
+                {onGroupClick ? (
+                  <button type="button" style={{ font: "inherit", color: "inherit", background: "none", border: 0, padding: 0, textDecoration: "underline", cursor: "pointer" }}
+                    onClick={() => onGroupClick({ label: s.slot, eventIds: s.eventIds })}>{s.slot}</button>
+                ) : s.slot}
               </th>
             ))}
           </tr>

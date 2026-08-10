@@ -390,10 +390,13 @@ export interface IngredientNutritionRow {
  */
 export function dayIngredientTable(
   db: Db, householdId: number, date: string, basis: "served" | "planned" = "served",
+  eventIds?: number[],
 ): IngredientNutritionRow[] {
+  const eventIdSet = eventIds ? new Set(eventIds) : null;
   const events = db.select().from(schema.mealEvents)
     .where(and(eq(schema.mealEvents.householdId, householdId), eq(schema.mealEvents.date, date)))
-    .all();
+    .all()
+    .filter((ev) => !eventIdSet || eventIdSet.has(ev.id));
   const ingredientById = new Map(
     db.select().from(schema.ingredients).where(eq(schema.ingredients.householdId, householdId)).all()
       .map((i) => [i.id, i]),
@@ -491,6 +494,7 @@ export function dayIngredientTable(
   }
 
   for (const c of listEaten(db, householdId, date)) {
+    if (eventIdSet && !eventIdSet.has(-c.id)) continue;
     const p = productById.get(c.productId);
     if (!p) continue;
     const src = c.variantId != null ? variantById.get(c.variantId) : p;
