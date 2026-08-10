@@ -337,6 +337,14 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
     await Promise.all([loadAgenda(), loadAnalysis()]);
   }
 
+  // Delete a whole batch (restores the stock it depleted). Confirm first —
+  // this drops every remaining serving across all its days.
+  async function removeBatch(batchId: number) {
+    if (!confirm("Delete this meal prep? Its remaining servings are removed and the stock it used is restored.")) return;
+    await fetch(`/api/batches/${batchId}`, { method: "DELETE" });
+    await Promise.all([loadAgenda(), loadAnalysis()]);
+  }
+
   // Past days collapse to a summary by default; tap to expand into full rows.
   const [expandedPast, setExpandedPast] = useState<Set<string>>(new Set());
   function togglePast(date: string) {
@@ -714,6 +722,17 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
             aria-label={`Remove ${meal.name}`}
             style={{ padding: "4px 10px", minHeight: "auto" }}
             onClick={() => requestRemove(meal)}
+          >
+            ×
+          </button>
+        )}
+        {meal.batchBacked && meal.batchId != null && (
+          <button
+            type="button"
+            className="btn-add"
+            aria-label={`Delete ${meal.name} meal prep`}
+            style={{ padding: "4px 10px", minHeight: "auto" }}
+            onClick={() => removeBatch(meal.batchId!)}
           >
             ×
           </button>
