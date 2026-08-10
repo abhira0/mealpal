@@ -1,6 +1,7 @@
 import { and, asc, eq } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
+import { allocateFEFO } from "@/lib/stock";
 
 type Db = BetterSQLite3Database<typeof schema>;
 
@@ -28,10 +29,12 @@ export function logEaten(db: Db, householdId: number, input: EatInput) {
     const [row] = tx.insert(schema.consumptions)
       .values({ householdId, date: input.date, productId: input.productId, variantId: input.variantId ?? null, count: canonical })
       .returning().all();
-    tx.insert(schema.stockMovements).values({
-      householdId, ingredientId: product.ingredientId, productId: product.id,
-      delta: -canonical, reason: "eaten",
-    }).run();
+    // Draw from lots FEFO (soonest-expiry first) like cooking does, so the
+    // depletion is attributed to real purchases — otherwise it lands in the
+    // unattributed pool, which stockByIngredient floors at 0.
+    allocateFEFO(tx, householdId, product.ingredientId, product.id, canonical, {
+      reason: "eaten", variantId: input.variantId ?? null,
+    });
     return row;
   });
 }

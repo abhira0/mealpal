@@ -28,9 +28,18 @@ export function recordMovement(db: Db, householdId: number, m: MovementInput) {
   return row;
 }
 
+// Net stock = real lots (attributed movements, incl. legit negatives from FEFO
+// overdraw) + the unattributed no-lot pool floored at 0. A negative no-lot pool
+// is pre-lot-tracking junk (legacy cooks never tied to a purchase) and must not
+// drag real stock down — so a manual add reads back exactly what you added.
+const netStock = sql<number>`
+  coalesce(sum(case when ${schema.stockMovements.purchaseId} is not null then ${schema.stockMovements.delta} end), 0)
+  + max(0, coalesce(sum(case when ${schema.stockMovements.purchaseId} is null then ${schema.stockMovements.delta} end), 0))
+`;
+
 export function currentStock(db: Db, householdId: number, ingredientId: number): number {
   const [row] = db
-    .select({ total: sql<number>`coalesce(sum(${schema.stockMovements.delta}), 0)` })
+    .select({ total: netStock })
     .from(schema.stockMovements)
     .where(and(
       eq(schema.stockMovements.householdId, householdId),
@@ -43,7 +52,7 @@ export function stockByIngredient(db: Db, householdId: number): Map<number, numb
   const rows = db
     .select({
       ingredientId: schema.stockMovements.ingredientId,
-      total: sql<number>`coalesce(sum(${schema.stockMovements.delta}), 0)`,
+      total: netStock,
     })
     .from(schema.stockMovements)
     .where(eq(schema.stockMovements.householdId, householdId))
