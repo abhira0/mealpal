@@ -7,6 +7,10 @@ import { test, expect } from "@playwright/test";
 const LABEL = `E2E-${Date.now()}`;
 
 test.describe("batch tracker (merged Today agenda)", () => {
+  // This exercises the mobile Today layout (FAB + bottom sheets). Pin a phone
+  // viewport so it doesn't land on the desktop dashboard at the default width.
+  test.use({ viewport: { width: 390, height: 844 } });
+
   test.afterAll(() => {
     // Self-clean: the pack flow below writes real rows into the dev DB
     // (./mealpal.db), so delete anything E2E-labelled in FK order once the
@@ -109,9 +113,13 @@ test.describe("batch tracker (merged Today agenda)", () => {
     await page.locator(".sheet").getByRole("button", { name: "Add", exact: true }).click();
     await expect(page.locator(".sh-title", { hasText: "Add" })).toBeHidden();
 
-    // Tap the ✎ on the batch-backed Morning Smoothie row.
+    // Tap the ✎ on the batch-backed Morning Smoothie row. Wait for the batch
+    // chip first: submitAdd closes the sheet before the agenda reload finishes,
+    // so the row only becomes batch-backed a moment later. Editing before then
+    // would hit the still-planned row ("Edit meal") instead of the batch.
     const todayDay = page.locator("p.section-label", { hasText: /^Today$/ }).locator("..");
     const smoothieRow = todayDay.locator(".row", { hasText: "Morning Smoothie" });
+    await expect(smoothieRow.locator(".chip")).toHaveText("4 left");
     await smoothieRow.getByRole("button", { name: "Edit Morning Smoothie" }).click();
 
     // Edit sheet opens pre-filled with this batch's label + meal count.

@@ -45,7 +45,8 @@ export default function LoginPage() {
   }
 
   return (
-    <>
+    <div className="login-page">
+      <div className="login-card">
       <header className="chrome">
         <p className="eb">MealPal</p>
         <h1>{mode === "login" ? "Welcome back" : "Set up your household"}</h1>
@@ -111,6 +112,7 @@ export default function LoginPage() {
           {mode === "login" ? "Need an account? Register" : "Have an account? Log in"}
         </button>
       </div>
-    </>
+      </div>
+    </div>
   );
 }
