@@ -197,7 +197,6 @@ export default function PantryPage() {
   return (
     <>
       <header className="chrome">
-        <p className="eb">Pantry</p>
         <h1>What&apos;s in stock</h1>
       </header>
 

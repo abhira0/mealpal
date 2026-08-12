@@ -42,7 +42,7 @@ Used across the week and across surfaces: **Today** (agenda + what to cook/eat n
 
 ## Brand Commitments
 
-None fixed. The name "MealPal" and the current visual system (teal, Bricolage Grotesque / Hanken Grotesk / Space Mono) are provisional — future work may evolve or replace either.
+Name "MealPal" kept; not otherwise fixed. Standing visual preference (chosen 2026-08-10 during a full revamp): the **category standard played straight** — a clean, familiar productivity-tool look, executed impeccably, no gimmick or novelty world. The craft bar is **Linear**: crisp neutral surfaces, tight typography, a single restrained accent, fast and information-dense. Restrained color strategy (neutrals + one accent), light-first for the daytime kitchen scene. The prior visual system (teal, Bricolage / Hanken / Space Mono) is superseded.
 
 ## Evidence on Hand
 

@@ -3,7 +3,7 @@
 import type { Nutrients } from "@/lib/nutrition";
 import { EChart } from "@/components/EChart";
 
-export const MACRO_COLOR = { protein: "#115E59", carbs: "#E0A526", fat: "#D1492C" };
+export const MACRO_COLOR = { protein: "#1E7A8C", carbs: "#D99A2B", fat: "#E8674F" };
 
 const pctOf = (value: number, goal: number | null) =>
   goal && goal > 0 ? Math.round((value / goal) * 100) : null;
@@ -45,11 +45,11 @@ export function CalorieMacroRing({ cal, macros, goal, n }: {
         type: "gauge", radius: "92%", center: ["50%", "46%"], startAngle: 90, endAngle: -270,
         min: 0, max: goal || 1, silent: false,
         progress: { show: true, width: 7, roundCap: true, itemStyle: { color: MACRO_COLOR.protein } },
-        axisLine: { lineStyle: { width: 7, color: [[1, "#e3ddcc"]] } },
+        axisLine: { lineStyle: { width: 7, color: [[1, "#EDEEF1"]] } },
         pointer: { show: false }, axisTick: { show: false }, splitLine: { show: false }, axisLabel: { show: false },
         anchor: { show: false },
         detail: {
-          offsetCenter: [0, "-4%"], fontSize: 24, fontWeight: 800, color: "#20262B",
+          offsetCenter: [0, "-4%"], fontSize: 24, fontWeight: 700, color: "#17181C",
           formatter: (v: number) => String(Math.round(v)),
         },
         title: { show: false },

@@ -42,7 +42,6 @@ export default function NutritionPage() {
   return (
     <>
       <header className="chrome">
-        <p className="eb">Nutrition</p>
         <h1>What you ate</h1>
       </header>
 
@@ -238,9 +237,9 @@ function OverviewBody({ data, mode, openCard, setOpenCard }: {
             onClick={() => setOpenCard(openCard === c.key ? null : c.key)}
             style={{
               borderRadius: 999, fontWeight: 700,
-              background: c.pass ? "#E3EDE4" : "#F4D9CE",
-              borderColor: c.pass ? "#c3d6c4" : "#e3b9a6",
-              color: c.pass ? "var(--enamel-dark)" : "#9c3a1f",
+              background: c.pass ? "#E8F3EB" : "#FCECEC",
+              borderColor: c.pass ? "#CDE6D4" : "#F3C9C9",
+              color: c.pass ? "#2F8F52" : "#DC2B2B",
             }}>
             {c.label} {c.pass ? "✓" : "✗"}
           </button>
@@ -322,7 +321,7 @@ function MacroBar({ label, served, planned, goal, unit, color }: {
         </span>
       </div>
       <div title={`${Math.round(served)} served · ${Math.round(planned)} planned / ${goal}${unit} goal`}
-        style={{ display: "flex", height: 8, borderRadius: 99, background: "#e3ddcc", overflow: "hidden" }}>
+        style={{ display: "flex", height: 8, borderRadius: 99, background: "#EDEEF1", overflow: "hidden" }}>
         <div style={{ height: "100%", width: `${servedW}%`, background: color }} />
         <div style={{ height: "100%", width: `${remW}%`, background: color, opacity: 0.45 }} />
       </div>
@@ -377,7 +376,7 @@ function NutrientTable({ n, goals }: { n: Nutrients; goals: Goals }) {
               <th scope="row" style={{ textAlign: "left", fontWeight: r.bold ? 700 : 400, padding: "4px 8px 4px 0", paddingLeft: r.indent ? 14 : 0 }}>{r.label}</th>
               <td style={{ textAlign: "right", padding: "4px 8px", fontWeight: r.bold ? 700 : 400 }}>{nfmt(n[r.key])}{r.unit}</td>
               <td style={{ textAlign: "right", padding: "4px 8px", color: "var(--sage)" }}>{goal != null ? `${goal}${r.unit}` : "—"}</td>
-              <td style={{ textAlign: "right", padding: "4px 0", fontWeight: 600, color: over ? "#9c3a1f" : "var(--ink)" }}>{pct != null ? `${pct}%` : "—"}</td>
+              <td style={{ textAlign: "right", padding: "4px 0", fontWeight: 600, color: over ? "#DC2B2B" : "var(--ink)" }}>{pct != null ? `${pct}%` : "—"}</td>
             </tr>
           );
         })}
@@ -442,7 +441,7 @@ function GroupedNutrientTable({ n, goals, meals, basis, groupBy, onGroupClick }:
                 <th scope="row" style={{ ...STICKY, textAlign: "left", fontWeight: r.bold ? 700 : 400, padding: "4px 10px 4px 0", paddingLeft: r.indent ? 14 : 0 }}>{r.label}</th>
                 <td style={{ textAlign: "right", padding: "4px 8px", fontWeight: r.bold ? 700 : 400 }}>{nfmt(n[r.key])}{r.unit}</td>
                 <td style={{ textAlign: "right", padding: "4px 8px", color: "var(--sage)" }}>{goal != null ? `${goal}${r.unit}` : "—"}</td>
-                <td style={{ textAlign: "right", padding: "4px 8px", fontWeight: 600, color: over ? "#9c3a1f" : "var(--ink)" }}>{pct != null ? `${pct}%` : "—"}</td>
+                <td style={{ textAlign: "right", padding: "4px 8px", fontWeight: 600, color: over ? "#DC2B2B" : "var(--ink)" }}>{pct != null ? `${pct}%` : "—"}</td>
                 {slots.map((s) => (
                   <td key={s.slot} style={{ textAlign: "right", padding: "4px 8px" }}>{nfmt(s.value(r.key))}{r.unit}</td>
                 ))}

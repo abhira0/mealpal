@@ -72,6 +72,14 @@ function addDays(date: string, n: number): string {
   return toISODate(new Date(localNoon(date).getTime() + n * 86_400_000));
 }
 
+// Days to cook ahead of when a meal is eaten: morning/lunch meals get prepped
+// the night before (overnight oats, packed lunch), dinner is cooked same-day.
+// ponytail: threshold on the slot's timeOfDay — slots at/after 17:00 are dinner.
+// A per-slot "cook ahead" field would generalize this; deferred until needed.
+function cookLead(timeOfDay: string | undefined): number {
+  return (timeOfDay ?? "12:00") < "17:00" ? 1 : 0;
+}
+
 /** Every date in [from, to] inclusive. */
 function dateRange(from: string, to: string): string[] {
   const dates: string[] = [];
@@ -127,12 +135,40 @@ export function agendaDays(
       .map((v) => [v.id, v]),
   );
 
-  // newest active batch per slot
   const activeBatches = listBatches(db, householdId); // newest cookedDate first
-  const batchBySlot = new Map<number, (typeof activeBatches)[number]>();
-  for (const b of activeBatches) {
-    if (!batchBySlot.has(b.slotId)) batchBySlot.set(b.slotId, b);
+
+  // what each active batch actually made, so it only decorates its own meals —
+  // not every unrelated recipe that happens to share its slot.
+  const activeBatchIds = new Set(activeBatches.map((b) => b.id));
+  const batchRecipeIds = new Map<number, Set<number>>();
+  const batchProductIds = new Map<number, Set<number>>();
+  for (const it of db.select().from(schema.batchItems).all()) {
+    if (!activeBatchIds.has(it.batchId)) continue;
+    if (it.recipeId != null) {
+      (batchRecipeIds.get(it.batchId) ?? batchRecipeIds.set(it.batchId, new Set()).get(it.batchId)!).add(it.recipeId);
+    }
+    if (it.productId != null) {
+      (batchProductIds.get(it.batchId) ?? batchProductIds.set(it.batchId, new Set()).get(it.batchId)!).add(it.productId);
+    }
   }
+
+  // Does batch b back this event on `date`? Only within its coverage window
+  // (cookedDate .. cookedDate + mealsTotal - 1) AND if b actually made this
+  // event's recipe/product. Prevents a batch leaking its "N left"/COOKED badge
+  // onto other meals in the same slot or onto dates it never covered.
+  const batchBacksEvent = (
+    b: (typeof activeBatches)[number],
+    ev: (typeof events)[number],
+    date: string,
+  ): boolean => {
+    if (date < b.cookedDate || date > addDays(b.cookedDate, b.mealsTotal - 1)) return false;
+    const recipes = batchRecipeIds.get(b.id);
+    const products = batchProductIds.get(b.id);
+    if (!recipes && !products) return true; // item-less batch: backs any meal in its slot
+    if (ev.recipeId != null && recipes?.has(ev.recipeId)) return true;
+    if (ev.productId != null && products?.has(ev.productId)) return true;
+    return false;
+  };
 
   const batchEatenRows = db.select().from(schema.batchEaten)
     .where(eq(schema.batchEaten.householdId, householdId)).all();
@@ -158,9 +194,9 @@ export function agendaDays(
   // window ends (cookedDate + mealsTotal), i.e. right after its last covered day.
   const cookFlagsByDate = new Map<string, CookFlag[]>();
   for (const b of activeBatches) {
-    const cookDate = addDays(b.cookedDate, b.mealsTotal);
-    if (cookDate < from || cookDate > to) continue;
     const slot = slotById.get(b.slotId);
+    const cookDate = addDays(b.cookedDate, b.mealsTotal - cookLead(slot?.timeOfDay));
+    if (cookDate < from || cookDate > to) continue;
     const flag: CookFlag = { slotId: b.slotId, slotName: slot?.name ?? "—", label: b.label };
     const bucket = cookFlagsByDate.get(cookDate);
     if (bucket) bucket.push(flag);
@@ -177,7 +213,9 @@ export function agendaDays(
     for (const d of dateRange(b.cookedDate, coverageEnd)) {
       if (d < from || d > to) continue;
       const dayEvents = eventsByDate.get(d) ?? [];
-      if (dayEvents.some((ev) => ev.slotId === b.slotId)) continue; // real event wins, no duplicate
+      // a real event for THIS batch's meal wins (no duplicate); an unrelated
+      // meal sharing the slot doesn't suppress the batch's own row.
+      if (dayEvents.some((ev) => ev.slotId === b.slotId && batchBacksEvent(b, ev, d))) continue;
       const eatenFromBatchToday = eatenKeys.has(`${b.id}:${d}`);
       const status: "planned" | "cooked" = eatenFromBatchToday ? "cooked" : "planned";
       const meal: AgendaMeal & { _timeOfDay: string } = {
@@ -211,7 +249,7 @@ export function agendaDays(
     const meals: AgendaMeal[] = dayEvents
       .map((ev): AgendaMeal & { _timeOfDay: string } => {
         const slot = slotById.get(ev.slotId);
-        const batch = batchBySlot.get(ev.slotId) ?? null;
+        const batch = activeBatches.find((b) => b.slotId === ev.slotId && batchBacksEvent(b, ev, date)) ?? null;
         const batchBacked = batch != null;
         const eatenFromBatchToday = batchBacked && eatenKeys.has(`${batch!.id}:${date}`);
         const status = ev.status as "planned" | "cooked" | "served";
@@ -271,7 +309,7 @@ export function nextCooks(db: Db, householdId: number, today: string): NextCook[
   const activeBatches = listBatches(db, householdId);
   const bySlot = new Map<number, { cookDate: string; label: string }>();
   for (const b of activeBatches) {
-    const cookDate = addDays(b.cookedDate, b.mealsTotal);
+    const cookDate = addDays(b.cookedDate, b.mealsTotal - cookLead(slotById.get(b.slotId)?.timeOfDay));
     const existing = bySlot.get(b.slotId);
     if (!existing || cookDate < existing.cookDate) {
       bySlot.set(b.slotId, { cookDate, label: b.label });
@@ -308,12 +346,13 @@ export function nextCooks(db: Db, householdId: number, today: string): NextCook[
   }
   for (const [recipeId, { date, slotId }] of byRecipe) {
     const slot = slotById.get(slotId);
+    const cookDate = addDays(date, -cookLead(slot?.timeOfDay));
     result.push({
       slotId,
       slotName: slot?.name ?? "—",
       label: getRecipe(db, householdId, recipeId)?.name ?? "Recipe",
-      cookDate: date,
-      daysAway: daysFrom(date),
+      cookDate,
+      daysAway: daysFrom(cookDate),
     });
   }
 

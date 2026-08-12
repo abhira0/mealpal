@@ -109,11 +109,11 @@ export default function ShopPage() {
   return (
     <>
       <header className="chrome">
-        <p className="eb">
-          Shop · {stopCount} {stopCount === 1 ? "stop" : "stops"}
+        <h1>The run</h1>
+        <p style={{ color: "var(--ink-2)", fontSize: 14, marginTop: 2 }}>
+          {stopCount} {stopCount === 1 ? "stop" : "stops"}
           {tripTotal > 0 && <> · ${centsToDollars(tripTotal).toFixed(2)}</>}
         </p>
-        <h1>The run</h1>
       </header>
 
       <main className="content stack">

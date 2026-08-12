@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { Pencil, X, AlertTriangle } from "lucide-react";
 import { Dropdown } from "@/components/Dropdown";
 import { Stepper } from "@/components/Stepper";
 import { Sheet } from "@/components/Sheet";
@@ -48,20 +49,12 @@ type CookChoice = {
 };
 type CookPick = { productId: number; variantId: number | null };
 
-// Slot-name accent colors for the "Next cooking" cards.
-function slotAccent(slotName: string): string {
-  const n = slotName.toLowerCase();
-  if (n.includes("lunch")) return "#c65a3a";
-  if (n.includes("dinner")) return "#2f6b64";
-  return "#7a6f57";
-}
-
 // Subset of GET /api/nutrition/analysis?mode=day&date=... used here — eaten
 // ("nutrients") vs planned ("planned") totals, scaled to the household goal.
 type DayAnalysis = {
   goals: { calorieGoal: number; proteinG: number; carbsG: number; fatG: number };
-  nutrients: { calories: number; proteinG: number };
-  planned: { calories: number; proteinG: number };
+  nutrients: { calories: number; proteinG: number; carbsG: number; fatG: number };
+  planned: { calories: number; proteinG: number; carbsG: number; fatG: number };
 };
 
 const DOW = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -70,9 +63,9 @@ const DOW = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 // cooked (amber, batch serving ready but not eaten today), served (green,
 // eaten/counts toward nutrition).
 const PHASE_CHIP: Record<AgendaMeal["phase"], { bg: string; fg: string }> = {
-  planned: { bg: "#a99e86", fg: "#fff" },
-  cooked: { bg: "#e0a92e", fg: "#3a2f10" },
-  served: { bg: "#5c8a5e", fg: "#fff" },
+  planned: { bg: "#EDEEF1", fg: "#5B6069" },
+  cooked: { bg: "#FBF1DC", fg: "#B26B00" },
+  served: { bg: "#E8F3EB", fg: "#2F8F52" },
 };
 
 function initials(name: string | null | undefined): string {
@@ -617,7 +610,7 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
       <div
         key={rowKey}
         className="row"
-        style={meal.outOfStock ? { background: "#fbeeeb", borderColor: "#e6b3a8" } : undefined}
+        style={meal.outOfStock ? { background: "#FCECEC", borderColor: "#F3C9C9" } : undefined}
       >
         <button
           type="button"
@@ -652,8 +645,8 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
             {meal.slotName}
           </span>
           {meal.outOfStock && (
-            <div style={{ color: "#c0392b", fontSize: "0.66em", fontWeight: 700 }}>
-              ⚠ out of stock: {meal.missingItems.join(", ")}
+            <div style={{ color: "#DC2B2B", fontSize: "0.66em", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <AlertTriangle size={11} /> out of stock: {meal.missingItems.join(", ")}
             </div>
           )}
         </div>
@@ -689,7 +682,7 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
         <span
           aria-label={`Status: ${meal.phase}`}
           style={{
-            background: meal.outOfStock ? "#c0392b" : PHASE_CHIP[meal.phase].bg,
+            background: meal.outOfStock ? "#DC2B2B" : PHASE_CHIP[meal.phase].bg,
             color: meal.outOfStock ? "#fff" : PHASE_CHIP[meal.phase].fg,
             fontSize: 10,
             fontWeight: 700,
@@ -712,7 +705,7 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
             style={{ padding: "4px 8px", minHeight: "auto" }}
             onClick={() => (meal.batchBacked ? openEditBatch(meal.batchId!) : openEditMeal(meal))}
           >
-            ✎
+            <Pencil size={15} />
           </button>
         )}
         {meal.eventId != null && (
@@ -723,7 +716,7 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
             style={{ padding: "4px 10px", minHeight: "auto" }}
             onClick={() => requestRemove(meal)}
           >
-            ×
+            <X size={16} />
           </button>
         )}
         {meal.batchBacked && meal.batchId != null && (
@@ -734,7 +727,7 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
             style={{ padding: "4px 10px", minHeight: "auto" }}
             onClick={() => removeBatch(meal.batchId!)}
           >
-            ×
+            <X size={16} />
           </button>
         )}
       </div>
@@ -746,7 +739,6 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
       <header className="chrome">
         <div className="chrome-row">
           <div>
-            <p className="eb">&nbsp;</p>
             <h1>&nbsp;</h1>
           </div>
           <Link href="/manage" aria-label="Manage account" className="avatar">
@@ -762,7 +754,6 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
       <header className="chrome">
         <div className="chrome-row">
           <div>
-            <p className="eb">Today</p>
             <h1>{dateLabel}</h1>
           </div>
           <Link href="/manage" aria-label="Manage account" className="avatar">
@@ -783,10 +774,9 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
           if (visibleCooks.length === 0) return null;
           return (
           <div>
-            <p className="section-label">🍳 Next cooking</p>
+            <p className="section-label">Next cooking</p>
             <div style={{ display: "flex", gap: 10, overflowX: "auto" }}>
               {visibleCooks.map((nc) => {
-                const accent = slotAccent(nc.slotName);
                 const dateLabel = localNoon(nc.cookDate)
                   .toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
                   .replace(/^(\w{3})\./, "$1"); // strip a trailing period on the weekday, if any
@@ -794,31 +784,24 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
                 return (
                   <div
                     key={nc.slotId}
-                    style={{
-                      flex: "1 1 0",
-                      minWidth: 140,
-                      background: "#fbf8f0",
-                      border: "1px solid #e2dac7",
-                      borderTop: `4px solid ${accent}`,
-                      borderRadius: 14,
-                      padding: 12,
-                    }}
+                    className="card"
+                    style={{ flex: "1 1 0", minWidth: 140, padding: 12 }}
                   >
-                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: accent }}>
+                    <div style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--ink-3)" }}>
                       {nc.slotName.toLowerCase()} prep
                     </div>
-                    <div style={{ fontSize: 13, color: "var(--sage)", margin: "2px 0 6px" }}>{nc.label}</div>
-                    <div style={{ fontWeight: 700, fontSize: 14 }}>{dateLabel}</div>
+                    <div style={{ fontSize: 13, color: "var(--ink-2)", margin: "3px 0 6px" }}>{nc.label}</div>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{dateLabel}</div>
                     <span
                       style={{
                         display: "inline-block",
-                        marginTop: 6,
-                        background: accent,
-                        color: "#fff",
+                        marginTop: 8,
+                        background: "var(--accent-2-weak)",
+                        color: "var(--accent-2-ink)",
                         fontSize: 11,
-                        fontWeight: 700,
-                        borderRadius: 99,
-                        padding: "3px 8px",
+                        fontWeight: 600,
+                        borderRadius: 999,
+                        padding: "3px 9px",
                       }}
                     >
                       {inLabel}
@@ -848,7 +831,23 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
               planned={analysis.planned.proteinG}
               goal={analysis.goals.proteinG}
               unit="g"
-              color="var(--turmeric)"
+              color="var(--accent)"
+            />
+            <MacroBar
+              label="Carbs"
+              cooked={analysis.nutrients.carbsG}
+              planned={analysis.planned.carbsG}
+              goal={analysis.goals.carbsG}
+              unit="g"
+              color="var(--accent)"
+            />
+            <MacroBar
+              label="Fat"
+              cooked={analysis.nutrients.fatG}
+              planned={analysis.planned.fatG}
+              goal={analysis.goals.fatG}
+              unit="g"
+              color="var(--accent)"
             />
           </div>
         )}
@@ -901,7 +900,7 @@ export function TodayAgenda({ userName }: { userName?: string | null }) {
                           style={{ width: "100%", textAlign: "left", border: "none", cursor: "pointer" }}
                           onClick={() => openAdd({ date: day.date, slotId: flag.slotId, type: "batch" })}
                         >
-                          <span className="row-main">🍳 cook {flag.label}</span>
+                          <span className="row-main">Cook {flag.label}</span>
                           <span className="chip run">{flag.slotName}</span>
                         </button>
                       ))}
@@ -1307,7 +1306,7 @@ function MacroBar({ label, cooked, planned, goal, unit, color }: {
           {Math.round(cooked)} / {goal}{unit}
         </span>
       </div>
-      <div style={{ display: "flex", height: 8, borderRadius: 99, background: "#e3ddcc", overflow: "hidden" }}>
+      <div style={{ display: "flex", height: 8, borderRadius: 99, background: "#EDEEF1", overflow: "hidden" }}>
         <div style={{ height: "100%", width: `${cookedW}%`, background: color }} />
         <div style={{ height: "100%", width: `${remW}%`, background: color, opacity: 0.45 }} />
       </div>

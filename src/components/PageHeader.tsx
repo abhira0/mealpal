@@ -11,7 +11,6 @@ export type Crumb = { label: string; href: string };
 // differs (see PlanEditor's chrome-row).
 export function PageHeader({
   crumbs = [],
-  eyebrow,
   title,
   children,
 }: {
@@ -26,7 +25,7 @@ export function PageHeader({
       <div className="chrome-lead">
         {parent && <BackLink href={parent.href} icon />}
         <div style={{ minWidth: 0, flex: 1 }}>
-          {crumbs.length > 0 ? (
+          {crumbs.length > 0 && (
             <nav className="crumbs" aria-label="Breadcrumb">
               {crumbs.map((c, i) => (
                 <span key={c.href}>
@@ -35,8 +34,6 @@ export function PageHeader({
                 </span>
               ))}
             </nav>
-          ) : (
-            eyebrow && <p className="eb">{eyebrow}</p>
           )}
           <h1>{title}</h1>
         </div>

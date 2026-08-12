@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-10T00:00:00Z",
+  "title": "Design System: MealPal",
+  "extensions": {
+    "colorMeta": {
+      "accent": { "role": "primary", "displayName": "Indigo Accent", "canonical": "#4F5BD5", "tonalRamp": ["#1B1E52", "#262B75", "#323897", "#3F49B5", "#4F5BD5", "#8189E2", "#B3B8EE", "#EEEFFB"] },
+      "bg": { "role": "neutral", "displayName": "Canvas", "canonical": "#FBFBFC", "tonalRamp": ["#17181C", "#2B2D33", "#5B6069", "#8A8F98", "#C9CCD2", "#E6E8EC", "#F4F5F7", "#FBFBFC"] },
+      "surface": { "role": "neutral", "displayName": "Surface", "canonical": "#FFFFFF", "tonalRamp": ["#17181C", "#2B2D33", "#5B6069", "#8A8F98", "#C9CCD2", "#EDEEF1", "#F4F5F7", "#FFFFFF"] },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#17181C", "tonalRamp": ["#17181C", "#2B2D33", "#42454C", "#5B6069", "#8A8F98", "#C9CCD2", "#E6E8EC", "#F4F5F7"] },
+      "danger": { "role": "tertiary", "displayName": "Danger Red", "canonical": "#DC2B2B", "tonalRamp": ["#4A0E0E", "#6E1616", "#9A1F1F", "#C02424", "#DC2B2B", "#E97070", "#F3C9C9", "#FCECEC"] },
+      "warn": { "role": "tertiary", "displayName": "Warn Amber", "canonical": "#B26B00", "tonalRamp": ["#3B2400", "#5A3700", "#7D4C00", "#B26B00", "#D98A1E", "#E8AF5C", "#EED9AE", "#FBF1DC"] },
+      "ok": { "role": "tertiary", "displayName": "OK Green", "canonical": "#2F8F52", "tonalRamp": ["#0F3D22", "#175A31", "#217544", "#2F8F52", "#4FAE72", "#8CCBA1", "#CDE6D4", "#E8F3EB"] },
+      "macro-carbs": { "role": "chart", "displayName": "Carbs Gold", "canonical": "#E0A63A", "tonalRamp": ["#4A3305", "#6E4C0B", "#9A6C13", "#C48C22", "#E0A63A", "#EBC170", "#F3DAA6", "#FAEFD6"] },
+      "macro-fat": { "role": "chart", "displayName": "Fat Coral", "canonical": "#E0684A", "tonalRamp": ["#4A1509", "#6E2211", "#9A331B", "#C44A2E", "#E0684A", "#EA9179", "#F3BCAC", "#FAE4DC"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Page titles and the desktop sidebar brand; the largest type on a screen." },
+      "title": { "displayName": "Title", "purpose": "Card, sheet, and ticket titles." },
+      "body": { "displayName": "Body", "purpose": "Base reading text and control labels; 14px in Ink 2 for secondary body." },
+      "numeral": { "displayName": "Numeral", "purpose": "Every quantity, price, macro, and date — mono, always tabular figures." },
+      "label": { "displayName": "Label / Eyebrow", "purpose": "10px uppercase mono in Ink 3; eyebrows, field labels, section headers, metadata." }
+    },
+    "shadows": [
+      { "name": "resting", "value": "0 1px 2px rgba(20,22,28,.05)", "purpose": "Default 1px lift on cards, rows, tickets. Barely visible." },
+      { "name": "raised", "value": "0 4px 14px rgba(20,22,28,.08)", "purpose": "Mid-layer surfaces; used lightly." },
+      { "name": "popover", "value": "0 16px 40px rgba(20,22,28,.16)", "purpose": "Floating overlays only — dropdowns, sheets, confirm dialogs." }
+    ],
+    "motion": [
+      { "name": "button-ease", "value": "background .12s ease", "purpose": "Default button/state background transition." },
+      { "name": "reduced-motion", "value": "prefers-reduced-motion: reduce -> transition/animation none", "purpose": "All motion disabled under reduced-motion." }
+    ],
+    "focus": [
+      { "name": "focus-ring", "value": "0 0 0 3px rgba(79,91,213,.28)", "purpose": "Shared :focus-visible ring on all interactive elements; replaces outline." }
+    ],
+    "breakpoints": [
+      { "name": "desktop", "value": "900px", "purpose": "Bottom nav becomes 220px left sidebar; content uncaps to 960px; card lists reflow to auto-fill grid." }
+    ],
+    "layout": [
+      { "name": "mobile-shell", "value": "max-width 600px, content padding 16px, bottom padding 84px" },
+      { "name": "desktop-shell", "value": "sidebar 220px + content max-width 960px, padding 24px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single indigo call-to-action; one per screen.",
+      "html": "<button class=\"ds-btn-primary\">Cook this</button>",
+      "css": ".ds-btn-primary{font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-weight:600;font-size:14px;background:#4F5BD5;color:#fff;border:1px solid #4F5BD5;border-radius:8px;padding:10px 16px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;transition:background .12s ease}.ds-btn-primary:hover{background:#3F49B5;border-color:#3F49B5}.ds-btn-primary:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(79,91,213,.28)}.ds-btn-primary:disabled{opacity:.45;cursor:default}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Neutral action; white surface with hairline border.",
+      "html": "<button class=\"ds-btn-secondary\">Cancel</button>",
+      "css": ".ds-btn-secondary{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;font-weight:600;font-size:14px;background:#fff;color:#17181C;border:1px solid #E6E8EC;border-radius:8px;padding:10px 16px;min-height:44px;cursor:pointer;transition:background .12s ease}.ds-btn-secondary:hover{background:#F4F5F7}.ds-btn-secondary:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(79,91,213,.28)}"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "White surface, hairline border, resting shadow; the primary container.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-title\">Sheet-pan chicken</div><div class=\"ds-card-meta\">Dinner · 35 MIN</div></div>",
+      "css": ".ds-card{background:#fff;border:1px solid #E6E8EC;border-radius:12px;padding:14px;box-shadow:0 1px 2px rgba(20,22,28,.05)}.ds-card-title{font-family:ui-sans-serif,system-ui,sans-serif;font-weight:640;font-size:16px;letter-spacing:-.01em;color:#17181C}.ds-card-meta{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#6B6F77;margin-top:3px}"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "16px field (no iOS zoom); accent border + focus ring on focus.",
+      "html": "<input class=\"ds-input\" placeholder=\"Search pantry\" />",
+      "css": ".ds-input{font-family:ui-sans-serif,system-ui,sans-serif;font-size:16px;line-height:1.2;color:#17181C;background:#fff;border:1px solid #E6E8EC;border-radius:8px;padding:12px 13px;width:100%;min-height:44px}.ds-input::placeholder{color:#6B6F77}.ds-input:hover{border-color:#6B6F77}.ds-input:focus{outline:none;border-color:#4F5BD5;box-shadow:0 0 0 3px rgba(79,91,213,.28)}"
+    },
+    {
+      "name": "Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Mono pill tag; neutral by default, accent/status variants for state.",
+      "html": "<span class=\"ds-chip\">2 CT</span> <span class=\"ds-chip ds-chip-accent\">$4.20</span> <span class=\"ds-chip ds-chip-low\">LOW</span>",
+      "css": ".ds-chip{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-weight:600;font-size:11px;background:#F4F5F7;color:#5B6069;padding:4px 9px;border-radius:999px;border:1px solid #E6E8EC;white-space:nowrap;display:inline-block}.ds-chip-accent{background:#EEEFFB;color:#3A42A8;border-color:transparent}.ds-chip-low{background:#FBF1DC;color:#B26B00;border-color:#EED9AE}"
+    },
+    {
+      "name": "Bottom Nav / Sidebar Item",
+      "kind": "nav",
+      "refersTo": "button-ghost",
+      "description": "Ink-3 at rest, indigo when active; row-form in the desktop sidebar.",
+      "html": "<a class=\"ds-nav-item ds-on\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M3 12l9-9 9 9M5 10v10h14V10\"/></svg><span>Today</span></a>",
+      "css": ".ds-nav-item{font-family:ui-sans-serif,system-ui,sans-serif;font-weight:500;font-size:14px;color:#5B6069;display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;cursor:pointer}.ds-nav-item:hover{background:#F4F5F7;color:#17181C}.ds-nav-item.ds-on{background:#EEEFFB;color:#3A42A8;font-weight:600}"
+    },
+    {
+      "name": "Macro Bar",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Planned fill behind a served fill in the nutrient's chart color.",
+      "html": "<div class=\"ds-macro\"><div class=\"ds-macro-head\"><span class=\"ds-macro-label\">PROTEIN</span><span class=\"ds-macro-val\">128 / 150 g</span></div><div class=\"ds-macro-track\"><div class=\"ds-macro-served\"></div></div></div>",
+      "css": ".ds-macro-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}.ds-macro-label{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6B6F77}.ds-macro-val{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-weight:600;font-size:12px;font-variant-numeric:tabular-nums;color:#17181C}.ds-macro-track{height:8px;border-radius:999px;background:#F4F5F7;overflow:hidden}.ds-macro-served{height:100%;width:85%;background:#4F5BD5}"
+    },
+    {
+      "name": "Phase Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Encodes meal state: planned (neutral), cooked (warn), served (ok).",
+      "html": "<span class=\"ds-phase ds-phase-served\">Served</span>",
+      "css": ".ds-phase{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-weight:600;font-size:11px;padding:4px 9px;border-radius:999px;white-space:nowrap;display:inline-block}.ds-phase-planned{background:#EDEEF1;color:#5B6069}.ds-phase-cooked{background:#FBF1DC;color:#B26B00}.ds-phase-served{background:#E8F3EB;color:#2F8F52}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Kitchen Operations Console",
+    "overview": "MealPal is a household's food operation rendered as a single calm, dense productivity tool. It plays the category standard straight — a clean, familiar productivity-tool look executed impeccably, no gimmick — and holds itself to Linear's craft bar: crisp neutral surfaces, tight typography, one restrained accent, fast and information-dense. Light-first by intent, built for a returning power user. The world is cool and near-monochrome: a light cool-gray canvas carries white surfaces separated by hairline borders and barely-there 1px shadows; text is near-black; a single indigo accent appears sparingly to mark the one live action or current selection. System fonts throughout, with a monospace stack reserved for eyebrows, metadata, and every numeral, always in tabular figures. It refuses the friendly rounded-card + food-photo + soft-green planner look, its Notion-lite opposite, and decorative novelty alike.",
+    "keyCharacteristics": [
+      "Light-first cool-neutral canvas with white surfaces and hairline (1px) borders.",
+      "One indigo accent (#4F5BD5), used sparingly for the primary action and current selection.",
+      "System font stack; tight tracking on headings; monospace + tabular numerals for all figures.",
+      "6–12px radii, 1px ambient shadows; information-dense, mobile-first, one-handed.",
+      "Responsive shell: bottom nav on mobile, fixed left sidebar at ≥900px."
+    ],
+    "rules": [
+      { "name": "The One Voice Rule", "body": "Indigo is the only accent and appears on a small fraction of any screen — the primary action and the current selection. If two things are indigo on a screen, one of them is probably wrong.", "section": "colors" },
+      { "name": "The Weak-Line-Ink Triad Rule", "body": "Every status color ships as a set: a -weak tint background, a -line border, and the saturated hue for text/icon. Never place a saturated status hue as a large fill.", "section": "colors" },
+      { "name": "The Signal-Not-Decoration Rule", "body": "Color marks state (planned/cooked/served, low/run-out, pass/fail, selected/active). A surface with no state is neutral. Do not colorize for variety.", "section": "colors" },
+      { "name": "The Tabular Numeral Rule", "body": "Numbers are set in the mono stack with tabular figures — never in the sans body face. Quantities, prices, macros, and dates must align vertically wherever they stack.", "section": "typography" },
+      { "name": "The Mono-Eyebrow Rule", "body": "Structural labels are 10px uppercase monospace in Ink 3 with wide tracking (~0.14em). This is the house label; do not substitute a sans small-caps.", "section": "typography" },
+      { "name": "Inputs Never Zoom", "body": "Text inputs are 16px so iOS Safari does not auto-zoom on focus. Do not shrink field text below 16px.", "section": "typography" },
+      { "name": "The Hairline-First Rule", "body": "Separation is a 1px Line border, not a shadow. Resting shadow is a 1px ambient hint only; anything heavier than Resting is reserved for floating overlays.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep indigo rare — the primary action and the current selection only (The One Voice Rule).",
+      "Do set every number in the mono stack with font-variant-numeric: tabular-nums.",
+      "Do separate surfaces with 1px Line hairlines and Resting shadow; reserve the Popover shadow for floating overlays.",
+      "Do use the mono 10px uppercase eyebrow (Ink 3, ~0.14em tracking) for labels, section headers, and metadata.",
+      "Do ship status color as the weak-tint background + -line border + saturated-ink triad.",
+      "Do keep input text at 16px and controls at a 44px min touch target.",
+      "Do use the shared focus ring (0 0 0 3px rgba(79,91,213,.28)) on :focus-visible.",
+      "Do honor the responsive split: bottom nav below 900px, 220px left sidebar and 960px content at and above it."
+    ],
+    "donts": [
+      "Don't introduce a second accent hue or use macro chart colors (carbs/fat) anywhere outside the macro charts.",
+      "Don't fill large areas with a saturated status hue; the tint carries the surface, the hue carries the label.",
+      "Don't add heavy or offset drop shadows, gradients, or receipt-scallop / skeuomorphic novelty — tickets are clean cards.",
+      "Don't set numbers in the sans body face or use non-tabular figures in stacked data.",
+      "Don't exceed the 600px mobile shell width or drop the 84px bottom-nav clearance.",
+      "Don't reference the legacy CSS-variable names (--enamel, --paprika, --paper, --turmeric, --sage, --low-*, --run-*) in new code; they are backward-compat aliases remapped onto the canon tokens."
+    ]
+  }
+}
