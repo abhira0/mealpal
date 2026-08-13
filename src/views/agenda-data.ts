@@ -476,7 +476,14 @@ export function useAgenda(
     setAddVariantId(null);
     setAddVariants([]);
     const res = await fetch(`/api/products/${id}/variants`);
-    if (res.ok) setAddVariants((await res.json()) as { id: number; name: string }[]);
+    if (res.ok) {
+      const vs = (await res.json()) as { id: number; name: string }[];
+      setAddVariants(vs);
+      // Default the planning variant to the first one so planned calories/macros
+      // count without an extra step. The user can change it here; serving still
+      // asks which variant was actually eaten (confirmCook).
+      setAddVariantId(vs[0]?.id ?? null);
+    }
   }
 
   const addRepeatInvalid = addRepeat && addUnit === "week" && !addRepeatDays.some(Boolean);

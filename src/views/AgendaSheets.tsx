@@ -102,7 +102,7 @@ export function AgendaSheets({ agenda }: { agenda: AgendaState }) {
               </div>
               {addVariants.length > 0 && (
                 <div className="field">
-                  <span className="field-label">Variant (optional)</span>
+                  <span className="field-label">Variant (for planning · asked again when served)</span>
                   <Dropdown
                     label="Variant"
                     value={addVariantId}
