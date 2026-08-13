@@ -53,11 +53,7 @@ export function DesktopNutrition() {
         ) : noMeals ? (
           <p style={{ opacity: 0.6 }}>No meals planned this week.</p>
         ) : (
-          <div
-            className="dash-grid"
-            data-testid="dash"
-            style={{ gridTemplateColumns: "minmax(360px,440px) minmax(0,1fr)" }}
-          >
+          <div className="dash-grid dash-nutrition" data-testid="dash">
             <section className="dash-col">
               <OverviewBody data={data} mode={mode} openCard={openCard} setOpenCard={setOpenCard} />
             </section>

@@ -112,7 +112,7 @@ button{font-family:inherit}
 .icon-btn:hover{color:var(--ink)}
 .icon-btn.danger{color:var(--danger)}
 .trigger.add{justify-content:center;color:var(--accent-ink)}
-.btn:focus-visible,.chip:focus-visible,.trigger:focus-visible,.input:focus-visible,.btn-link:focus-visible,.icon-btn:focus-visible,.btn-add:focus-visible,.checkbox:focus-visible,.row-link:focus-visible,.account-row:focus-visible,.week .day:focus-visible,.tab:focus-visible,.tabs button:focus-visible,.filter button:focus-visible,.unit-radio button:focus-visible,.stepper button:focus-visible,.sheet .o:focus-visible{outline:none;box-shadow:var(--focus)}
+.btn:focus-visible,.chip:focus-visible,.trigger:focus-visible,.input:focus-visible,.btn-link:focus-visible,.icon-btn:focus-visible,.btn-add:focus-visible,.checkbox:focus-visible,.row-link:focus-visible,.account-row:focus-visible,.week .day:focus-visible,.tab:focus-visible,.tabs button:focus-visible,.filter button:focus-visible,.unit-radio button:focus-visible,.stepper button:focus-visible,.sheet .o:focus-visible,.nav a:focus-visible,.avatar:focus-visible,.chrome-back-icon:focus-visible,.dropdown-pop .o:focus-visible,.gallery-thumb:focus-visible,.pantry-row:focus-visible,.section-toggle:focus-visible{outline:none;box-shadow:var(--focus)}
 
 /* ---------- chips ---------- */
 .chip{font-family:var(--mono);font-weight:600;font-size:11px;background:var(--surface-2);color:var(--ink-2);padding:4px 9px;border-radius:999px;border:1px solid var(--line);white-space:nowrap;display:inline-block}
@@ -429,9 +429,19 @@ button.row-link{background:none;border:none;width:100%;text-align:left;cursor:po
      view via style=; .dash-grid only carries gap + alignment. */
   .dash-grid{display:grid;gap:24px;align-items:start}
   .dash-col{min-width:0;display:flex;flex-direction:column;gap:16px}
+  /* Nutrition: single column until there's room for the wide nutrient table
+     beside the overview (avoids an 8-col table crushed into a narrow pane). */
+  .dash-nutrition{grid-template-columns:minmax(0,520px)}
+  .dash-nutrition > *{max-width:640px}
   /* login: no sidebar on this route, so center the form as a card */
   .login-page{min-height:100dvh;display:grid;place-items:center}
   .login-card{width:100%;max-width:420px}
+}
+
+/* Nutrition goes two-pane only when there's room for the wide table beside the overview */
+@media (min-width:1280px){
+  .dash-nutrition{grid-template-columns:minmax(360px,420px) minmax(0,1fr)}
+  .dash-nutrition > *{max-width:none}
 }
 
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
