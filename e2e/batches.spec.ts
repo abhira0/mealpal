@@ -51,12 +51,24 @@ test.describe("batch tracker (merged Today agenda)", () => {
     // Switch the type row to Batch.
     await page.getByRole("button", { name: "Batch", exact: true }).click();
 
-    // Slot defaults to the first slot, which is Breakfast (that's the slot
-    // the demo's "Morning Smoothie" lives in) — verify rather than assume.
+    // Pin the batch to the Dinner slot. This is what makes the test
+    // deterministic and independent of ambient demo state: the demo's Dinner
+    // slot has no *recipe*-backed rotation events, so this batch backs no real
+    // meal there and instead projects one SYNTHETIC row per covered day
+    // (cookedDate .. cookedDate + meals - 1). Those rows carry the batch's own
+    // unique LABEL as their name — so we always get exactly `meals` eatable
+    // rows to spend, regardless of which recipe meals happen to be planned or
+    // already-served in the demo. (Pinning to Breakfast + the demo's "Morning
+    // Smoothie" is fragile: in the drifted demo DB only one Smoothie day across
+    // the whole visible range is still eatable, so a 2-meal batch could never
+    // be eaten to zero through those rows.)
     const slotField = page.locator(".field").filter({ hasText: "Slot" });
-    await expect(slotField.getByRole("button")).toContainText("Breakfast");
+    await slotField.getByRole("button").click();
+    await page.getByRole("option", { name: "Dinner", exact: true }).click();
+    await expect(slotField.getByRole("button")).toContainText("Dinner");
 
-    // Unique label so this run's batch is unambiguous and cleanly deletable.
+    // Unique label so this run's batch is unambiguous and cleanly deletable,
+    // and so its synthetic rows are addressable by an exact name.
     await page.getByPlaceholder("e.g. Chicken & rice").fill(LABEL);
 
     // Meals defaults to 4 — step down to 2.
@@ -65,33 +77,40 @@ test.describe("batch tracker (merged Today agenda)", () => {
     await decrease.click();
     await expect(page.locator(".stepper .val")).toHaveText("2");
 
-    // Recipe/product picker defaults to the first item — leave it as-is.
-    // Scoped to the sheet: the FAB behind it is also named "Add".
+    // Recipe/product picker defaults to the first item — leave it as-is. It
+    // only determines which stock the pack depletes; it doesn't matter which
+    // recipe it is, since no Dinner event uses it (so the batch stays purely
+    // synthetic). Scoped to the sheet: the FAB behind it is also named "Add".
     await page.locator(".sheet").getByRole("button", { name: "Add", exact: true }).click();
     await expect(page.locator(".sh-title", { hasText: "Add" })).toBeHidden();
 
-    // Back on the agenda: today's row for the batch-backed slot's meal
-    // (Morning Smoothie, in Breakfast) now carries a batch chip.
+    // Back on the agenda: today falls inside the batch's coverage window, so
+    // today's Dinner row is a synthetic batch row (named LABEL) carrying the
+    // "N left" chip.
     const todayHeading = page.locator("p.section-label", { hasText: /^Today$/ });
     const todayDay = todayHeading.locator("..");
-    const smoothieRow = todayDay.locator(".row", { hasText: "Morning Smoothie" });
-    const chip = smoothieRow.locator(".chip");
+    const batchRow = todayDay.locator(".row", { hasText: LABEL });
+    const chip = batchRow.locator(".chip");
     await expect(chip).toHaveText("2 left");
 
-    // Eat one — drops to the low/cook-soon state. Today's own Morning
-    // Smoothie is already cooked in this seed (its checkbox is disabled), so
-    // eat from the earliest not-yet-eaten day for the same slot instead —
-    // batches back the slot across every date, so today's chip still
-    // reflects the shared batch's remaining count.
-    const eatCheckbox = page.getByRole("checkbox", { name: "Mark Morning Smoothie eaten" }).first();
-    await eatCheckbox.click();
+    // The batch-backed checkboxes are this batch's own synthetic rows, one per
+    // covered day (today + tomorrow), each named for the batch's LABEL.
+    const eatCheckbox = page.getByRole("checkbox", { name: `Mark ${LABEL} eaten` });
+    await expect(eatCheckbox).toHaveCount(2);
+
+    // Eat one — drops to the low/cook-soon state. Click the earliest not-yet-
+    // eaten row; wait for the shared chip to reflect the new remaining count
+    // (which also confirms the agenda reloaded and the row's acting-lock
+    // cleared) before eating again.
+    await eatCheckbox.first().click();
     await expect(chip).toHaveText("cook soon");
 
     // Eat the last one — the batch is now fully spent. `listBatches` only
     // treats batches with mealsRemaining > 0 as active, so once the count
-    // hits zero the batch stops backing the slot entirely and its chip
-    // disappears from every day's row (rather than showing "empty · cook").
-    await page.getByRole("checkbox", { name: "Mark Morning Smoothie eaten" }).first().click();
+    // hits zero the batch stops backing the slot entirely and its synthetic
+    // rows (and their chip) disappear from every day rather than showing
+    // "empty · cook".
+    await page.getByRole("checkbox", { name: `Mark ${LABEL} eaten` }).first().click();
     await expect(chip).toHaveCount(0);
   });
 

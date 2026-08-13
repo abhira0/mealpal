@@ -7,10 +7,10 @@
   /* two-color theme: teal primary + coral secondary */
   --accent:#1E7A8C; --accent-press:#185F6E; --accent-ink:#175766; --accent-weak:#E1EDF0;
   --accent-2:#E8674F; --accent-2-ink:#BE4732; --accent-2-weak:#FCEAE6;
-  /* semantic, used sparingly */
-  --danger:#DC2B2B; --danger-weak:#FCECEC; --danger-line:#F3C9C9;
-  --warn:#B26B00; --warn-weak:#FBF1DC; --warn-line:#EED9AE;
-  --ok:#2F8F52; --ok-weak:#E8F3EB; --ok-line:#CDE6D4;
+  /* semantic, used sparingly — inks darkened to clear 4.5:1 on their weak tints */
+  --danger:#C41F1F; --danger-weak:#FCECEC; --danger-line:#F3C9C9;
+  --warn:#8A5200; --warn-weak:#FBF1DC; --warn-line:#EED9AE;
+  --ok:#256B3E; --ok-weak:#E8F3EB; --ok-line:#CDE6D4;
   /* radii + elevation */
   --r1:6px; --r2:8px; --r3:12px;
   --shadow-sm:0 1px 2px rgba(20,22,28,.05); --shadow-md:0 4px 14px rgba(20,22,28,.08);
@@ -18,7 +18,7 @@
   /* type — system stacks, no webfont payload */
   --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   --mono:ui-monospace,"SF Mono","SFMono-Regular","Menlo","Cascadia Mono","Roboto Mono",monospace;
-  --focus:0 0 0 3px rgba(79,91,213,.28);
+  --focus:0 0 0 3px rgba(30,122,140,.30);
   --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
 
   /* legacy token names remapped so every existing rule inherits the canon palette */
@@ -32,6 +32,8 @@
   --run-bg:var(--danger-weak); --run-ink:var(--danger);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+/* shared 150ms hover feel on interactive surfaces (DESIGN.md: 150-300ms) */
+.filter button,.trigger,.input,.row,.account-row,.nav a,.week .day,.icon-btn,.chrome-back-icon,.avatar,.stepper button,.tab,.unit-radio button,button.row-link,.pantry-row,.dropdown-pop .o,.sheet .o,.gallery-thumb{transition:background-color .15s ease,border-color .15s ease,color .15s ease,box-shadow .15s ease}
 html,body{background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 body{font-size:15px;line-height:1.5}
 a,a:link,a:visited{color:inherit;text-decoration:none}
@@ -62,14 +64,14 @@ button{font-family:inherit}
 
 /* ---------- view tabs (underlined) ---------- */
 .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line)}
-.tabs button{font-weight:600;font-size:13px;letter-spacing:0;background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;padding:10px 12px;min-height:44px;color:var(--ink-2);cursor:pointer}
+.tabs button{font-weight:600;font-size:13px;letter-spacing:0;background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;padding:10px 12px;min-height:44px;color:var(--ink-2);cursor:pointer;transition:color .15s ease,border-color .15s ease}
 .tabs button:hover{color:var(--ink)}
 .tabs button[aria-pressed="true"]{color:var(--ink);border-bottom-color:var(--accent)}
 
 /* ---------- filter chips ---------- */
 .filter{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .filter .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-right:2px}
-.filter button{font-weight:600;font-size:13px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 12px;min-height:34px;color:var(--ink-2);cursor:pointer}
+.filter button{font-weight:600;font-size:13px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:8px 14px;min-height:44px;color:var(--ink-2);cursor:pointer}
 .filter button:hover{background:var(--surface-2)}
 .filter button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
 
@@ -77,6 +79,11 @@ button{font-family:inherit}
 .section-label,.slot{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
 .section-label{display:block;font-weight:600;font-size:11px;color:var(--ink-3);margin:8px 0 2px;padding-top:16px;border-top:1px solid var(--line-soft)}
 .section-label:first-child{margin-top:0;padding-top:0;border-top:none}
+.section-toggle{background:none;border:none;border-top:1px solid var(--line-soft);cursor:pointer;width:100%;text-align:left;font:inherit;letter-spacing:inherit;text-transform:inherit}
+.section-toggle:hover{color:var(--ink-2)}
+/* loading skeleton: quiet pulsing placeholder (disabled under reduced-motion) */
+.skel{background:var(--surface);border-color:var(--line-soft);animation:skel-pulse 1.4s ease-in-out infinite}
+@keyframes skel-pulse{0%,100%{opacity:1}50%{opacity:.55}}
 
 /* ---------- cards ---------- */
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r3);padding:14px;box-shadow:var(--shadow-sm)}
@@ -111,7 +118,10 @@ button{font-family:inherit}
 .chip{font-family:var(--mono);font-weight:600;font-size:11px;background:var(--surface-2);color:var(--ink-2);padding:4px 9px;border-radius:999px;border:1px solid var(--line);white-space:nowrap;display:inline-block}
 .chip.low{background:var(--warn-weak);color:var(--warn);border-color:var(--warn-line)}
 .chip.run{background:var(--danger-weak);color:var(--danger);border-color:var(--danger-line)}
-.chip.price,.chip.qty{background:var(--accent-weak);color:var(--accent-ink);border-color:transparent}
+.chip.price{background:var(--accent-weak);color:var(--accent-ink);border-color:transparent}
+/* qty pills rest neutral so teal stays "the one thing"; teal only when the row is selected */
+.chip.qty{background:var(--surface-2);color:var(--ink-2);border-color:var(--line)}
+.is-selected .chip.qty{background:var(--accent-weak);color:var(--accent-ink);border-color:transparent}
 
 /* ---------- pantry rows ---------- */
 .pantry-row{display:flex;align-items:center;gap:12px;width:100%;text-align:left;cursor:pointer}
@@ -127,9 +137,9 @@ button{font-family:inherit}
 .lot-row.neg .val.qty{color:var(--danger);border-bottom-color:var(--danger)}
 .onhand-blank{background:var(--surface-2);border:1px dashed var(--line)}
 .onhand-title .trigger{border:none;background:none;padding:0;min-height:0;font-family:var(--sans);color:var(--ink-3)}
-.onhand-title .trigger .placeholder{color:var(--ink-3);opacity:.7}
+.onhand-title .trigger .placeholder{color:var(--ink-3)}
 .onhand-title .trigger .caret{margin-left:6px}
-.pantry-row.out .chip.qty{color:var(--ink-3);background:var(--surface-2)}
+.pantry-row.out .chip.qty{color:var(--ink-2);background:var(--surface-2)}
 
 /* ---------- form fields ---------- */
 .field{display:block}
@@ -279,7 +289,7 @@ button.row-link{background:none;border:none;width:100%;text-align:left;cursor:po
 .val{font-family:var(--mono);font-weight:600;font-size:12px;font-variant-numeric:tabular-nums;color:var(--ink);background:none;border:none;border-bottom:1px dashed var(--ink-3);border-radius:0;padding:2px 1px;white-space:nowrap;cursor:text;min-height:0}
 .val:hover{border-bottom-color:var(--accent);border-bottom-style:solid;background:var(--surface-2)}
 .val .k{color:var(--ink-3);font-weight:400;font-size:9px;margin-right:5px;text-transform:uppercase;letter-spacing:.06em}
-.val-edit{font-family:var(--mono);font-weight:600;font-size:11px;font-variant-numeric:tabular-nums;background:var(--surface);border:1px solid var(--accent);border-radius:var(--r1);padding:3px 6px;height:28px;min-height:0}
+.val-edit{font-family:var(--mono);font-weight:600;font-size:16px;font-variant-numeric:tabular-nums;background:var(--surface);border:1px solid var(--accent);border-radius:var(--r1);padding:4px 6px;min-height:0}
 .val-edit.money{width:72px}.val-edit.qty{width:44px}.val-edit.date{width:130px}
 .hrow-trash{background:none;border:none;color:var(--danger);cursor:pointer;display:inline-flex;align-items:center;padding:4px}
 
@@ -347,7 +357,7 @@ button.row-link{background:none;border:none;width:100%;text-align:left;cursor:po
 .cook-edit-times{flex:1;min-width:160px;display:flex;flex-direction:column;gap:12px}
 .cook-edit-clip-field{display:flex;flex-direction:column;gap:4px}
 .cook-edit-text{width:100%;border:none;background:none;box-shadow:none;padding:0;text-align:left;font-weight:600;font-size:clamp(20px,4.5vw,32px);line-height:1.3;letter-spacing:-.01em;resize:vertical}
-.cook-edit-text:focus{outline:none}
+.cook-edit-text:focus{outline:none;box-shadow:var(--focus)}
 
 /* recipe editor */
 .icon-x{flex:none;display:grid;place-items:center;width:34px;height:34px;border:1px solid var(--line);border-radius:var(--r2);background:var(--surface);color:var(--ink-3);cursor:pointer}

@@ -202,16 +202,16 @@ export function OverviewBody({ data, mode, openCard, setOpenCard }: {
             onClick={() => setOpenCard(openCard === c.key ? null : c.key)}
             style={{
               borderRadius: 999, fontWeight: 700,
-              background: c.pass ? "#E8F3EB" : "#FCECEC",
-              borderColor: c.pass ? "#CDE6D4" : "#F3C9C9",
-              color: c.pass ? "#2F8F52" : "#DC2B2B",
+              background: c.pass ? "var(--ok-weak)" : "var(--danger-weak)",
+              borderColor: c.pass ? "var(--ok-line)" : "var(--danger-line)",
+              color: c.pass ? "var(--ok)" : "var(--danger)",
             }}>
             {c.label} {c.pass ? "✓" : "✗"}
           </button>
         ))}
       </div>
       {openCard && (
-        <p className="mono" style={{ fontSize: 11, color: "var(--sage)", margin: 0 }}>
+        <p className="mono" style={{ fontSize: 11, color: "var(--ink-3)", margin: 0 }}>
           {data.scorecards.find((c) => c.key === openCard)?.reason}
         </p>
       )}

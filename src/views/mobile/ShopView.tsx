@@ -22,14 +22,14 @@ export function MobileShop() {
       </header>
 
       <main className="content stack">
-        <div className="tabs" role="tablist">
-          <button role="tab" onClick={() => setTab("run")} aria-pressed={tab === "run"}>
+        <div className="tabs">
+          <button type="button" onClick={() => setTab("run")} aria-pressed={tab === "run"}>
             Stops
           </button>
-          <button role="tab" onClick={() => setTab("bill")} aria-pressed={tab === "bill"}>
+          <button type="button" onClick={() => setTab("bill")} aria-pressed={tab === "bill"}>
             Bill{s.pendingCount > 0 && <> · {s.pendingCount}</>}
           </button>
-          <button role="tab" onClick={() => setTab("history")} aria-pressed={tab === "history"}>
+          <button type="button" onClick={() => setTab("history")} aria-pressed={tab === "history"}>
             History
           </button>
         </div>

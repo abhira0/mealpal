@@ -19,6 +19,7 @@ export function EditDeleteActions({
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [deleteHot, setDeleteHot] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   async function remove() {
@@ -35,11 +36,21 @@ export function EditDeleteActions({
 
   return (
     <>
-      <div style={{ display: "flex", gap: 8 }}>
-        <button type="button" className="btn block" onClick={onEdit} aria-label={`Edit ${singular}`}>
+      <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+        <button type="button" className="icon-btn" onClick={onEdit} aria-label={`Edit ${singular}`}>
           <Pencil size={18} />
         </button>
-        <button type="button" className="btn block danger" onClick={() => dialogRef.current?.showModal()} aria-label={`Delete ${singular}`}>
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={() => dialogRef.current?.showModal()}
+          onMouseEnter={() => setDeleteHot(true)}
+          onMouseLeave={() => setDeleteHot(false)}
+          onFocus={() => setDeleteHot(true)}
+          onBlur={() => setDeleteHot(false)}
+          style={deleteHot ? { color: "var(--danger)" } : undefined}
+          aria-label={`Delete ${singular}`}
+        >
           <Trash2 size={18} />
         </button>
       </div>

@@ -32,7 +32,7 @@ export function CalorieMacroRing({ cal, macros, goal, n }: {
     },
     series: [
       {
-        name: "Macros", type: "pie", radius: ["42%", "62%"], center: ["50%", "46%"],
+        name: "Macros", type: "pie", radius: ["46%", "68%"], center: ["50%", "46%"],
         avoidLabelOverlap: false, label: { show: false }, labelLine: { show: false },
         emphasis: { scaleSize: 6, itemStyle: { shadowBlur: 6, shadowColor: "rgba(0,0,0,0.2)" } },
         data: [
@@ -42,10 +42,10 @@ export function CalorieMacroRing({ cal, macros, goal, n }: {
         ],
       },
       {
-        type: "gauge", radius: "92%", center: ["50%", "46%"], startAngle: 90, endAngle: -270,
+        type: "gauge", radius: "80%", center: ["50%", "46%"], startAngle: 90, endAngle: -270,
         min: 0, max: goal || 1, silent: false,
-        progress: { show: true, width: 7, roundCap: true, itemStyle: { color: MACRO_COLOR.protein } },
-        axisLine: { lineStyle: { width: 7, color: [[1, "#EDEEF1"]] } },
+        progress: { show: true, width: 8, roundCap: true, itemStyle: { color: MACRO_COLOR.protein } },
+        axisLine: { lineStyle: { width: 8, color: [[1, "#EDEEF1"]] } },
         pointer: { show: false }, axisTick: { show: false }, splitLine: { show: false }, axisLabel: { show: false },
         anchor: { show: false },
         detail: {

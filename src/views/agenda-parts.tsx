@@ -293,7 +293,14 @@ export function TodayVsGoal({ analysis }: { analysis: DayAnalysis }) {
 // Shared verbatim between the mobile and desktop layouts.
 export function AgendaList({ agenda }: { agenda: AgendaState }) {
   const { days, loading, todayIso, todayRef, expandedPast, togglePast, openAdd } = agenda;
-  if (loading) return <p className="loading">Loading…</p>;
+  if (loading)
+    return (
+      <div className="stack-sm" aria-busy="true" aria-label="Loading agenda">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <div key={i} className="row skel" style={{ height: 64 }} />
+        ))}
+      </div>
+    );
   if (days.length === 0) return <p className="empty">Nothing on the agenda — tap + to add.</p>;
   return (
     <div className="stack-sm">

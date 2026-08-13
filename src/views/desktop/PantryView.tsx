@@ -24,6 +24,7 @@ export function DesktopPantry() {
     categorize,
   } = usePantryData();
   const [selected, setSelected] = useState<Ingredient | null>(null);
+  const [showOut, setShowOut] = useState(false);
 
   // Shared row: name (+ optional expiry/batches line) left, status + qty chips right.
   const row = (
@@ -106,11 +107,19 @@ export function DesktopPantry() {
                   )}
                   {inStock.map((ing) => row(ing, datedLotCount, { showExp: true }))}
                   {out.length > 0 && (
-                    <p className="section-label">Out of stock · {out.length}</p>
+                    <button
+                      type="button"
+                      className="section-label section-toggle"
+                      aria-expanded={showOut}
+                      onClick={() => setShowOut((v) => !v)}
+                    >
+                      Out of stock · {out.length} {showOut ? "▾" : "▸"}
+                    </button>
                   )}
-                  {out.map((ing) =>
-                    row(ing, datedLotCount, { dim: true, statusChip: <span className="chip">out</span> }),
-                  )}
+                  {showOut &&
+                    out.map((ing) =>
+                      row(ing, datedLotCount, { dim: true, statusChip: <span className="chip">out</span> }),
+                    )}
                 </>
               );
             })()}

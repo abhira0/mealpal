@@ -2,10 +2,16 @@
 
 import { useState } from "react";
 
-// Brand logo for a shop. Prefers the stored website's domain; falls back to
-// guessing it from the name (Costco → costco.com). Source is the DuckDuckGo
-// favicon CDN — already globally + browser cached, so we store nothing.
-// On load failure, shows a letter badge instead of a broken image.
+// Brand logo for a shop. Prefers an explicit iconUrl, else the stored website's
+// domain via the DuckDuckGo favicon CDN (globally + browser cached, so we store
+// nothing). House style (DESIGN.md) is a cool near-monochrome field with a
+// single teal accent, so:
+//   - With no real image source (no iconUrl and no website), we DON'T guess a
+//     domain from the name — guessed favicons are the garish red/purple auto-
+//     generated blocks. Instead we render a clean neutral monogram tile.
+//   - Real remote logos that DO load are desaturated (grayscale) so brand color
+//     doesn't shatter the monochrome canvas, while staying recognizable.
+//   - On load failure we fall back to the same neutral monogram tile.
 export function Favicon({
   name,
   website,
@@ -18,13 +24,15 @@ export function Favicon({
   size?: number;
 }) {
   const [failed, setFailed] = useState(false);
-  const domain =
-    domainFrom(website) ?? name.toLowerCase().replace(/[^a-z0-9]/g, "") + ".com";
-  // Explicit icon overrides the website-derived favicon.
-  const src = iconUrl?.trim() || `https://icons.duckduckgo.com/ip3/${domain}.ico`;
-  const initial = name.trim().charAt(0).toUpperCase() || "?";
 
-  if (failed) {
+  const icon = iconUrl?.trim();
+  const domain = domainFrom(website);
+  // Explicit icon overrides the website-derived favicon. Only build a source
+  // when we have a real one — we never guess a domain from the name.
+  const src = icon || (domain ? `https://icons.duckduckgo.com/ip3/${domain}.ico` : null);
+
+  // Neutral monogram tile: on-brand fallback for missing/failed images.
+  if (!src || failed) {
     return (
       <span
         aria-hidden
@@ -34,13 +42,20 @@ export function Favicon({
           justifyContent: "center",
           width: size,
           height: size,
-          background: "var(--line)",
-          fontSize: size * 0.55,
-          fontWeight: 700,
+          background: "var(--surface-2)",
+          border: "1px solid var(--line)",
+          borderRadius: "var(--r2)",
+          color: "var(--ink-3)",
+          fontFamily: "var(--mono)",
+          fontSize: size * 0.42,
+          lineHeight: 1,
+          letterSpacing: "-0.02em",
           flexShrink: 0,
+          overflow: "hidden",
+          boxSizing: "border-box",
         }}
       >
-        {initial}
+        {monogram(name)}
       </span>
     );
   }
@@ -53,9 +68,24 @@ export function Favicon({
       width={size}
       height={size}
       onError={() => setFailed(true)}
-      style={{ objectFit: "contain", verticalAlign: "middle", flexShrink: 0 }}
+      // Desaturate brand logos so they read as monochrome marks in the cool field.
+      style={{
+        objectFit: "contain",
+        verticalAlign: "middle",
+        flexShrink: 0,
+        filter: "grayscale(1) contrast(1.05)",
+      }}
     />
   );
+}
+
+// First 1–2 letters for the fallback tile: initials of the first two words
+// (e.g. "Trader Joe's" → "TJ"), else the first two characters of one word.
+function monogram(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
 }
 
 // "https://www.costco.com/path" or "costco.com" → "costco.com". null if blank.
