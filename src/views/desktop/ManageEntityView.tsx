@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DeskPage } from "@/components/DeskPage";
 import { EntityList } from "@/components/EntityList";
 import { IngredientDetail } from "@/components/IngredientDetail";
 import { ShopDetail } from "@/components/ShopDetail";
@@ -21,29 +22,24 @@ export function DesktopManageEntity({ slug }: { slug: EntitySlug }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   return (
-    <div data-testid="desktop-manage">
-      <header className="chrome">
-        <h1>{ENTITIES[slug].label}</h1>
-      </header>
-      <div className="content">
-        <div className="md-layout" data-testid="md-layout">
-          <div className="md-list">
-            <EntityList
-              slug={slug}
-              bare
-              onSelect={(r) => setSelectedId(String(r.id))}
-              selectedId={selectedId}
-            />
-          </div>
-          <aside className="md-pane" data-testid="md-pane">
-            {selectedId ? (
-              <Detail key={selectedId} slug={slug} id={selectedId} />
-            ) : (
-              <div className="md-pane-empty">Select an item.</div>
-            )}
-          </aside>
+    <DeskPage title={ENTITIES[slug].label} testId="desktop-manage">
+      <div className="md-layout" data-testid="md-layout">
+        <div className="md-list">
+          <EntityList
+            slug={slug}
+            bare
+            onSelect={(r) => setSelectedId(String(r.id))}
+            selectedId={selectedId}
+          />
         </div>
+        <aside className="md-pane" data-testid="md-pane">
+          {selectedId ? (
+            <Detail key={selectedId} slug={slug} id={selectedId} />
+          ) : (
+            <div className="md-pane-empty">Select an item.</div>
+          )}
+        </aside>
       </div>
-    </div>
+    </DeskPage>
   );
 }

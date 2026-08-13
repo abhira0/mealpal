@@ -394,17 +394,30 @@ button.row-link{background:none;border:none;width:100%;text-align:left;cursor:po
   .sheet .grab{display:none}
 
   /* ---------- desktop-only layout primitives (separate desktop views) ---------- */
+  /* Wide page shell for the bespoke desktop views. Deliberately NOT ".content":
+     it opts out of the legacy 960px cap + the :has() card auto-grid, which are
+     only for the remaining stretched-mobile pages (manage hub, goals, detail). */
+  .desk-page{max-width:1360px;margin:0 auto;padding:24px 28px 40px}
+  .desk-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:20px;min-height:36px}
+  .desk-head h1{font-weight:680;font-size:26px;letter-spacing:-.03em;line-height:1.1;color:var(--ink)}
+  .desk-head .sub{font-family:var(--mono);font-size:12px;color:var(--ink-3);white-space:nowrap}
+  .desk-head-titles{display:flex;align-items:baseline;gap:12px;min-width:0}
+  .desk-head-actions{display:flex;align-items:center;gap:8px;flex:none}
+
   /* master-detail: list on the left, sticky detail pane on the right */
-  .md-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(360px,460px);gap:20px;align-items:start;max-width:1200px;margin:0 auto}
-  .md-list{min-width:0;display:flex;flex-direction:column;gap:12px}
-  .md-pane{position:sticky;top:20px;max-height:calc(100dvh - 40px);overflow-y:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r3);padding:16px}
-  .md-pane-empty{display:grid;place-items:center;min-height:220px;color:var(--ink-3);font-size:14px;text-align:center}
+  .md-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(380px,460px);gap:24px;align-items:start}
+  .md-list{min-width:0;display:flex;flex-direction:column;gap:10px}
+  .md-pane{position:sticky;top:24px;min-height:calc(100dvh - 156px);max-height:calc(100dvh - 48px);overflow-y:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r3);box-shadow:var(--shadow-sm);padding:18px}
+  .md-pane-empty{display:grid;place-items:center;min-height:calc(100dvh - 210px);color:var(--ink-3);font-size:14px;text-align:center}
   /* detail components render their own page chrome; in a pane, drop the back-icon
      + breadcrumbs (they navigate away) and tighten the header, keep the title */
-  .md-pane .chrome{padding:0 0 10px}
+  .md-pane .chrome{padding:0 0 12px;max-width:none;margin:0}
+  .md-pane .content{padding:12px 0 0;max-width:none;margin:0}
   .md-pane .chrome-back-icon,.md-pane .crumbs{display:none}
-  /* multi-column dashboard for Today / Nutrition */
-  .dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;align-items:start;max-width:1200px;margin:0 auto}
+
+  /* dashboards (Today / Nutrition): explicit 2-column templates set inline per
+     view via style=; .dash-grid only carries gap + alignment. */
+  .dash-grid{display:grid;gap:24px;align-items:start}
   .dash-col{min-width:0;display:flex;flex-direction:column;gap:16px}
   /* login: no sidebar on this route, so center the form as a card */
   .login-page{min-height:100dvh;display:grid;place-items:center}

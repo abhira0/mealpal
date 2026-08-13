@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DeskPage } from "@/components/DeskPage";
 import {
   OverviewBody,
   BreakdownBody,
@@ -22,12 +23,8 @@ export function DesktopNutrition() {
   const { data, loading, noMeals } = useNutritionAnalysis(mode, date);
 
   return (
-    <div data-testid="desktop-nutrition">
-      <header className="chrome">
-        <h1>What you ate</h1>
-      </header>
-
-      <div className="content stack">
+    <DeskPage title="What you ate" testId="desktop-nutrition">
+      <div className="stack">
         <div className="filter" style={{ alignItems: "center", flexWrap: "wrap", gap: 12 }}>
           <div className="filter">
             <button type="button" aria-pressed={mode === "day"} onClick={() => setMode("day")}>Day</button>
@@ -56,7 +53,11 @@ export function DesktopNutrition() {
         ) : noMeals ? (
           <p style={{ opacity: 0.6 }}>No meals planned this week.</p>
         ) : (
-          <div className="dash-grid" data-testid="dash">
+          <div
+            className="dash-grid"
+            data-testid="dash"
+            style={{ gridTemplateColumns: "minmax(360px,440px) minmax(0,1fr)" }}
+          >
             <section className="dash-col">
               <OverviewBody data={data} mode={mode} openCard={openCard} setOpenCard={setOpenCard} />
             </section>
@@ -66,6 +67,6 @@ export function DesktopNutrition() {
           </div>
         )}
       </div>
-    </div>
+    </DeskPage>
   );
 }

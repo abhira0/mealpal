@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DeskPage } from "@/components/DeskPage";
 import { EntityList } from "@/components/EntityList";
 import { RecipeSheet } from "@/components/RecipeSheet";
 import { RecipeView } from "@/components/RecipeView";
@@ -12,11 +13,8 @@ export function DesktopRecipes() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   return (
-    <div data-testid="desktop-recipes">
-      <header className="chrome">
-        <h1>Recipes</h1>
-      </header>
-      <div className="content">
+    <>
+      <DeskPage title="Recipes" testId="desktop-recipes">
         <div className="md-layout" data-testid="md-layout">
           <div className="md-list">
             <EntityList
@@ -36,7 +34,7 @@ export function DesktopRecipes() {
             )}
           </aside>
         </div>
-      </div>
+      </DeskPage>
       <RecipeSheet
         open={createOpen}
         onClose={() => setCreateOpen(false)}
@@ -45,6 +43,6 @@ export function DesktopRecipes() {
           setReload((n) => n + 1);
         }}
       />
-    </div>
+    </>
   );
 }

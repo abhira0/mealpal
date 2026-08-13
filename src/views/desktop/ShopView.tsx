@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DeskPage } from "@/components/DeskPage";
 import { ShopTicket } from "@/components/ShopTicket";
 import { Bill } from "@/components/Bill";
 import { AddExtra } from "@/components/AddExtra";
@@ -12,16 +13,17 @@ export function DesktopShop() {
   const [tab, setTab] = useState<"run" | "bill" | "history">("run");
 
   return (
-    <div data-testid="desktop-shop">
-      <header className="chrome">
-        <h1>The run</h1>
-        <p style={{ color: "var(--ink-2)", fontSize: 14, marginTop: 2 }}>
+    <DeskPage
+      title="The run"
+      testId="desktop-shop"
+      sub={
+        <>
           {s.stopCount} {s.stopCount === 1 ? "stop" : "stops"}
           {s.tripTotal > 0 && <> · ${centsToDollars(s.tripTotal).toFixed(2)}</>}
-        </p>
-      </header>
-
-      <main className="content stack">
+        </>
+      }
+    >
+      <main className="stack">
         <div className="tabs" role="tablist">
           <button role="tab" onClick={() => setTab("run")} aria-pressed={tab === "run"}>
             Stops
@@ -64,7 +66,11 @@ export function DesktopShop() {
             />
 
             {s.shops.length > 0 && (
-              <div className="dash-grid" data-testid="dash">
+              <div
+                className="dash-grid"
+                data-testid="dash"
+                style={{ gridTemplateColumns: "repeat(auto-fill,minmax(320px,1fr))" }}
+              >
                 {s.shops.map(([shopName, lines]) => {
                   const meta = s.shopMeta[shopName];
                   return (
@@ -86,6 +92,6 @@ export function DesktopShop() {
           </>
         )}
       </main>
-    </div>
+    </DeskPage>
   );
 }

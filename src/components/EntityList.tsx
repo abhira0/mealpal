@@ -124,7 +124,7 @@ export function EntityList(props: {
         <PageHeader crumbs={[{ label: "Manage", href: "/manage" }]} title={config.label} />
       )}
 
-      <div className="content stack-sm">
+      <div className={bare ? "stack-sm" : "content stack-sm"}>
         {error && <p className="notice">{error}</p>}
 
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>

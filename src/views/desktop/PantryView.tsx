@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { DeskPage } from "@/components/DeskPage";
 import { formatQty } from "@/lib/units";
 import { PantryDetail } from "@/views/PantryDetail";
 import { usePantryData, type Ingredient } from "@/views/pantry-data";
@@ -59,13 +60,9 @@ export function DesktopPantry() {
   };
 
   return (
-    <div data-testid="desktop-pantry">
-      <header className="chrome">
-        <h1>Pantry</h1>
-      </header>
-      <div className="content">
-        <div className="md-layout" data-testid="md-layout">
-          <div className="md-list stack-sm">
+    <DeskPage title="Pantry" testId="desktop-pantry">
+      <div className="md-layout" data-testid="md-layout">
+        <div className="md-list stack-sm">
             {error && <p className="notice">{error}</p>}
 
             {ingredients === null && !error && <p className="loading">Loading…</p>}
@@ -135,9 +132,8 @@ export function DesktopPantry() {
             ) : (
               <div className="md-pane-empty">Select an ingredient.</div>
             )}
-          </aside>
-        </div>
+        </aside>
       </div>
-    </div>
+    </DeskPage>
   );
 }

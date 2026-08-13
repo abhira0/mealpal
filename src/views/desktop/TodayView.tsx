@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { DeskPage } from "@/components/DeskPage";
 import { useAgenda } from "@/views/agenda-data";
 import { AgendaSheets } from "@/views/AgendaSheets";
 import { AgendaList, NextCooking, TodayVsGoal, initials } from "@/views/agenda-parts";
@@ -19,21 +20,22 @@ export function DesktopToday({ userName }: { userName?: string | null }) {
     : " ";
 
   return (
-    <div data-testid="desktop-today">
-      <header className="chrome">
-        <div className="chrome-row">
-          <div>
-            <h1>{dateLabel}</h1>
-          </div>
+    <>
+      <DeskPage
+        title={dateLabel}
+        testId="desktop-today"
+        actions={
           <Link href="/manage" aria-label="Manage account" className="avatar">
             {initials(userName)}
           </Link>
-        </div>
-      </header>
-
-      {mounted && (
-        <div className="content">
-          <div className="dash-grid" data-testid="dash">
+        }
+      >
+        {mounted && (
+          <div
+            className="dash-grid"
+            data-testid="dash"
+            style={{ gridTemplateColumns: "minmax(0,1.55fr) minmax(340px,1fr)" }}
+          >
             {/* Left column: the day-by-day agenda timeline. */}
             <div className="dash-col">
               <div className="chrome-row" style={{ padding: 0 }}>
@@ -46,7 +48,7 @@ export function DesktopToday({ userName }: { userName?: string | null }) {
                   aria-label="Add"
                   disabled={loading}
                   onClick={() => openAdd()}
-                  style={{ padding: "6px 14px", minHeight: "auto" }}
+                  style={{ padding: "8px 16px", minHeight: "auto" }}
                 >
                   + Add
                 </button>
@@ -77,10 +79,10 @@ export function DesktopToday({ userName }: { userName?: string | null }) {
               {analysis && <TodayVsGoal analysis={analysis} />}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </DeskPage>
 
       <AgendaSheets agenda={agenda} />
-    </div>
+    </>
   );
 }
