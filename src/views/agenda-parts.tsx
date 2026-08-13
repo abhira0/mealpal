@@ -33,7 +33,18 @@ export function dayHeaderLabel(date: string, todayIso: string): string {
 }
 
 // One meal row: checkbox (eat/cook), name + slot, batch chip, remove.
-export function MealRow({ meal, date, agenda }: { meal: AgendaMeal; date: string; agenda: AgendaState }) {
+export function MealRow({
+  meal,
+  date,
+  agenda,
+  manage = true,
+}: {
+  meal: AgendaMeal;
+  date: string;
+  agenda: AgendaState;
+  // Today passes manage=false: status changes only (eat / cook), no edit/remove.
+  manage?: boolean;
+}) {
   const { acting, toggleMeal, cookAhead, uncookAhead, openEditBatch, openEditMeal, requestRemove, removeBatch } = agenda;
   const checked = meal.phase === "served";
   const key = meal.batchBacked && meal.batchId != null ? meal.batchId : meal.eventId;
@@ -47,7 +58,7 @@ export function MealRow({ meal, date, agenda }: { meal: AgendaMeal; date: string
   return (
     <div
       className="row"
-      style={meal.outOfStock ? { background: "#FCECEC", borderColor: "#F3C9C9" } : undefined}
+      style={meal.outOfStock ? { background: "var(--danger-weak)", borderColor: "var(--danger-line)" } : undefined}
     >
       <button
         type="button"
@@ -82,7 +93,7 @@ export function MealRow({ meal, date, agenda }: { meal: AgendaMeal; date: string
           {meal.slotName}
         </span>
         {meal.outOfStock && (
-          <div style={{ color: "#DC2B2B", fontSize: "0.66em", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <div style={{ color: "var(--danger)", fontSize: "0.66em", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4 }}>
             <AlertTriangle size={11} /> out of stock: {meal.missingItems.join(", ")}
           </div>
         )}
@@ -119,7 +130,7 @@ export function MealRow({ meal, date, agenda }: { meal: AgendaMeal; date: string
       <span
         aria-label={`Status: ${meal.phase}`}
         style={{
-          background: meal.outOfStock ? "#DC2B2B" : PHASE_CHIP[meal.phase].bg,
+          background: meal.outOfStock ? "var(--danger)" : PHASE_CHIP[meal.phase].bg,
           color: meal.outOfStock ? "#fff" : PHASE_CHIP[meal.phase].fg,
           fontSize: 10,
           fontWeight: 700,
@@ -132,20 +143,22 @@ export function MealRow({ meal, date, agenda }: { meal: AgendaMeal; date: string
       >
         {meal.phase}
       </span>
-      {/* Edit: planned meals (in place) and batches (full re-pack). */}
-      {((!meal.batchBacked && meal.phase === "planned" && meal.eventId != null) ||
-        (meal.batchBacked && meal.batchId != null)) && (
-        <button
-          type="button"
-          className="btn-add"
-          aria-label={`Edit ${meal.name}`}
-          style={{ padding: "4px 8px", minHeight: "auto" }}
-          onClick={() => (meal.batchBacked ? openEditBatch(meal.batchId!) : openEditMeal(meal))}
-        >
-          <Pencil size={15} />
-        </button>
-      )}
-      {meal.eventId != null && (
+      {/* Edit/remove are management actions — hidden on Today (manage=false),
+          which is status-changes only. */}
+      {manage &&
+        ((!meal.batchBacked && meal.phase === "planned" && meal.eventId != null) ||
+          (meal.batchBacked && meal.batchId != null)) && (
+          <button
+            type="button"
+            className="btn-add"
+            aria-label={`Edit ${meal.name}`}
+            style={{ padding: "4px 8px", minHeight: "auto" }}
+            onClick={() => (meal.batchBacked ? openEditBatch(meal.batchId!) : openEditMeal(meal))}
+          >
+            <Pencil size={15} />
+          </button>
+        )}
+      {manage && meal.eventId != null && (
         <button
           type="button"
           className="btn-add"
@@ -156,7 +169,7 @@ export function MealRow({ meal, date, agenda }: { meal: AgendaMeal; date: string
           <X size={16} />
         </button>
       )}
-      {meal.batchBacked && meal.batchId != null && (
+      {manage && meal.batchBacked && meal.batchId != null && (
         <button
           type="button"
           className="btn-add"
@@ -291,7 +304,7 @@ export function TodayVsGoal({ analysis }: { analysis: DayAnalysis }) {
 
 // The day-by-day agenda timeline (cook-flags + meal rows, past days collapse).
 // Shared verbatim between the mobile and desktop layouts.
-export function AgendaList({ agenda }: { agenda: AgendaState }) {
+export function AgendaList({ agenda, manage = true }: { agenda: AgendaState; manage?: boolean }) {
   const { days, loading, todayIso, todayRef, expandedPast, togglePast, openAdd } = agenda;
   if (loading)
     return (
@@ -312,7 +325,7 @@ export function AgendaList({ agenda }: { agenda: AgendaState }) {
           <div key={day.date} ref={isToday ? todayRef : undefined}>
             <p
               className="section-label"
-              style={isToday ? { color: "var(--paprika)", borderTopColor: "var(--paprika)" } : undefined}
+              style={isToday ? { color: "var(--accent-ink)", borderTopColor: "var(--accent)" } : undefined}
             >
               {dayHeaderLabel(day.date, todayIso)}
             </p>
@@ -338,18 +351,19 @@ export function AgendaList({ agenda }: { agenda: AgendaState }) {
               // rows render side-by-side instead of stacked. This day
               // section must always stay a single full-width column.
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {day.cookFlags.map((flag, i) => (
-                  <button
-                    key={`${day.date}-${flag.slotId}-${i}`}
-                    type="button"
-                    className="row"
-                    style={{ width: "100%", textAlign: "left", border: "none", cursor: "pointer" }}
-                    onClick={() => openAdd({ date: day.date, slotId: flag.slotId, type: "batch" })}
-                  >
-                    <span className="row-main">Cook {flag.label}</span>
-                    <span className="chip run">{flag.slotName}</span>
-                  </button>
-                ))}
+                {manage &&
+                  day.cookFlags.map((flag, i) => (
+                    <button
+                      key={`${day.date}-${flag.slotId}-${i}`}
+                      type="button"
+                      className="row"
+                      style={{ width: "100%", textAlign: "left", border: "none", cursor: "pointer" }}
+                      onClick={() => openAdd({ date: day.date, slotId: flag.slotId, type: "batch" })}
+                    >
+                      <span className="row-main">Cook {flag.label}</span>
+                      <span className="chip run">{flag.slotName}</span>
+                    </button>
+                  ))}
 
                 {day.meals.length === 0 ? (
                   <p className="empty" style={{ padding: "0 0 8px", textAlign: "left" }}>
@@ -362,6 +376,7 @@ export function AgendaList({ agenda }: { agenda: AgendaState }) {
                       meal={meal}
                       date={day.date}
                       agenda={agenda}
+                      manage={manage}
                     />
                   ))
                 )}

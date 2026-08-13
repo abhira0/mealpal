@@ -9,7 +9,7 @@ import { CalorieMacroRing } from "@/components/CalorieMacroRing";
 
 export function DesktopToday({ userName }: { userName?: string | null }) {
   const agenda = useAgenda(userName);
-  const { mounted, todayIso, nextCooks, analysis, loading, openAdd } = agenda;
+  const { mounted, todayIso, nextCooks, analysis } = agenda;
 
   const dateLabel = mounted
     ? new Date(todayIso + "T00:00:00").toLocaleDateString(undefined, {
@@ -38,22 +38,10 @@ export function DesktopToday({ userName }: { userName?: string | null }) {
           >
             {/* Left column: the day-by-day agenda timeline. */}
             <div className="dash-col">
-              <div className="chrome-row" style={{ padding: 0 }}>
-                <p className="section-label" style={{ margin: 0, padding: 0, border: "none" }}>
-                  Agenda
-                </p>
-                <button
-                  type="button"
-                  className="btn"
-                  aria-label="Add"
-                  disabled={loading}
-                  onClick={() => openAdd()}
-                  style={{ padding: "8px 16px", minHeight: "auto" }}
-                >
-                  + Add
-                </button>
-              </div>
-              <AgendaList agenda={agenda} />
+              <p className="section-label" style={{ margin: 0, padding: 0, border: "none" }}>
+                Agenda
+              </p>
+              <AgendaList agenda={agenda} manage={false} />
             </div>
 
             {/* Right column: next cooking, calorie ring, macros vs goal. */}

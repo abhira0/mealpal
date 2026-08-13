@@ -34,18 +34,20 @@ test.describe("batch tracker (merged Today agenda)", () => {
     await page.getByLabel("Email").fill("demo@demo.com");
     await page.getByLabel("Password").fill("demo1234");
     await page.getByRole("button", { name: "Log in" }).click();
-
-    // Lands on the Today agenda.
     await expect(page).toHaveURL("/");
-    // The Next.js dev indicator can overlap the header and intercept clicks.
-    await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
-    await expect(page.locator("p.eb", { hasText: "Today" })).toBeVisible();
-    await expect(page.locator("p.section-label", { hasText: /^Today$/ })).toBeVisible();
 
-    // Open the merged "Add" sheet via the floating "+" FAB.
-    const fab = page.getByRole("button", { name: "Add" });
-    await expect(fab).toBeEnabled();
-    await fab.click();
+    // Creating/scheduling now lives on the Plan page — Today is status-only.
+    // Pack the batch on /plan, then hop to Today to eat it down.
+    await page.goto("/plan");
+    await expect(page.getByTestId("mobile-plan")).toBeVisible();
+    // The Next.js dev indicator can overlap chrome and intercept clicks.
+    await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
+
+    // Open the merged "Add" sheet via the Plan "+ Add" button. It opens the
+    // add sheet for the currently selected day (today, selected by default).
+    const planAdd = page.getByRole("button", { name: "+ Add", exact: true });
+    await expect(planAdd).toBeEnabled();
+    await planAdd.click();
     await expect(page.locator(".sh-title", { hasText: "Add" })).toBeVisible();
 
     // Switch the type row to Batch.
@@ -84,9 +86,14 @@ test.describe("batch tracker (merged Today agenda)", () => {
     await page.locator(".sheet").getByRole("button", { name: "Add", exact: true }).click();
     await expect(page.locator(".sh-title", { hasText: "Add" })).toBeHidden();
 
-    // Back on the agenda: today falls inside the batch's coverage window, so
-    // today's Dinner row is a synthetic batch row (named LABEL) carrying the
-    // "N left" chip.
+    // Eating happens on Today, which is unchanged. Hop over to the status-only
+    // Today agenda. Today falls inside the batch's coverage window, so today's
+    // Dinner row is a synthetic batch row (named LABEL) carrying the "N left"
+    // chip.
+    await page.goto("/");
+    await expect(page).toHaveURL("/");
+    await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
+    await expect(page.locator("p.eb", { hasText: "Today" })).toBeVisible();
     const todayHeading = page.locator("p.section-label", { hasText: /^Today$/ });
     const todayDay = todayHeading.locator("..");
     const batchRow = todayDay.locator(".row", { hasText: LABEL });
@@ -121,25 +128,41 @@ test.describe("batch tracker (merged Today agenda)", () => {
     await page.getByLabel("Password").fill("demo1234");
     await page.getByRole("button", { name: "Log in" }).click();
     await expect(page).toHaveURL("/");
+
+    // Editing (like creating) now lives on the Plan page. Pack a fresh batch
+    // there, then edit it in place on the same page.
+    await page.goto("/plan");
+    await expect(page.getByTestId("mobile-plan")).toBeVisible();
     await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
 
-    // Pack a fresh batch (meals=4) so a batch-backed row exists to edit.
-    const fab = page.getByRole("button", { name: "Add" });
-    await expect(fab).toBeEnabled();
-    await fab.click();
+    // Pack a fresh batch (meals=4) pinned to Dinner so a synthetic batch-backed
+    // row appears on today's Plan (today is selected by default).
+    const planAdd = page.getByRole("button", { name: "+ Add", exact: true });
+    await expect(planAdd).toBeEnabled();
+    await planAdd.click();
+    await expect(page.locator(".sh-title", { hasText: "Add" })).toBeVisible();
     await page.getByRole("button", { name: "Batch", exact: true }).click();
+
+    // Pin to Dinner — same rationale as the pack test: no recipe rotation there,
+    // so the batch projects a purely synthetic row named by its LABEL.
+    const slotField = page.locator(".field").filter({ hasText: "Slot" });
+    await slotField.getByRole("button").click();
+    await page.getByRole("option", { name: "Dinner", exact: true }).click();
+    await expect(slotField.getByRole("button")).toContainText("Dinner");
+
     await page.getByPlaceholder("e.g. Chicken & rice").fill(editLabel);
+    // Leave Meals at its default of 4.
+    await expect(page.locator(".stepper .val")).toHaveText("4");
     await page.locator(".sheet").getByRole("button", { name: "Add", exact: true }).click();
     await expect(page.locator(".sh-title", { hasText: "Add" })).toBeHidden();
 
-    // Tap the ✎ on the batch-backed Morning Smoothie row. Wait for the batch
-    // chip first: submitAdd closes the sheet before the agenda reload finishes,
-    // so the row only becomes batch-backed a moment later. Editing before then
-    // would hit the still-planned row ("Edit meal") instead of the batch.
-    const todayDay = page.locator("p.section-label", { hasText: /^Today$/ }).locator("..");
-    const smoothieRow = todayDay.locator(".row", { hasText: "Morning Smoothie" });
-    await expect(smoothieRow.locator(".chip")).toHaveText("4 left");
-    await smoothieRow.getByRole("button", { name: "Edit Morning Smoothie" }).click();
+    // Still on Plan, today selected: the Dinner section now holds this batch's
+    // synthetic row (named editLabel). Wait for the batch chip first — submitAdd
+    // closes the sheet before the agenda reload finishes, so the row only becomes
+    // batch-backed a moment later. Editing before then would race the reload.
+    const batchRow = page.locator(".row", { hasText: editLabel });
+    await expect(batchRow.locator(".chip")).toHaveText("4 left");
+    await batchRow.getByRole("button", { name: `Edit ${editLabel}` }).click();
 
     // Edit sheet opens pre-filled with this batch's label + meal count.
     await expect(page.locator(".sh-title", { hasText: "Edit batch" })).toBeVisible();
