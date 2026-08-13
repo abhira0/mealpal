@@ -3,18 +3,33 @@
 import { useMemo, useState } from "react";
 import { addDays, useAgenda } from "@/views/agenda-data";
 import { AgendaSheets } from "@/views/AgendaSheets";
-import { AgendaList } from "@/views/agenda-parts";
+import { MealRow, DOW } from "@/views/agenda-parts";
 import { todayISO } from "@/lib/dates";
 
-const fmt = (iso: string) =>
-  new Date(iso + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+const dowOf = (iso: string) => new Date(iso + "T00:00:00").getDay();
+const dnumOf = (iso: string) => new Date(iso + "T00:00:00").getDate();
+const longLabel = (iso: string) =>
+  new Date(iso + "T00:00:00").toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
 
-// Manage the schedule: a navigable 7-day window over planned / cooked / served
-// meals, backed by the same agenda hook + sheets as Today.
+// Planner: pick a day on the week strip, arrange that day's meals. Distinct
+// from Today (which is the operational timeline of the next few days).
 export function MobilePlan() {
   const [start, setStart] = useState(() => todayISO());
+  const [selected, setSelected] = useState(() => todayISO());
   const end = useMemo(() => addDays(start, 6), [start]);
   const agenda = useAgenda(null, { from: start, to: end });
+  const today = todayISO();
+
+  const week = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(start, i)), [start]);
+  const byDate = useMemo(() => new Map(agenda.days.map((d) => [d.date, d])), [agenda.days]);
+  const shiftWeek = (n: number) => {
+    const ns = addDays(start, n * 7);
+    setStart(ns);
+    setSelected(ns);
+  };
+
+  const day = byDate.get(selected);
+  const meals = day?.meals ?? [];
 
   return (
     <div data-testid="mobile-plan">
@@ -26,22 +41,53 @@ export function MobilePlan() {
         {agenda.mounted && (
           <>
             <div className="filter" style={{ justifyContent: "space-between", width: "100%" }}>
-              <button type="button" onClick={() => setStart((s) => addDays(s, -7))} aria-label="Previous week">
-                ‹ Prev
-              </button>
-              <span className="mono" style={{ fontSize: 13, alignSelf: "center", color: "var(--ink-2)" }}>
-                {fmt(start)} – {fmt(end)}
-              </span>
-              <button type="button" onClick={() => setStart((s) => addDays(s, 7))} aria-label="Next week">
-                Next ›
+              <button type="button" onClick={() => shiftWeek(-1)} aria-label="Previous week">‹</button>
+              <button type="button" onClick={() => { setStart(today); setSelected(today); }}>This week</button>
+              <button type="button" onClick={() => shiftWeek(1)} aria-label="Next week">›</button>
+            </div>
+
+            <div className="week" role="tablist" aria-label="Week">
+              {week.map((d) => {
+                const has = (byDate.get(d)?.meals.length ?? 0) > 0;
+                const cls = `day${d === selected ? " on" : ""}${d === today ? " day--today" : ""}`;
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    className={cls}
+                    aria-pressed={d === selected}
+                    onClick={() => setSelected(d)}
+                  >
+                    <span className="dow">{DOW[dowOf(d)]}</span>
+                    <span className="dnum">{dnumOf(d)}</span>
+                    {has && <span className="dot" />}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="chrome-row" style={{ padding: 0, alignItems: "center" }}>
+              <p className="section-label" style={{ margin: 0, padding: 0, border: "none" }}>{longLabel(selected)}</p>
+              <button type="button" className="btn" style={{ padding: "8px 14px", minHeight: "auto" }}
+                onClick={() => agenda.openAdd({ date: selected })} disabled={agenda.loading}>
+                + Add
               </button>
             </div>
 
-            <button type="button" className="btn block" onClick={() => agenda.openAdd()} disabled={agenda.loading}>
-              + Schedule a meal
-            </button>
-
-            <AgendaList agenda={agenda} />
+            {meals.length === 0 ? (
+              <p className="empty">Nothing planned — tap “+ Add”.</p>
+            ) : (
+              <div className="stack-sm">
+                {meals.map((m) => (
+                  <MealRow
+                    key={m.eventId != null ? `e${m.eventId}` : `b${m.batchId}-${m.slotId}`}
+                    meal={m}
+                    date={selected}
+                    agenda={agenda}
+                  />
+                ))}
+              </div>
+            )}
           </>
         )}
       </main>
