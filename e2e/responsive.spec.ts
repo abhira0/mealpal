@@ -19,6 +19,7 @@ async function login(page: Page) {
 // route path -> mobile/desktop root testids
 const ROUTES: { path: string; mobile: string; desktop: string }[] = [
   { path: "/", mobile: "mobile-today", desktop: "desktop-today" },
+  { path: "/plan", mobile: "mobile-plan", desktop: "desktop-plan" },
   { path: "/nutrition", mobile: "mobile-nutrition", desktop: "desktop-nutrition" },
   { path: "/pantry", mobile: "mobile-pantry", desktop: "desktop-pantry" },
   { path: "/shop", mobile: "mobile-shop", desktop: "desktop-shop" },

@@ -55,7 +55,7 @@ export type DayAnalysis = {
   macros: { carbs: number; fat: number; protein: number };
 };
 
-function addDays(date: string, n: number): string {
+export function addDays(date: string, n: number): string {
   return toISODate(new Date(localNoon(date).getTime() + n * 86_400_000));
 }
 
@@ -64,14 +64,20 @@ function addDays(date: string, n: number): string {
  * Behavior-identical to the original monolithic TodayAgenda component; the
  * mobile and desktop views both consume this so their actions stay in sync.
  */
-export function useAgenda(userName?: string | null) {
+export function useAgenda(
+  userName?: string | null,
+  range?: { from?: string; to?: string },
+) {
   // ponytail: server can't know the client's date/timezone, so all
   // time-derived text is client-only to avoid hydration drift.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const todayIso = useMemo(todayISO, []);
-  const from = todayIso;
-  const to = useMemo(() => addDays(todayIso, 5), [todayIso]);
+  // Today uses a fixed 5-day look-ahead; the Plan page passes an explicit
+  // (navigable) range that may reach into the past.
+  const defaultTo = useMemo(() => addDays(todayIso, 5), [todayIso]);
+  const from = range?.from ?? todayIso;
+  const to = range?.to ?? defaultTo;
 
   const [days, setDays] = useState<AgendaDay[]>([]);
   const [nextCooks, setNextCooks] = useState<NextCook[]>([]);

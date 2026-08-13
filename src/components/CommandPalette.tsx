@@ -8,6 +8,7 @@ type Item = { key: string; label: string; sub?: string; href: string; group: str
 
 const NAV: Item[] = [
   { key: "nav-today", label: "Today", href: "/", group: "Go to" },
+  { key: "nav-plan", label: "Plan", href: "/plan", group: "Go to" },
   { key: "nav-nutrition", label: "Nutrition", href: "/nutrition", group: "Go to" },
   { key: "nav-pantry", label: "Pantry", href: "/pantry", group: "Go to" },
   { key: "nav-shop", label: "Shop", href: "/shop", group: "Go to" },
