@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { BottomNav } from "@/components/BottomNav";
+import { CommandPalette } from "@/components/CommandPalette";
 
 export const metadata: Metadata = {
   title: "MealPal",
@@ -42,6 +43,7 @@ export default function RootLayout({
         FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md. */}
         <div className="app">{children}</div>
         <BottomNav />
+        <CommandPalette />
       </body>
     </html>
   );

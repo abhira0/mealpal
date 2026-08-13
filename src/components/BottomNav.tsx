@@ -81,6 +81,14 @@ export function BottomNav() {
       <span className="nav-brand" aria-hidden="true">
         MealPal
       </span>
+      <button
+        type="button"
+        className="nav-search"
+        onClick={() => window.dispatchEvent(new CustomEvent("mealpal:open-cmdk"))}
+      >
+        <span>Search…</span>
+        <kbd>⌘K</kbd>
+      </button>
       {TABS.map((tab) => {
         const active =
           tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);

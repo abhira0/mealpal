@@ -60,4 +60,21 @@ test.describe("device split — desktop viewport", () => {
     await page.locator(".md-list button.row-link").first().click();
     await expect(pane.getByText(/select a recipe/i)).toHaveCount(0);
   });
+
+  test("command palette: open, search + Enter navigates; Escape closes", async ({ page }) => {
+    await login(page);
+    const cmdk = page.locator(".cmdk");
+    // Open via the desktop sidebar trigger (deterministic; ⌘K also works).
+    await page.locator(".nav-search").click();
+    await expect(cmdk).toBeVisible();
+    await page.locator(".cmdk-input").fill("milk");
+    await expect(page.locator(".cmdk-item").first()).toBeVisible();
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/\/manage\/ingredients\/\d+/);
+    // Reopen and close with Escape.
+    await page.locator(".nav-search").click();
+    await expect(cmdk).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(cmdk).toHaveCount(0);
+  });
 });
