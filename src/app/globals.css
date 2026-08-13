@@ -103,26 +103,26 @@ button{font-family:inherit}
 .btn-secondary:hover{background:var(--surface-2)}
 .btn-secondary:disabled{opacity:.45;cursor:default}
 
-/* ---------- Plan: week grid (desktop) ---------- */
-.plan-grid{display:grid;grid-template-columns:repeat(7,minmax(150px,1fr));gap:10px;align-items:start;overflow-x:auto}
-.plan-day{background:var(--surface);border:1px solid var(--line);border-radius:var(--r3);box-shadow:var(--shadow-sm);min-height:180px;display:flex;flex-direction:column}
-.plan-day.today{border-color:var(--accent)}
-.plan-day-head{display:flex;align-items:baseline;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line-soft)}
-.plan-day-head .plan-dow{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
-.plan-day.today .plan-dow{color:var(--accent-ink)}
-.plan-day-head .plan-dnum{font-weight:640;font-size:16px;font-variant-numeric:tabular-nums;color:var(--ink)}
-.plan-day-body{display:flex;flex-direction:column;gap:6px;padding:8px}
-.plan-cell{display:flex;align-items:center;gap:7px;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r2);padding:7px 9px;cursor:pointer;color:var(--ink);font-size:13px;transition:background-color .15s ease}
-.plan-cell:hover:not(:disabled){background:var(--surface-3)}
-.plan-cell:disabled{cursor:default}
-.plan-cell.out{background:var(--danger-weak);border-color:var(--danger-line)}
-.plan-cell .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.plan-cell .plan-left{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
-.plan-dot{flex:none;width:7px;height:7px;border-radius:50%;background:var(--ink-3)}
-.plan-dot.cooked{background:var(--warn)}
-.plan-dot.served{background:var(--ok)}
-.plan-add{background:none;border:1px dashed var(--line);border-radius:var(--r2);color:var(--ink-3);cursor:pointer;padding:6px;font-size:15px;transition:background-color .15s ease,color .15s ease}
-.plan-add:hover{background:var(--surface-2);color:var(--accent-ink);border-color:var(--accent)}
+/* ---------- Plan: week calendar with slot lanes + spanning bars (desktop) ---------- */
+.plan-cal{display:flex;flex-direction:column;overflow-x:auto}
+.plan-cal-row{display:grid;grid-template-columns:96px repeat(7,minmax(120px,1fr));column-gap:0;row-gap:5px;align-items:start;border-top:1px solid var(--line-soft);padding:7px 0}
+.plan-cal-head{border-top:none;padding-top:0;padding-bottom:6px;position:sticky;top:0;background:var(--bg);z-index:1}
+.plan-slotlabel{grid-column:1;grid-row:1/-1;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);padding:8px 10px 0 0}
+.plan-colhead{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:2px 8px;border-left:1px solid var(--line-soft)}
+.plan-colhead .dow{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.plan-colhead .dnum{font-weight:640;font-size:16px;font-variant-numeric:tabular-nums;color:var(--ink)}
+.plan-colhead.today{border-top:2px solid var(--accent)}
+.plan-colhead.today .dnum,.plan-colhead.today .dow{color:var(--accent-ink)}
+.plan-coladd{flex:none;width:24px;height:24px;border-radius:var(--r1);border:1px solid var(--line);background:var(--surface);color:var(--ink-3);cursor:pointer;font-size:14px;line-height:1;transition:background-color .15s ease,color .15s ease}
+.plan-coladd:hover{background:var(--accent-weak);color:var(--accent-ink);border-color:var(--accent)}
+.plan-bar{display:flex;align-items:center;gap:7px;margin:0 3px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r2);padding:6px 10px;cursor:pointer;color:var(--ink);font-size:13px;min-width:0;transition:background-color .15s ease}
+.plan-bar:hover{background:var(--surface-3)}
+.plan-bar.out{background:var(--danger-weak);border-color:var(--danger-line)}
+.plan-bar .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plan-bar .plan-left{flex:none;font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+.plan-bar .plan-dot{flex:none;width:7px;height:7px;border-radius:50%;background:var(--ink-3)}
+.plan-bar.cooked .plan-dot{background:var(--warn)}
+.plan-bar.served .plan-dot{background:var(--ok)}
 .btn.secondary{background:var(--surface);color:var(--ink);border-color:var(--line)}
 .btn.secondary:hover{background:var(--surface-2)}
 .btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}

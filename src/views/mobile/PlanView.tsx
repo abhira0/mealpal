@@ -22,6 +22,10 @@ export function MobilePlan() {
 
   const week = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(start, i)), [start]);
   const byDate = useMemo(() => new Map(agenda.days.map((d) => [d.date, d])), [agenda.days]);
+  const slots = useMemo(
+    () => [...agenda.slots].sort((a, b) => (a.timeOfDay > b.timeOfDay ? 1 : a.timeOfDay < b.timeOfDay ? -1 : a.id - b.id)),
+    [agenda.slots],
+  );
   const shiftWeek = (n: number) => {
     const ns = addDays(start, n * 7);
     setStart(ns);
@@ -77,16 +81,25 @@ export function MobilePlan() {
             {meals.length === 0 ? (
               <p className="empty">Nothing planned — tap “+ Add”.</p>
             ) : (
-              <div className="stack-sm">
-                {meals.map((m) => (
-                  <MealRow
-                    key={m.eventId != null ? `e${m.eventId}` : `b${m.batchId}-${m.slotId}`}
-                    meal={m}
-                    date={selected}
-                    agenda={agenda}
-                  />
-                ))}
-              </div>
+              slots.map((slot) => {
+                const sm = meals.filter((m) => m.slotId === slot.id);
+                if (sm.length === 0) return null;
+                return (
+                  <div key={slot.id}>
+                    <p className="section-label">{slot.name}</p>
+                    <div className="stack-sm">
+                      {sm.map((m) => (
+                        <MealRow
+                          key={m.eventId != null ? `e${m.eventId}` : `b${m.batchId}-${m.slotId}`}
+                          meal={m}
+                          date={selected}
+                          agenda={agenda}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })
             )}
           </>
         )}
