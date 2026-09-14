@@ -9,8 +9,6 @@ import { useState } from "react";
 //   - With no real image source (no iconUrl and no website), we DON'T guess a
 //     domain from the name — guessed favicons are the garish red/purple auto-
 //     generated blocks. Instead we render a clean neutral monogram tile.
-//   - Real remote logos that DO load are desaturated (grayscale) so brand color
-//     doesn't shatter the monochrome canvas, while staying recognizable.
 //   - On load failure we fall back to the same neutral monogram tile.
 export function Favicon({
   name,
@@ -68,12 +66,10 @@ export function Favicon({
       width={size}
       height={size}
       onError={() => setFailed(true)}
-      // Desaturate brand logos so they read as monochrome marks in the cool field.
       style={{
         objectFit: "contain",
         verticalAlign: "middle",
         flexShrink: 0,
-        filter: "grayscale(1) contrast(1.05)",
       }}
     />
   );
