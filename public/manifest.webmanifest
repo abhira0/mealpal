@@ -1,6 +1,6 @@
 {
-  "name": "MealPal",
-  "short_name": "MealPal",
+  "name": "Platr",
+  "short_name": "Platr",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FBFBFC",

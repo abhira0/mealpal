@@ -12,7 +12,7 @@
 #   - otherwise (child table) -> filter via its FK to a household-scoped parent
 set -euo pipefail
 cd "$(dirname "$0")/.."
-DB="${DATABASE_URL:-./mealpal.db}"
+DB="${DATABASE_URL:-./platr.db}"
 OUT="drizzle/demo_seed.sql"
 HH=8  # demo@demo.com household id
 

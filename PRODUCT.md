@@ -18,7 +18,7 @@ Run a household's food operation end to end: decide what to eat, track what's on
 
 ## Positioning
 
-Not a recipe book or a standalone macro tracker. MealPal's difference is that four loops are wired together against real household inventory:
+Not a recipe book or a standalone macro tracker. Platr's difference is that four loops are wired together against real household inventory:
 
 - **Pantry → cook → shop loop** — real stock and lot tracking (FEFO) ties what you own to what you cook to what you still need to buy.
 - **Nutrition tracking** — macro/calorie goals measured against what was actually eaten, including photo/label analysis.
@@ -42,7 +42,7 @@ Used across the week and across surfaces: **Today** (agenda + what to cook/eat n
 
 ## Brand Commitments
 
-Name "MealPal" kept; not otherwise fixed. Standing visual preference (chosen 2026-08-10 during a full revamp): the **category standard played straight** — a clean, familiar productivity-tool look, executed impeccably, no gimmick or novelty world. The craft bar is **Linear**: crisp neutral surfaces, tight typography, a single restrained accent, fast and information-dense. Restrained color strategy (neutrals + one accent), light-first for the daytime kitchen scene. The prior visual system (teal, Bricolage / Hanken / Space Mono) is superseded.
+Name "Platr" kept; not otherwise fixed. Standing visual preference (chosen 2026-08-10 during a full revamp): the **category standard played straight** — a clean, familiar productivity-tool look, executed impeccably, no gimmick or novelty world. The craft bar is **Linear**: crisp neutral surfaces, tight typography, a single restrained accent, fast and information-dense. Restrained color strategy (neutrals + one accent), light-first for the daytime kitchen scene. The prior visual system (teal, Bricolage / Hanken / Space Mono) is superseded.
 
 ## Evidence on Hand
 
