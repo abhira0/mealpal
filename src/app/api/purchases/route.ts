@@ -49,7 +49,13 @@ export async function POST(req: Request) {
     if (!Number.isInteger(shopId) || shopId < 1)
       return NextResponse.json({ error: "invalid shopId" }, { status: 400 });
   }
-  return NextResponse.json(
-    recordPurchase(db, session.user.householdId, { productId, quantity, cents: cents === null ? null : Math.round(cents), expiresAt, purchasedAt, shopId }),
-    { status: 201 });
+  try {
+    return NextResponse.json(
+      recordPurchase(db, session.user.householdId, { productId, quantity, cents: cents === null ? null : Math.round(cents), expiresAt, purchasedAt, shopId }),
+      { status: 201 });
+  } catch {
+    // recordPurchase throws when productId doesn't belong to this household —
+    // surface it as a 404, not an unhandled 500.
+    return NextResponse.json({ error: "product not found" }, { status: 404 });
+  }
 }

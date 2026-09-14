@@ -1,8 +1,9 @@
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { mkdir, readdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { auth } from "@/auth";
-import { db } from "@/db";
+import { db, schema } from "@/db";
 import { updateProduct } from "@/lib/products";
 
 // Label photos live in public/nutrition/ (served statically by Next), not the
@@ -26,6 +27,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const id = Number((await params).id);
+
+  // Confirm this product is ours BEFORE touching the filesystem — otherwise a
+  // PUT to someone else's product id would delete/overwrite their nutrition
+  // photo file even though the DB write below is correctly household-scoped.
+  const [owned] = db.select({ id: schema.products.id }).from(schema.products)
+    .where(and(eq(schema.products.id, id), eq(schema.products.householdId, session.user.householdId))).all();
+  if (!owned) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const form = await req.formData().catch(() => null);
   const file = form?.get("photo");

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { getBatch, packBatch, unpackBatch, type PackBatchInput } from "@/lib/batches";
+import { todayISO } from "@/lib/dates";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -27,7 +28,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (!ok) return null;
     return packBatch(db, session.user.householdId, {
       slotId: b.slotId!, label: b.label!.trim(),
-      cookedDate: b.cookedDate ?? new Date().toISOString().slice(0, 10),
+      cookedDate: b.cookedDate ?? todayISO(),
       mealsTotal: b.mealsTotal!, items: Array.isArray(b.items) ? b.items : [],
     });
   });

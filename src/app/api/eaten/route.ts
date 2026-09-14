@@ -20,10 +20,16 @@ export async function POST(req: Request) {
   const date = b?.date;
   if (!productId || typeof date !== "string" || !DATE_RE.test(date))
     return NextResponse.json({ error: "productId and date=YYYY-MM-DD required" }, { status: 400 });
-  const row = logEaten(db, session.user.householdId, {
-    date, productId,
-    variantId: b?.variantId != null && b.variantId !== "" ? Number(b.variantId) : null,
-    count: b?.count != null ? Number(b.count) : 1,
-  });
-  return NextResponse.json(row, { status: 201 });
+  try {
+    const row = logEaten(db, session.user.householdId, {
+      date, productId,
+      variantId: b?.variantId != null && b.variantId !== "" ? Number(b.variantId) : null,
+      count: b?.count != null ? Number(b.count) : 1,
+    });
+    return NextResponse.json(row, { status: 201 });
+  } catch (err) {
+    // Bad input (product/variant not found in this household, or a
+    // variantId that belongs to a different product) — not a server error.
+    return NextResponse.json({ error: (err as Error).message }, { status: 400 });
+  }
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { and, eq } from "drizzle-orm";
 import { auth } from "@/auth";
-import { db } from "@/db";
+import { db, schema } from "@/db";
 import {
   createProduct,
   listAllProducts,
@@ -10,6 +11,20 @@ import {
 } from "@/lib/products";
 import { dollarsToCents } from "@/lib/money";
 import { cacheProductImage } from "@/lib/product-image";
+
+// Products carry a raw ingredientId/shopId with no FK check against household —
+// without this, a product could be created pointing at another household's
+// ingredient or shop (cross-household reference / data leak).
+function ownsIngredient(householdId: number, ingredientId: number): boolean {
+  const [row] = db.select({ id: schema.ingredients.id }).from(schema.ingredients)
+    .where(and(eq(schema.ingredients.id, ingredientId), eq(schema.ingredients.householdId, householdId))).all();
+  return !!row;
+}
+function ownsShop(householdId: number, shopId: number): boolean {
+  const [row] = db.select({ id: schema.shops.id }).from(schema.shops)
+    .where(and(eq(schema.shops.id, shopId), eq(schema.shops.householdId, householdId))).all();
+  return !!row;
+}
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -39,6 +54,9 @@ export async function POST(req: Request) {
       { error: "ingredientId, shopId, name, and a positive packSize are required." },
       { status: 400 },
     );
+  }
+  if (!ownsIngredient(session.user.householdId, ingredientId) || !ownsShop(session.user.householdId, shopId)) {
+    return NextResponse.json({ error: "Unknown ingredientId or shopId." }, { status: 400 });
   }
   // Optional manual price / importer seed. null = derive from purchases.
   const dollars = b?.dollars !== undefined ? Number(b.dollars) : NaN;

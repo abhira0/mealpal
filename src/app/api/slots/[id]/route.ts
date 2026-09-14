@@ -28,7 +28,8 @@ export async function DELETE(
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
-  const deleted = deleteSlot(db, session.user.householdId, Number(id));
-  if (!deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const result = deleteSlot(db, session.user.householdId, Number(id));
+  if (!result.ok) return NextResponse.json({ error: result.reason }, { status: 409 });
+  if (!result.deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ ok: true });
 }

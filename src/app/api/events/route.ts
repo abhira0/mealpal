@@ -6,11 +6,7 @@ import { schema } from "@/db";
 import { addEvent, listEvents } from "@/lib/plan";
 import { listVariants } from "@/lib/variants";
 import { topUpRules } from "@/lib/rules";
-
-function today(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
+import { todayISO } from "@/lib/dates";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -18,7 +14,7 @@ export async function GET(req: Request) {
   const sp = new URL(req.url).searchParams;
   const from = sp.get("from") ?? "0000-01-01";
   const to = sp.get("to") ?? "9999-12-31";
-  topUpRules(db, session.user.householdId, today());
+  topUpRules(db, session.user.householdId, todayISO());
   return NextResponse.json(listEvents(db, session.user.householdId, from, to));
 }
 
@@ -35,10 +31,20 @@ export async function POST(req: Request) {
   if ([b?.recipeId, b?.ingredientId, b?.productId].filter(set).length !== 1)
     return NextResponse.json({ error: "provide exactly one of recipeId, ingredientId, productId" }, { status: 400 });
 
-  const base = { date: String(b.date), slotId: Number(b.slotId), servings: Number(b.servings) || 1 };
+  const slotId = Number(b.slotId);
+  const [slot] = db.select({ id: schema.mealSlots.id }).from(schema.mealSlots)
+    .where(and(eq(schema.mealSlots.id, slotId), eq(schema.mealSlots.householdId, hid))).all();
+  if (!slot) return NextResponse.json({ error: "slot not found" }, { status: 404 });
 
-  if (set(b.recipeId))
-    return NextResponse.json(addEvent(db, hid, { ...base, recipeId: Number(b.recipeId) }), { status: 201 });
+  const base = { date: String(b.date), slotId, servings: Number(b.servings) || 1 };
+
+  if (set(b.recipeId)) {
+    const recipeId = Number(b.recipeId);
+    const [recipe] = db.select({ id: schema.recipes.id }).from(schema.recipes)
+      .where(and(eq(schema.recipes.id, recipeId), eq(schema.recipes.householdId, hid))).all();
+    if (!recipe) return NextResponse.json({ error: "recipe not found" }, { status: 404 });
+    return NextResponse.json(addEvent(db, hid, { ...base, recipeId }), { status: 201 });
+  }
 
   if (set(b.ingredientId)) {
     const amount = Number(b.amount);
