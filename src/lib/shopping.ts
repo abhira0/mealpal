@@ -119,7 +119,7 @@ export function updatePurchase(
       if (!product) throw new Error("product not found in household");
       tx.update(schema.stockMovements)
         .set({ productId: product.id, ingredientId: product.ingredientId, delta: product.packSize * quantity })
-        .where(eq(schema.stockMovements.purchaseId, id)).run();
+        .where(and(eq(schema.stockMovements.purchaseId, id), eq(schema.stockMovements.reason, "purchase"))).run();
     }
 
     const [row] = tx.update(schema.purchases)
