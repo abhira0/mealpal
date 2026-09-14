@@ -5,7 +5,7 @@ import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
 import { createProduct } from "@/lib/products";
 import { recordPurchase, listPendingPurchases, listPurchaseHistory, updatePurchase, deletePurchase, learnedShelfLife, addExtra, listExtras, deleteExtra, urgency, shoppingList } from "@/lib/shopping";
-import { currentStock } from "@/lib/stock";
+import { currentStock, allocateFEFO } from "@/lib/stock";
 import { addEvent } from "@/lib/plan";
 import { todayISO, toISODate } from "@/lib/dates";
 
@@ -149,6 +149,32 @@ describe("updatePurchase product swap", () => {
     const mv = db.select().from(schema.stockMovements)
       .where(eq(schema.stockMovements.purchaseId, pid)).all();
     expect(mv[0].productId).toBe(altId);
+  });
+});
+
+describe("updatePurchase quantity change with FEFO consumption", () => {
+  it("only re-sizes the inbound restock movement, leaving consumption movements from allocateFEFO untouched", () => {
+    const pid = recordPurchase(db, hid, { productId, quantity: 2 }).id; // 2*11340 = 22680
+    expect(currentStock(db, hid, flourId)).toBe(22680);
+
+    // cook/eat draws down the lot via FEFO, tagging the consumption movement
+    // with the same purchaseId as the inbound restock.
+    allocateFEFO(db, hid, flourId, productId, 5000, { reason: "cooked" });
+    expect(currentStock(db, hid, flourId)).toBe(17680);
+
+    // bump the purchase quantity 2 -> 3; must only re-size the restock row, not
+    // the consumption movement (which shares the same purchaseId).
+    updatePurchase(db, hid, pid, { quantity: 3 });
+
+    const movements = db.select().from(schema.stockMovements)
+      .where(eq(schema.stockMovements.purchaseId, pid)).all();
+    const consumption = movements.find((m) => m.reason === "cooked");
+    const restock = movements.find((m) => m.reason === "purchase");
+    expect(consumption?.delta).toBe(-5000); // untouched
+    expect(restock?.delta).toBe(3 * 11340); // resized to the new quantity
+
+    // lot remaining = packSize*newQty - consumed
+    expect(currentStock(db, hid, flourId)).toBe(3 * 11340 - 5000);
   });
 });
 
