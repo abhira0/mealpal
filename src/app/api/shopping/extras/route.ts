@@ -14,7 +14,12 @@ export async function POST(req: Request) {
   const quantity = Number(b?.quantity) || 1;
   if (!productId && !title)
     return NextResponse.json({ error: "productId or title required" }, { status: 400 });
-  return NextResponse.json(
-    addExtra(db, session.user.householdId, { productId, title, shopId, quantity }),
-    { status: 201 });
+  try {
+    return NextResponse.json(
+      addExtra(db, session.user.householdId, { productId, title, shopId, quantity }),
+      { status: 201 });
+  } catch {
+    // addExtra throws when productId/shopId doesn't belong to this household.
+    return NextResponse.json({ error: "invalid productId or shopId" }, { status: 400 });
+  }
 }

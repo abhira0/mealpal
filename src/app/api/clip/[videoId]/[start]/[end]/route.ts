@@ -3,7 +3,7 @@ import { createReadStream, statSync } from "node:fs";
 import { Readable } from "node:stream";
 import path from "node:path";
 import { auth } from "@/auth";
-import { cacheClip } from "@/lib/video-clip";
+import { cacheClip, parseByteRange } from "@/lib/video-clip";
 
 const MAX_CLIP_SECONDS = 180;
 
@@ -26,22 +26,23 @@ export async function GET(req: Request, { params }: { params: Promise<{ videoId:
 
   const filePath = path.join(process.cwd(), "public", localPath);
   const stat = statSync(filePath);
-  const range = req.headers.get("range");
   const baseHeaders = {
     "Content-Type": "video/mp4",
     "Accept-Ranges": "bytes",
     "Cache-Control": "public, max-age=31536000, immutable",
   };
 
-  if (!range) {
+  // Clamped against the actual file size — an out-of-bounds Range (past EOF,
+  // or a suffix range we don't parse) falls back to a full 200 rather than
+  // promising a Content-Length the stream can't deliver.
+  const parsed = parseByteRange(req.headers.get("range"), stat.size);
+  if (!parsed) {
     return new NextResponse(Readable.toWeb(createReadStream(filePath)) as ReadableStream, {
       headers: { ...baseHeaders, "Content-Length": String(stat.size) },
     });
   }
 
-  const m = /bytes=(\d+)-(\d+)?/.exec(range);
-  const rangeStart = m ? Number(m[1]) : 0;
-  const rangeEnd = m?.[2] ? Number(m[2]) : stat.size - 1;
+  const { start: rangeStart, end: rangeEnd } = parsed;
   return new NextResponse(Readable.toWeb(createReadStream(filePath, { start: rangeStart, end: rangeEnd })) as ReadableStream, {
     status: 206,
     headers: {

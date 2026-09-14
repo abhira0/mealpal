@@ -157,7 +157,7 @@ export function Bill({ onCount, history = false }: { onCount?: (n: number) => vo
 
   return (
     <>
-      {error && <p className="notice">{error}</p>}
+      {error && <p className="notice" role="alert">{error}</p>}
       {rows === null && !error && <p className="loading">Loading…</p>}
 
       {history && rows !== null && <AddPurchase products={products} shops={shops} onAdded={loadFirst} />}

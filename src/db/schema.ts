@@ -137,6 +137,7 @@ export const consumptions = sqliteTable("consumptions", {
   productId: integer("product_id").notNull().references(() => products.id),
   variantId: integer("variant_id").references(() => productVariants.id),
   count: integer("count").notNull().default(1), // canonical units eaten
+  nutrientsJson: text("nutrients_json"), // per-unit label frozen at log time
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
@@ -262,6 +263,10 @@ export const stockMovements = sqliteTable("stock_movements", {
   // edit/delete reverse its exact depletion by deleting these rows.
   batchId: integer("batch_id").references(() => batches.id),
   purchaseId: integer("purchase_id"),
+  // Per-unit nutrient label frozen at cook/eat time (JSON of the nutrient
+  // columns). Null = not snapshotted (pre-existing or non-consumption rows) —
+  // nutrition then falls back to the product's current label.
+  nutrientsJson: text("nutrients_json"),
   at: integer("at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   // date-only YYYY-MM-DD for manual backfill of on-hand stock; null = no expiry
   expiresAt: text("expires_at"),

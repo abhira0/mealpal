@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { listBatches, packBatch, type PackBatchInput } from "@/lib/batches";
+import { todayISO } from "@/lib/dates";
 
 export async function GET() {
   const session = await auth();
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "slotId, label, mealsTotal required" }, { status: 400 });
   }
   const batch = packBatch(db, session.user.householdId, {
-    slotId: b.slotId, label: b.label.trim(), cookedDate: b.cookedDate ?? new Date().toISOString().slice(0, 10),
+    slotId: b.slotId, label: b.label.trim(), cookedDate: b.cookedDate ?? todayISO(),
     mealsTotal: b.mealsTotal, items: Array.isArray(b.items) ? b.items : [],
   });
   return NextResponse.json(batch, { status: 201 });

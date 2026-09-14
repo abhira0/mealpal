@@ -33,4 +33,26 @@ describe("registerHousehold", () => {
     await registerHousehold(db, args);
     await expect(registerHousehold(db, args)).rejects.toThrow();
   });
+
+  it("treats email as case-insensitive for storage, lookup, and uniqueness", async () => {
+    const user = await registerHousehold(db, {
+      email: "Mixed.Case@Example.com",
+      password: "hunter2",
+      name: null,
+      householdName: "Home",
+    });
+    expect(user.email).toBe("mixed.case@example.com");
+
+    const found = await findUserByEmail(db, "MIXED.CASE@EXAMPLE.COM");
+    expect(found?.id).toBe(user.id);
+
+    await expect(
+      registerHousehold(db, {
+        email: "mixed.case@example.com",
+        password: "y",
+        name: null,
+        householdName: "Home 2",
+      }),
+    ).rejects.toThrow();
+  });
 });

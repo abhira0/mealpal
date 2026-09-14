@@ -1,9 +1,23 @@
 import { NextResponse } from "next/server";
+import { and, eq } from "drizzle-orm";
 import { auth } from "@/auth";
-import { db } from "@/db";
+import { db, schema } from "@/db";
 import { deleteProduct, updateProduct, NUTRIENT_PATCH_KEYS, type ProductPatch } from "@/lib/products";
 import { dollarsToCents } from "@/lib/money";
 import { cacheProductImage } from "@/lib/product-image";
+
+// Same cross-household guard as POST /api/products — a PATCH can reassign a
+// product to a different ingredient/shop, so it needs the same check.
+function ownsIngredient(householdId: number, ingredientId: number): boolean {
+  const [row] = db.select({ id: schema.ingredients.id }).from(schema.ingredients)
+    .where(and(eq(schema.ingredients.id, ingredientId), eq(schema.ingredients.householdId, householdId))).all();
+  return !!row;
+}
+function ownsShop(householdId: number, shopId: number): boolean {
+  const [row] = db.select({ id: schema.shops.id }).from(schema.shops)
+    .where(and(eq(schema.shops.id, shopId), eq(schema.shops.householdId, householdId))).all();
+  return !!row;
+}
 
 // Pull any nutrient fields present in the body into a patch (per canonical unit).
 // Accepts numbers and null (clears). Ignores absent keys.
@@ -34,6 +48,12 @@ export async function PATCH(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const b = await req.json().catch(() => null);
+  if (b?.ingredientId !== undefined && !ownsIngredient(session.user.householdId, Number(b.ingredientId))) {
+    return NextResponse.json({ error: "Unknown ingredientId." }, { status: 400 });
+  }
+  if (b?.shopId !== undefined && !ownsShop(session.user.householdId, Number(b.shopId))) {
+    return NextResponse.json({ error: "Unknown shopId." }, { status: 400 });
+  }
   const trimmedImageUrl = b?.imageUrl == null ? null : String(b.imageUrl).trim() || null;
   const imageUrl =
     b?.imageUrl !== undefined

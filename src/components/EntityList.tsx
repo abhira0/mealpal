@@ -25,8 +25,15 @@ export function EntityList(props: {
   detailHref?: (row: Row) => string;
   create?: { label: string; href?: string; onClick?: () => void };
   reloadToken?: number;
+  // Desktop master-detail: select a row into a pane instead of navigating.
+  // When onSelect is set, editable rows render as buttons (not links) and the
+  // matching selectedId row gets `.is-selected`. `bare` drops the PageHeader so
+  // the desktop view can supply its own.
+  onSelect?: (row: Row) => void;
+  selectedId?: string | number | null;
+  bare?: boolean;
 }) {
-  const { slug, reloadToken = 0 } = props;
+  const { slug, reloadToken = 0, onSelect, selectedId = null, bare = false } = props;
   const config = props.config ?? ENTITIES[slug!];
   const detailHref = props.detailHref ?? ((row: Row) => `/manage/${slug}/${row.id}`);
   const create = props.create ?? { label: "+ New", href: `/manage/${slug}/new` };
@@ -113,14 +120,16 @@ export function EntityList(props: {
 
   return (
     <>
-      <PageHeader crumbs={[{ label: "Manage", href: "/manage" }]} title={config.label} />
+      {!bare && (
+        <PageHeader crumbs={[{ label: "Manage", href: "/manage" }]} title={config.label} />
+      )}
 
-      <div className="content stack-sm">
-        {error && <p className="notice">{error}</p>}
+      <div className={bare ? "stack-sm" : "content stack-sm"}>
+        {error && <p className="notice" role="alert">{error}</p>}
 
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {rows.length > 0 && (
-            <div className="search" style={{ flex: 1 }}>
+            <div className="search" style={{ flex: 1, position: "relative" }}>
               <span className="search-icon" aria-hidden="true">⌕</span>
               <input
                 type="text"
@@ -130,6 +139,17 @@ export function EntityList(props: {
                 aria-label={`Search ${config.label.toLowerCase()}`}
                 className="input"
               />
+              {query && (
+                <button
+                  type="button"
+                  className="btn-link"
+                  onClick={() => setQuery("")}
+                  aria-label="Clear search"
+                  style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", width: "auto", padding: 0 }}
+                >
+                  ✕
+                </button>
+              )}
             </div>
           )}
           {create.href ? (
@@ -220,9 +240,21 @@ export function EntityList(props: {
             ));
           const badge = config.bigImage || config.titleTop ? null : iconBadge;
 
+          const selected = onSelect != null && String(row.id) === String(selectedId ?? "");
           return (
-            <div key={String(row.id)} className="row">
-              {config.canEdit ? (
+            <div key={String(row.id)} className={selected ? "row is-selected" : "row"}>
+              {config.canEdit && onSelect ? (
+                <button
+                  type="button"
+                  className="row-link"
+                  aria-current={selected ? "true" : undefined}
+                  onClick={() => onSelect(row)}
+                >
+                  {badge}
+                  {main}
+                  <ChevronRight className="arrow" size={16} aria-hidden="true" />
+                </button>
+              ) : config.canEdit ? (
                 <Link href={detailHref(row)} className="row-link">
                   {badge}
                   {main}

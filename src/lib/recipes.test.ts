@@ -120,6 +120,13 @@ describe("recipes", () => {
     expect(listRecipes(db, hid)).toHaveLength(0);
   });
 
+  it("lists recipes alphabetically by name, not insertion order", () => {
+    createRecipe(db, hid, { name: "Zucchini Bread", baseServings: 1, notes: null, ingredients: [], steps: [], media: [] });
+    createRecipe(db, hid, { name: "Apple Pie", baseServings: 1, notes: null, ingredients: [], steps: [], media: [] });
+    createRecipe(db, hid, { name: "Mango Salsa", baseServings: 1, notes: null, ingredients: [], steps: [], media: [] });
+    expect(listRecipes(db, hid).map((r) => r.name)).toEqual(["Apple Pie", "Mango Salsa", "Zucchini Bread"]);
+  });
+
   it("deletes a recipe and its children", () => {
     const r = createRecipe(db, hid, {
       name: "Bread", baseServings: 2, notes: null,

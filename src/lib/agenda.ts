@@ -39,7 +39,7 @@ export interface NextCook {
   slotName: string;
   label: string;
   cookDate: string;
-  daysAway: number;
+  daysAway: number; // negative when cookDate is in the past (overdue prep)
 }
 
 export interface AgendaDay {
@@ -70,6 +70,14 @@ function derivePhase(m: {
 /** ISO date + n days, computed in local time (no UTC drift). */
 function addDays(date: string, n: number): string {
   return toISODate(new Date(localNoon(date).getTime() + n * 86_400_000));
+}
+
+// Days to cook ahead of when a meal is eaten: morning/lunch meals get prepped
+// the night before (overnight oats, packed lunch), dinner is cooked same-day.
+// ponytail: threshold on the slot's timeOfDay — slots at/after 17:00 are dinner.
+// A per-slot "cook ahead" field would generalize this; deferred until needed.
+function cookLead(timeOfDay: string | undefined): number {
+  return (timeOfDay ?? "12:00") < "17:00" ? 1 : 0;
 }
 
 /** Every date in [from, to] inclusive. */
@@ -127,12 +135,46 @@ export function agendaDays(
       .map((v) => [v.id, v]),
   );
 
-  // newest active batch per slot
   const activeBatches = listBatches(db, householdId); // newest cookedDate first
-  const batchBySlot = new Map<number, (typeof activeBatches)[number]>();
-  for (const b of activeBatches) {
-    if (!batchBySlot.has(b.slotId)) batchBySlot.set(b.slotId, b);
+
+  // what each active batch actually made, so it only decorates its own meals —
+  // not every unrelated recipe that happens to share its slot.
+  const activeBatchIds = new Set(activeBatches.map((b) => b.id));
+  const batchRecipeIds = new Map<number, Set<number>>();
+  const batchProductIds = new Map<number, Set<number>>();
+  for (const it of db.select().from(schema.batchItems).all()) {
+    if (!activeBatchIds.has(it.batchId)) continue;
+    if (it.recipeId != null) {
+      (batchRecipeIds.get(it.batchId) ?? batchRecipeIds.set(it.batchId, new Set()).get(it.batchId)!).add(it.recipeId);
+    }
+    if (it.productId != null) {
+      (batchProductIds.get(it.batchId) ?? batchProductIds.set(it.batchId, new Set()).get(it.batchId)!).add(it.productId);
+    }
   }
+
+  // A batch covers days until its servings run out, not a fixed calendar span:
+  // skip a day and the remaining servings slide forward. Past days keep their
+  // rows (cookedDate onwards); the future end is today + what's left.
+  const coverageEnd = (b: (typeof activeBatches)[number]): string =>
+    addDays(b.cookedDate > today ? b.cookedDate : today, b.mealsRemaining - 1);
+
+  // Does batch b back this event on `date`? Only within its coverage window
+  // AND if b actually made this event's recipe/product. Prevents a batch
+  // leaking its "N left"/COOKED badge onto other meals in the same slot or
+  // onto dates it never covered.
+  const batchBacksEvent = (
+    b: (typeof activeBatches)[number],
+    ev: (typeof events)[number],
+    date: string,
+  ): boolean => {
+    if (date < b.cookedDate || date > coverageEnd(b)) return false;
+    const recipes = batchRecipeIds.get(b.id);
+    const products = batchProductIds.get(b.id);
+    if (!recipes && !products) return true; // item-less batch: backs any meal in its slot
+    if (ev.recipeId != null && recipes?.has(ev.recipeId)) return true;
+    if (ev.productId != null && products?.has(ev.productId)) return true;
+    return false;
+  };
 
   const batchEatenRows = db.select().from(schema.batchEaten)
     .where(eq(schema.batchEaten.householdId, householdId)).all();
@@ -155,29 +197,30 @@ export function agendaDays(
   }
 
   // day -> cook flags landing on it: the day AFTER each active batch's coverage
-  // window ends (cookedDate + mealsTotal), i.e. right after its last covered day.
+  // window ends, i.e. right after its last covered day.
   const cookFlagsByDate = new Map<string, CookFlag[]>();
   for (const b of activeBatches) {
-    const cookDate = addDays(b.cookedDate, b.mealsTotal);
-    if (cookDate < from || cookDate > to) continue;
     const slot = slotById.get(b.slotId);
+    const cookDate = addDays(coverageEnd(b), 1 - cookLead(slot?.timeOfDay));
+    if (cookDate < from || cookDate > to) continue;
     const flag: CookFlag = { slotId: b.slotId, slotName: slot?.name ?? "—", label: b.label };
     const bucket = cookFlagsByDate.get(cookDate);
     if (bucket) bucket.push(flag);
     else cookFlagsByDate.set(cookDate, [flag]);
   }
 
-  // day -> synthetic batch meal rows: for each active batch's coverage window
-  // (cookedDate .. cookedDate + mealsTotal - 1), project a meal row onto every
-  // covered day that has no real meal_event for that batch's slot already.
+  // day -> synthetic batch meal rows: for each active batch's coverage window,
+  // project a meal row onto every covered day that has no real meal_event for
+  // that batch's slot already.
   const syntheticByDate = new Map<string, (AgendaMeal & { _timeOfDay: string })[]>();
   for (const b of activeBatches) {
     const slot = slotById.get(b.slotId);
-    const coverageEnd = addDays(b.cookedDate, b.mealsTotal - 1);
-    for (const d of dateRange(b.cookedDate, coverageEnd)) {
+    for (const d of dateRange(b.cookedDate, coverageEnd(b))) {
       if (d < from || d > to) continue;
       const dayEvents = eventsByDate.get(d) ?? [];
-      if (dayEvents.some((ev) => ev.slotId === b.slotId)) continue; // real event wins, no duplicate
+      // a real event for THIS batch's meal wins (no duplicate); an unrelated
+      // meal sharing the slot doesn't suppress the batch's own row.
+      if (dayEvents.some((ev) => ev.slotId === b.slotId && batchBacksEvent(b, ev, d))) continue;
       const eatenFromBatchToday = eatenKeys.has(`${b.id}:${d}`);
       const status: "planned" | "cooked" = eatenFromBatchToday ? "cooked" : "planned";
       const meal: AgendaMeal & { _timeOfDay: string } = {
@@ -211,7 +254,7 @@ export function agendaDays(
     const meals: AgendaMeal[] = dayEvents
       .map((ev): AgendaMeal & { _timeOfDay: string } => {
         const slot = slotById.get(ev.slotId);
-        const batch = batchBySlot.get(ev.slotId) ?? null;
+        const batch = activeBatches.find((b) => b.slotId === ev.slotId && batchBacksEvent(b, ev, date)) ?? null;
         const batchBacked = batch != null;
         const eatenFromBatchToday = batchBacked && eatenKeys.has(`${batch!.id}:${date}`);
         const status = ev.status as "planned" | "cooked" | "served";
@@ -258,9 +301,9 @@ export function agendaDays(
 }
 
 /**
- * Next meal-prep date per slot: for each active batch, its cook date is
- * cookedDate + mealsTotal days (the day its coverage window runs out, same
- * math as agendaDays' cook flags). A slot with multiple active batches keeps
+ * Next meal-prep date per slot: for each active batch, its cook date is the
+ * day after its remaining servings run out (today + mealsRemaining, same math
+ * as agendaDays' cook flags). A slot with multiple active batches keeps
  * only the one that runs out soonest. Sorted by cookDate ascending.
  */
 export function nextCooks(db: Db, householdId: number, today: string): NextCook[] {
@@ -271,7 +314,8 @@ export function nextCooks(db: Db, householdId: number, today: string): NextCook[
   const activeBatches = listBatches(db, householdId);
   const bySlot = new Map<number, { cookDate: string; label: string }>();
   for (const b of activeBatches) {
-    const cookDate = addDays(b.cookedDate, b.mealsTotal);
+    const start = b.cookedDate > today ? b.cookedDate : today;
+    const cookDate = addDays(start, b.mealsRemaining - cookLead(slotById.get(b.slotId)?.timeOfDay));
     const existing = bySlot.get(b.slotId);
     if (!existing || cookDate < existing.cookDate) {
       bySlot.set(b.slotId, { cookDate, label: b.label });
@@ -279,8 +323,10 @@ export function nextCooks(db: Db, householdId: number, today: string): NextCook[
   }
 
   const todayMs = localNoon(today).getTime();
+  // Negative daysAway means the cook date has already passed (overdue prep);
+  // callers should treat daysAway < 0 as overdue rather than clamping to "today".
   const daysFrom = (date: string) =>
-    Math.max(0, Math.round((localNoon(date).getTime() - todayMs) / 86_400_000));
+    Math.round((localNoon(date).getTime() - todayMs) / 86_400_000);
 
   const result: NextCook[] = [];
   for (const [slotId, { cookDate, label }] of bySlot) {
@@ -308,12 +354,13 @@ export function nextCooks(db: Db, householdId: number, today: string): NextCook[
   }
   for (const [recipeId, { date, slotId }] of byRecipe) {
     const slot = slotById.get(slotId);
+    const cookDate = addDays(date, -cookLead(slot?.timeOfDay));
     result.push({
       slotId,
       slotName: slot?.name ?? "—",
       label: getRecipe(db, householdId, recipeId)?.name ?? "Recipe",
-      cookDate: date,
-      daysAway: daysFrom(date),
+      cookDate,
+      daysAway: daysFrom(cookDate),
     });
   }
 

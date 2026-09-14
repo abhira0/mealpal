@@ -4,7 +4,7 @@ Date: 2026-06-29
 
 ## Goal
 
-Add a calorie + full-label nutrition counter to MealPal that derives "what I ate
+Add a calorie + full-label nutrition counter to Platr that derives "what I ate
 today" from the existing meal plan (no separate food diary). Nutrition data is
 sourced per-product from uploaded label photos; numeric values are filled later
 by reading those photos. Daily totals use the *actual product consumed*, which

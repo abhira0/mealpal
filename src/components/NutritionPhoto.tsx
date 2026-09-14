@@ -102,8 +102,18 @@ export function NutritionPhoto({
         <img
           src={`${current}?v=${v}`}
           alt="Nutrition facts label"
+          loading="lazy"
+          role="button"
+          tabIndex={0}
+          aria-label="View nutrition facts label full screen"
           title="Click to view full screen"
           onClick={(e) => e.currentTarget.requestFullscreen?.()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              e.currentTarget.requestFullscreen?.();
+            }
+          }}
           style={{ display: "block", maxHeight: 220, borderRadius: 8, border: "1px solid var(--line, #0001)", cursor: "zoom-in" }}
         />
       ) : (
@@ -132,7 +142,7 @@ export function NutritionPhoto({
           </button>
         )}
       </div>
-      {error && <p className="notice" style={{ margin: 0 }}>{error}</p>}
+      {error && <p className="notice" role="alert" style={{ margin: 0 }}>{error}</p>}
     </div>
   );
 }

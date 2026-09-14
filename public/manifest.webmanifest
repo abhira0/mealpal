@@ -1,10 +1,10 @@
 {
-  "name": "MealPal",
-  "short_name": "MealPal",
+  "name": "Platr",
+  "short_name": "Platr",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#EFEADD",
-  "theme_color": "#115E59",
+  "background_color": "#FBFBFC",
+  "theme_color": "#FBFBFC",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }

@@ -29,9 +29,36 @@ export function updateSlot(
   return row;
 }
 
-export function deleteSlot(db: Db, householdId: number, id: number): boolean {
+/** Result of a delete that may be blocked by rows referencing it. */
+export type DeleteResult =
+  | { ok: true; deleted: boolean }
+  | { ok: false; reason: string };
+
+export function deleteSlot(db: Db, householdId: number, id: number): DeleteResult {
+  // meal_events.slot_id, meal_rules.slot_id, and batches.slot_id all
+  // FK-reference meal_slots.id NOT NULL with foreign_keys=ON, so an unchecked
+  // delete throws a raw SqliteError instead of a friendly message (mirrors
+  // deleteShop's guard in lib/shops.ts).
+  const eventCount = db.select().from(schema.mealEvents)
+    .where(and(eq(schema.mealEvents.householdId, householdId), eq(schema.mealEvents.slotId, id)))
+    .all().length;
+  if (eventCount > 0) {
+    return { ok: false, reason: `Can't delete: ${eventCount} planned ${eventCount === 1 ? "meal uses" : "meals use"} this slot.` };
+  }
+  const ruleCount = db.select().from(schema.mealRules)
+    .where(and(eq(schema.mealRules.householdId, householdId), eq(schema.mealRules.slotId, id)))
+    .all().length;
+  if (ruleCount > 0) {
+    return { ok: false, reason: `Can't delete: ${ruleCount} recurring ${ruleCount === 1 ? "rule uses" : "rules use"} this slot.` };
+  }
+  const batchCount = db.select().from(schema.batches)
+    .where(and(eq(schema.batches.householdId, householdId), eq(schema.batches.slotId, id)))
+    .all().length;
+  if (batchCount > 0) {
+    return { ok: false, reason: `Can't delete: ${batchCount} ${batchCount === 1 ? "batch uses" : "batches use"} this slot.` };
+  }
   const rows = db.delete(schema.mealSlots)
     .where(and(eq(schema.mealSlots.id, id), eq(schema.mealSlots.householdId, householdId)))
     .returning().all();
-  return rows.length > 0;
+  return { ok: true, deleted: rows.length > 0 };
 }

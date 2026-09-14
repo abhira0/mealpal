@@ -59,7 +59,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     patch.purchasedAt = localNoon(b.purchasedAt);
   }
 
-  const row = updatePurchase(db, session.user.householdId, Number(id), patch);
+  // updatePurchase throws when a swapped productId doesn't resolve in this
+  // household — a bad request, not a server error.
+  let row;
+  try {
+    row = updatePurchase(db, session.user.householdId, Number(id), patch);
+  } catch {
+    return NextResponse.json({ error: "invalid productId" }, { status: 400 });
+  }
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(row);
 }

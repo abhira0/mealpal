@@ -29,6 +29,16 @@ const TABS: Tab[] = [
     ),
   },
   {
+    href: "/plan",
+    label: "Plan",
+    icon: (
+      <svg {...ICON_PROPS}>
+        <rect x="3" y="4" width="18" height="17" rx="2" />
+        <path d="M3 9h18M8 2v4M16 2v4" />
+      </svg>
+    ),
+  },
+  {
     href: "/nutrition",
     label: "Nutrition",
     icon: (
@@ -79,8 +89,16 @@ export function BottomNav() {
   return (
     <nav className="nav" aria-label="Primary">
       <span className="nav-brand" aria-hidden="true">
-        MealPal
+        Platr
       </span>
+      <button
+        type="button"
+        className="nav-search"
+        onClick={() => window.dispatchEvent(new CustomEvent("platr:open-cmdk"))}
+      >
+        <span>Search…</span>
+        <kbd>⌘K</kbd>
+      </button>
       {TABS.map((tab) => {
         const active =
           tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);

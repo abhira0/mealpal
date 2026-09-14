@@ -45,7 +45,7 @@ export function AddExtra({
     });
     setBusy(false);
     if (!res.ok) { setError("Couldn't add."); return; }
-    setProductId(""); setTitle(""); setQuantity("1");
+    setProductId(""); setTitle(""); setQuantity("1"); setShopId("");
     setOpen(false);
     onAdded();
   }

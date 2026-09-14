@@ -10,6 +10,23 @@ const run = promisify(execFile);
 const CLIP_DIR = path.join(process.cwd(), "public", "clips");
 const SOURCE_DIR = path.join(process.cwd(), ".cache", "yt-source");
 
+/**
+ * Parse an HTTP `Range: bytes=...` header against a known file size, clamping
+ * to valid bounds. Returns null when there's no usable range (no header, a
+ * suffix range we don't support, or a start past EOF) so the caller falls
+ * back to a full 200 response instead of emitting a Content-Length that
+ * promises more bytes than the stream will actually deliver.
+ */
+export function parseByteRange(range: string | null, size: number): { start: number; end: number } | null {
+  if (!range) return null;
+  const m = /bytes=(\d+)-(\d+)?/.exec(range);
+  if (!m) return null;
+  const start = Number(m[1]);
+  const end = m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
+  if (start >= size || start > end) return null;
+  return { start, end };
+}
+
 async function exists(p: string): Promise<boolean> {
   try {
     await access(p);
@@ -60,7 +77,8 @@ export async function cacheClip(videoId: string, start: number, end: number): Pr
       out,
     ]);
     return rel;
-  } catch {
+  } catch (err) {
+    console.error(`clip ${videoId} ${start}-${end} failed:`, err);
     return null;
   }
 }

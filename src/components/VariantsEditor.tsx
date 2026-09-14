@@ -40,7 +40,9 @@ export function VariantsEditor({ productId, unit }: { productId: number; unit: s
   }
 
   async function remove(id: number) {
-    await fetch(`/api/variants/${id}`, { method: "DELETE" });
+    setError(null);
+    const res = await fetch(`/api/variants/${id}`, { method: "DELETE" });
+    if (!res.ok) { setError("Couldn't delete that variant."); return; }
     if (openId === id) setOpenId(null);
     reload();
   }
@@ -107,7 +109,7 @@ export function VariantsEditor({ productId, unit }: { productId: number; unit: s
             {busy ? "…" : "Add"}
           </button>
         </div>
-        {error && <p className="notice" style={{ color: "var(--paprika)" }}>{error}</p>}
+        {error && <p className="notice" role="alert" style={{ color: "var(--paprika)" }}>{error}</p>}
       </section>
     </>
   );

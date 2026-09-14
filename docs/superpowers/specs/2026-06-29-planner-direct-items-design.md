@@ -94,7 +94,7 @@ Validation: exactly one of recipeId/ingredientId/productId; product must belong 
 ## Demo cleanup (first ask)
 
 Delete the "Dry Fruits" recipe (id 12, household 8):
-- live `mealpal.db`: delete its `meal_events`, `recipe_ingredients`, `recipe_steps`, `recipe_media`, then the `recipes` row.
+- live `platr.db`: delete its `meal_events`, `recipe_ingredients`, `recipe_steps`, `recipe_media`, then the `recipes` row.
 - `drizzle/demo_seed.sql`: remove the same rows so a reseed doesn't bring it back.
 
 ## Edge cases

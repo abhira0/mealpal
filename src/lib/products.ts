@@ -217,6 +217,34 @@ export const NUTRIENT_PATCH_KEYS = [
   "vitaminAMcg", "vitaminCMg",
 ] as const;
 
+/**
+ * The per-unit nutrition label to freeze onto a consumption row: the variant's
+ * if it has anything filled in, else the product's. Stored as JSON so a later
+ * label edit re-values only future meals (see nutrition.ts's frozen reads).
+ * Null when neither has usable numbers — nutrition then falls back to live rows.
+ */
+export function nutrientSnapshot(
+  db: Db, householdId: number, productId: number | null, variantId: number | null,
+): string | null {
+  const pick = (row: Record<string, unknown> | undefined) => {
+    if (!row) return null;
+    const vals = Object.fromEntries(
+      NUTRIENT_PATCH_KEYS.map((k) => [k, row[k]]).filter(([, v]) => v != null && v !== 0),
+    );
+    return Object.keys(vals).length ? vals : null;
+  };
+  const variant = variantId != null
+    ? db.select().from(schema.productVariants)
+        .where(and(eq(schema.productVariants.id, variantId), eq(schema.productVariants.householdId, householdId))).all()[0]
+    : undefined;
+  const product = productId != null
+    ? db.select().from(schema.products)
+        .where(and(eq(schema.products.id, productId), eq(schema.products.householdId, householdId))).all()[0]
+    : undefined;
+  const vals = pick(variant as Record<string, unknown> | undefined) ?? pick(product as Record<string, unknown> | undefined);
+  return vals ? JSON.stringify(vals) : null;
+}
+
 export function updateProduct(
   db: Db,
   householdId: number,
@@ -255,6 +283,26 @@ export function deleteProduct(
       reason: `Can't delete: ${purchaseCount} ${purchaseCount === 1 ? "purchase references" : "purchases reference"} this product.`,
     };
   }
+  // Variants and eat-log entries hold a NOT NULL FK to this product, so they
+  // can't be nulled out like the references below — block instead, same as purchases.
+  const variantCount = db.select().from(schema.productVariants)
+    .where(and(eq(schema.productVariants.householdId, householdId), eq(schema.productVariants.productId, id)))
+    .all().length;
+  if (variantCount > 0) {
+    return {
+      ok: false,
+      reason: `Can't delete: ${variantCount} ${variantCount === 1 ? "variant references" : "variants reference"} this product.`,
+    };
+  }
+  const consumptionCount = db.select().from(schema.consumptions)
+    .where(and(eq(schema.consumptions.householdId, householdId), eq(schema.consumptions.productId, id)))
+    .all().length;
+  if (consumptionCount > 0) {
+    return {
+      ok: false,
+      reason: `Can't delete: ${consumptionCount} eaten-log ${consumptionCount === 1 ? "entry references" : "entries reference"} this product.`,
+    };
+  }
   // Clear the other (nullable) FK references first, else SQLite throws a
   // FOREIGN KEY constraint error that escapes as an unhandled 500.
   const scope = and(eq(schema.products.id, id), eq(schema.products.householdId, householdId));
@@ -267,6 +315,16 @@ export function deleteProduct(
     // A product shopping line with no productId would be a broken orphan, so drop it.
     tx.delete(schema.shoppingExtras)
       .where(and(eq(schema.shoppingExtras.householdId, householdId), eq(schema.shoppingExtras.productId, id)))
+      .run();
+    // Plan/rule/batch rows referencing this product keep their row, minus the link.
+    tx.update(schema.mealEvents).set({ productId: null })
+      .where(and(eq(schema.mealEvents.householdId, householdId), eq(schema.mealEvents.productId, id)))
+      .run();
+    tx.update(schema.mealRules).set({ productId: null })
+      .where(and(eq(schema.mealRules.householdId, householdId), eq(schema.mealRules.productId, id)))
+      .run();
+    tx.update(schema.batchItems).set({ productId: null })
+      .where(eq(schema.batchItems.productId, id))
       .run();
     return tx.delete(schema.products).where(scope).returning().all().length > 0;
   });

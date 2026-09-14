@@ -201,7 +201,7 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
           hasNutritionData(row) ? (
             <Check size={14} style={{ color: "var(--ok, green)", verticalAlign: "middle" }} />
           ) : (
-            <X size={14} style={{ color: "var(--muted, #999)", verticalAlign: "middle" }} />
+            <X size={14} style={{ color: "var(--ink-3)", verticalAlign: "middle" }} />
           ),
       },
     ],

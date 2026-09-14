@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { createRule } from "@/lib/rules";
+import { createRule, listRules } from "@/lib/rules";
+import { todayISO } from "@/lib/dates";
 
-function today(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+// List every recurring rule for the household (management/debugging view —
+// previously there was no way to see created rules other than via the agenda).
+export async function GET() {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  return NextResponse.json(listRules(db, session.user.householdId));
 }
 
 export async function POST(req: Request) {
@@ -16,10 +20,15 @@ export async function POST(req: Request) {
   const item = [b?.recipeId, b?.productId, b?.ingredientId].filter((v) => v != null).length;
   if (!b?.slotId || !b?.startDate || item !== 1)
     return NextResponse.json({ error: "slotId, startDate, and exactly one of recipeId/productId/ingredientId required" }, { status: 400 });
+  // A direct-ingredient rule needs a positive amount per occurrence — mirrors
+  // /api/events, which rejects the same case. Without this, createRule silently
+  // stores amount 0 and every materialized occurrence logs zero consumption.
+  if (b.ingredientId != null && (!Number.isFinite(Number(b.amount)) || Number(b.amount) <= 0))
+    return NextResponse.json({ error: "amount must be a positive number" }, { status: 400 });
   const unit = b.unit === "day" ? "day" : "week";
   const daysOfWeek = typeof b.daysOfWeek === "string" && /^[01]{7}$/.test(b.daysOfWeek)
     ? b.daysOfWeek : "1111111";
-  const rule = createRule(db, session.user.householdId, today(), {
+  const rule = createRule(db, session.user.householdId, todayISO(), {
     slotId: Number(b.slotId),
     recipeId: b.recipeId != null ? Number(b.recipeId) : null,
     productId: b.productId != null ? Number(b.productId) : null,

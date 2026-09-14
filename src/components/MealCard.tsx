@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Dropdown } from "@/components/Dropdown";
 import { QuantityChip } from "@/components/QuantityChip";
 import { Sheet } from "@/components/Sheet";
+import { Stepper } from "@/components/Stepper";
 
 type DeleteScope = "one" | "following" | "all";
 
@@ -54,6 +55,8 @@ export function MealCard({
   const [picked, setPicked] = useState<Record<number, Pick>>({});
   const [cookErr, setCookErr] = useState<string | null>(null);
   const [shortStock, setShortStock] = useState(false);
+  // Batch cook-ahead: cook this + the next N-1 planned days of the same meal.
+  const [days, setDays] = useState(1);
   const cooked = local === "cooked";
 
   async function doCook(allocations?: Record<number, Pick>, force = false) {
@@ -63,7 +66,7 @@ export function MealCard({
     const res = await fetch(`/api/events/${eventId}/cook`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ allocations: allocations ?? {}, force }),
+      body: JSON.stringify({ allocations: allocations ?? {}, force, days }),
     });
     setCooking(false);
     if (res.ok) {
@@ -133,7 +136,7 @@ export function MealCard({
             {cooking ? "Undoing…" : "Undo"}
           </button>
         ) : (
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button
               type="button"
               className="btn-add"
@@ -142,8 +145,11 @@ export function MealCard({
             >
               Remove
             </button>
+            {recurring && (
+              <Stepper value={days} min={1} onChange={setDays} />
+            )}
             <button type="button" className="btn" onClick={cook} disabled={cooking}>
-              {cooking ? "Cooking…" : "Cook it"}
+              {cooking ? "Cooking…" : days > 1 ? `Cook ${days} days` : "Cook it"}
             </button>
           </div>
         )}
@@ -151,7 +157,7 @@ export function MealCard({
 
       {cookErr && (
         <div style={{ marginTop: 8 }}>
-          <p className="notice">{cookErr}</p>
+          <p className="notice" role="alert">{cookErr}</p>
           {shortStock && (
             <button type="button" className="btn-add" disabled={cooking} onClick={() => doCook(undefined, true)}>
               {cooking ? "Cooking…" : "Cook anyway"}

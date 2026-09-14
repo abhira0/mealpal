@@ -1,7 +1,7 @@
-# MealPal Frontend Redesign — "Enamel & Label Tape" (locked design)
+# Platr Frontend Redesign — "Enamel & Label Tape" (locked design)
 
 > Implementation spec. The visual source of truth is the Design Lab screenshots in
-> `/private/tmp/claude-501/-Users-abhishekr-git-repos-mealpal/038731b3-2295-4329-bd91-9b7c43dd68d7/scratchpad/lab-*.png`
+> `/private/tmp/claude-501/-Users-abhishekr-git-repos-platr/038731b3-2295-4329-bd91-9b7c43dd68d7/scratchpad/lab-*.png`
 > (lab-d2..d7f). Match them. This doc gives exact tokens, component APIs, and per-page structure.
 
 **Goal:** Replace the current rough frontend with the locked, custom-built, mobile-first PWA. No native form controls.
@@ -94,7 +94,7 @@ body{background:var(--paper);color:var(--ink);font-family:var(--body);-webkit-fo
 - **Recipe detail** `recipes/[id]/page.tsx` (lab-d7e RD1): chrome "← Recipes" + title. Body single scroll: media block (YouTube embed / `<img>` / video by `kind`), `Stepper` for servings (rescales ingredient amounts live, client state), Ingredients list (name + `QuantityChip`), numbered Steps (teal `.num` markers), "Cook it · logs to today" `.btn` → needs an event; if opened standalone, POST a cooked event or call a cook endpoint (use existing `/api/events` then cook, or note as TODO if no direct recipe-cook endpoint). Data: `/api/recipes/:id`.
 - **Recipes list** `recipes/page.tsx` (lab-d7f i): search field (custom input, client filter) + recipe cards (thumbnail block + title + "Serves N · last cooked / N ingredients") linking to detail + "+ New recipe" `.btn` (opens a create form — can be a simple stub form posting `/api/recipes`).
 - **Manage** `manage/page.tsx` (lab-d7f ii): grouped rows — Catalog: Ingredients / Shops & branches / Products & prices (with counts) each linking to a sub-list+form; Account: email + household name, "Sign out" (server action `signOut`). Build the catalog sub-forms here (create ingredient/shop/branch/product/price) using custom controls; unit picker uses inline radio (g/ml/oz/count).
-- **Login** `login/page.tsx` (lab-d7f iii): keep existing register+`signIn` logic, restyle: chrome "MealPal" + "Welcome back", custom fields, paprika "Log in", register toggle (adds household name field). Preserve the working auth flow.
+- **Login** `login/page.tsx` (lab-d7f iii): keep existing register+`signIn` logic, restyle: chrome "Platr" + "Welcome back", custom fields, paprika "Log in", register toggle (adds household name field). Preserve the working auth flow.
 
 ## API contract (unchanged; call by URL)
 `GET/POST /api/ingredients`, `PATCH /api/ingredients/:id`; `GET/POST /api/shops`; `GET/POST /api/branches?shopId=`; `GET/POST /api/products?ingredientId=`, `POST /api/products/:id/price {dollars}`; `GET /api/recipes`, `GET /api/recipes/:id`, `POST /api/recipes`; `GET/POST /api/slots`; `GET /api/events?from=&to=`, `POST /api/events`, `POST /api/events/:id/cook`; `GET/POST /api/stock`; `GET /api/shopping`; `POST /api/purchases {productId,quantity,dollars}`. All scoped to the session household.

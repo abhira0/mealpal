@@ -91,6 +91,32 @@ describe("agendaDays", () => {
     expect(days[0].eatenCount).toBe(1);
   });
 
+  it("does not overlay a batch onto unrelated meals sharing its slot, nor onto days outside its window", () => {
+    const oats = makeRecipe("Overnight Oats");
+    const chapati = makeRecipe("Chapati Sabzi");
+    // batch of Chapati (2-day window) lives in the same slot as a daily Oats meal
+    packBatch(db, hid, {
+      slotId: lunchSlot, label: "Chapati batch", cookedDate: "2026-08-09", mealsTotal: 2,
+      items: [{ recipeId: chapati }],
+    });
+    for (const d of ["2026-08-09", "2026-08-10", "2026-08-11"]) {
+      db.insert(schema.mealEvents).values({
+        householdId: hid, date: d, slotId: lunchSlot, recipeId: oats, servings: 1, status: "planned",
+      }).run();
+    }
+
+    const days = agendaDays(db, hid, "2026-08-09", "2026-08-11", "2026-08-09");
+    for (const day of days) {
+      const oatsMeal = day.meals.find((m) => m.name === "Overnight Oats")!;
+      expect(oatsMeal.batchBacked).toBe(false); // never inherits the Chapati batch
+      expect(oatsMeal.mealsRemaining).toBeNull();
+      expect(oatsMeal.phase).toBe("planned"); // stays planned, not falsely COOKED
+    }
+    // Chapati batch surfaces as its own row only on its 2 covered days
+    const chapatiDays = days.filter((d) => d.meals.some((m) => m.name === "Chapati batch"));
+    expect(chapatiDays.map((d) => d.date)).toEqual(["2026-08-09", "2026-08-10"]);
+  });
+
   it("flags the day a batch runs out (today + mealsRemaining days) for its slot", () => {
     packBatch(db, hid, {
       slotId: dinnerSlot, label: "Chapathi batch", cookedDate: "2026-08-09", mealsTotal: 2, items: [],
@@ -104,6 +130,26 @@ describe("agendaDays", () => {
     ]);
     expect(byDate.get("2026-08-09")!.cookFlags).toEqual([]);
     expect(byDate.get("2026-08-10")!.cookFlags).toEqual([]);
+    expect(byDate.get("2026-08-12")!.cookFlags).toEqual([]);
+  });
+
+  it("rolls a skipped serving forward: coverage runs off what's left, not the calendar", () => {
+    const batch = packBatch(db, hid, {
+      slotId: dinnerSlot, label: "Chapathi sabzi", cookedDate: "2026-08-09", mealsTotal: 3, items: [],
+    });
+    // Ate on the cook day, then skipped 08-10 entirely. 2 servings still left on 08-11.
+    eatFromBatch(db, hid, batch.id, "2026-08-09");
+
+    const days = agendaDays(db, hid, "2026-08-09", "2026-08-14", "2026-08-11");
+    const byDate = new Map(days.map((d) => [d.date, d]));
+
+    // still on the plate through 08-12, not cut off at the original 08-11 window
+    expect(byDate.get("2026-08-12")!.meals.some((m) => m.batchId === batch.id)).toBe(true);
+    expect(byDate.get("2026-08-13")!.meals.some((m) => m.batchId === batch.id)).toBe(false);
+    // runs out on 08-13, one day later than the original cook + 3 window
+    expect(byDate.get("2026-08-13")!.cookFlags).toEqual([
+      { slotId: dinnerSlot, slotName: "Dinner", label: "Chapathi sabzi" },
+    ]);
     expect(byDate.get("2026-08-12")!.cookFlags).toEqual([]);
   });
 
@@ -136,10 +182,12 @@ describe("agendaDays", () => {
     expect(day2.meals).toHaveLength(1);
     expect(day2.meals[0]).toMatchObject({ eventId: null, batchBacked: true, batchId: batch.id, name: "Rice Bowl" });
 
-    // cook-flag lands the day AFTER the coverage window (cookedDate + mealsTotal)
-    expect(byDate.get("2026-08-12")!.cookFlags).toEqual([
+    // lunch slot -> cook the night before the day it runs out
+    // (coverage ends 08-11, base cook 08-12, minus 1 day lead)
+    expect(byDate.get("2026-08-11")!.cookFlags).toEqual([
       { slotId: lunchSlot, slotName: "Lunch", label: "Rice Bowl" },
     ]);
+    expect(byDate.get("2026-08-12")!.cookFlags).toEqual([]);
     expect(byDate.get("2026-08-13")!.cookFlags).toEqual([]);
   });
 
@@ -221,7 +269,7 @@ describe("nextCooks", () => {
 
     const result = nextCooks(db, hid, "2026-08-09");
     expect(result).toEqual([
-      { slotId: lunchSlot, slotName: "Lunch", label: "Rice Bowl", cookDate: "2026-08-13", daysAway: 4 },
+      { slotId: lunchSlot, slotName: "Lunch", label: "Rice Bowl", cookDate: "2026-08-12", daysAway: 3 },
       { slotId: dinnerSlot, slotName: "Dinner", label: "Chicken Curry", cookDate: "2026-08-15", daysAway: 6 },
     ]);
   });
@@ -237,11 +285,23 @@ describe("nextCooks", () => {
     const result = nextCooks(db, hid, "2026-08-09");
     expect(result).toHaveLength(1);
     expect(result[0].label).toBe("Newer");
-    expect(result[0].cookDate).toBe("2026-08-11");
+    expect(result[0].cookDate).toBe("2026-08-10"); // lunch slot -> cook the night before
   });
 
   it("returns an empty array when there are no active batches", () => {
     expect(nextCooks(db, hid, "2026-08-09")).toEqual([]);
+  });
+
+  it("slides an old batch's cook date forward by what's left, not by when it was cooked", () => {
+    // Cooked 8 days ago but nothing eaten: 2 servings still cover the next 2 days.
+    packBatch(db, hid, {
+      slotId: lunchSlot, label: "Old Rice Bowl", cookedDate: "2026-08-01", mealsTotal: 2, items: [],
+    });
+
+    const result = nextCooks(db, hid, "2026-08-09");
+    expect(result).toHaveLength(1);
+    expect(result[0].cookDate).toBe("2026-08-10"); // 2026-08-09 + 2 left - 1 (lunch cook-lead)
+    expect(result[0].daysAway).toBe(1);
   });
 
   it("surfaces a recurring recipe meal's next planned occurrence as a prep entry", () => {
@@ -255,7 +315,7 @@ describe("nextCooks", () => {
 
     const result = nextCooks(db, hid, "2026-08-09");
     expect(result).toContainEqual({
-      slotId: lunchSlot, slotName: "Lunch", label: "Overnight Oats", cookDate: "2026-08-10", daysAway: 1,
+      slotId: lunchSlot, slotName: "Lunch", label: "Overnight Oats", cookDate: "2026-08-09", daysAway: 0,
     });
   });
 
@@ -270,6 +330,6 @@ describe("nextCooks", () => {
 
     const result = nextCooks(db, hid, "2026-08-09");
     const oatsEntry = result.find((r) => r.label === "Overnight Oats");
-    expect(oatsEntry?.cookDate).toBe("2026-08-12");
+    expect(oatsEntry?.cookDate).toBe("2026-08-11"); // lunch slot -> cook the night before
   });
 });

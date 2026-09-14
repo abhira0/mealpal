@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import { makeTestDb, type TestDb } from "@/test/db";
 import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
@@ -38,5 +39,28 @@ describe("variants CRUD", () => {
     const v = createVariant(db, hid, productId, { name: "Mega Omega" })!;
     expect(updateVariant(db, other, v.id, { calories: 5 })).toBeUndefined();
     expect(deleteVariant(db, other, v.id)).toBe(false);
+  });
+
+  it("deletes a variant that's referenced by stock movements/events/rules without a FK error", () => {
+    const v = createVariant(db, hid, productId, { name: "Mega Omega" })!;
+    const slotId = db.insert(schema.mealSlots).values({ householdId: hid, name: "Snack" }).returning().all()[0].id;
+    const ing = db.select().from(schema.products).where(eq(schema.products.id, productId)).all()[0].ingredientId;
+    db.insert(schema.stockMovements).values({
+      householdId: hid, ingredientId: ing, productId, variantId: v.id, delta: -1, reason: "eaten",
+    }).run();
+    db.insert(schema.mealEvents).values({
+      householdId: hid, date: "2026-01-01", slotId, productId, variantId: v.id, servings: 1,
+    }).run();
+    db.insert(schema.mealRules).values({
+      householdId: hid, slotId, productId, variantId: v.id, startDate: "2026-01-01",
+    }).run();
+
+    expect(() => deleteVariant(db, hid, v.id)).not.toThrow();
+    expect(deleteVariant(db, hid, v.id)).toBe(false); // already gone
+
+    // referencing rows survive with the link cleared
+    expect(db.select().from(schema.stockMovements).all()[0].variantId).toBeNull();
+    expect(db.select().from(schema.mealEvents).all()[0].variantId).toBeNull();
+    expect(db.select().from(schema.mealRules).all()[0].variantId).toBeNull();
   });
 });

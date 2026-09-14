@@ -3,7 +3,8 @@
 import type { Nutrients } from "@/lib/nutrition";
 import { EChart } from "@/components/EChart";
 
-export const MACRO_COLOR = { protein: "#115E59", carbs: "#E0A526", fat: "#D1492C" };
+// Chart-only macro hues (DESIGN.md): protein = accent teal, carbs, fat.
+export const MACRO_COLOR = { protein: "#1E7A8C", carbs: "#E0A63A", fat: "#E0684A" };
 
 const pctOf = (value: number, goal: number | null) =>
   goal && goal > 0 ? Math.round((value / goal) * 100) : null;
@@ -24,7 +25,10 @@ export function CalorieMacroRing({ cal, macros, goal, n }: {
     p.seriesType === "gauge"
       ? `Calories: ${Math.round(p.value)} / ${goal} kcal · ${pctOf(p.value, goal) ?? 0}%`
       : `${p.name}: ${p.value}% of calories · ${p.data?.grams ?? 0} g`;
+  const reduceMotion =
+    typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
   const option = {
+    animation: !reduceMotion,
     tooltip: { trigger: "item", formatter: tip },
     legend: {
       bottom: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 11 },
@@ -32,7 +36,7 @@ export function CalorieMacroRing({ cal, macros, goal, n }: {
     },
     series: [
       {
-        name: "Macros", type: "pie", radius: ["42%", "62%"], center: ["50%", "46%"],
+        name: "Macros", type: "pie", radius: ["46%", "68%"], center: ["50%", "46%"],
         avoidLabelOverlap: false, label: { show: false }, labelLine: { show: false },
         emphasis: { scaleSize: 6, itemStyle: { shadowBlur: 6, shadowColor: "rgba(0,0,0,0.2)" } },
         data: [
@@ -42,14 +46,14 @@ export function CalorieMacroRing({ cal, macros, goal, n }: {
         ],
       },
       {
-        type: "gauge", radius: "92%", center: ["50%", "46%"], startAngle: 90, endAngle: -270,
+        type: "gauge", radius: "80%", center: ["50%", "46%"], startAngle: 90, endAngle: -270,
         min: 0, max: goal || 1, silent: false,
-        progress: { show: true, width: 7, roundCap: true, itemStyle: { color: MACRO_COLOR.protein } },
-        axisLine: { lineStyle: { width: 7, color: [[1, "#e3ddcc"]] } },
+        progress: { show: true, width: 8, roundCap: true, itemStyle: { color: MACRO_COLOR.protein } },
+        axisLine: { lineStyle: { width: 8, color: [[1, "#DADFE4"]] } },
         pointer: { show: false }, axisTick: { show: false }, splitLine: { show: false }, axisLabel: { show: false },
         anchor: { show: false },
         detail: {
-          offsetCenter: [0, "-4%"], fontSize: 24, fontWeight: 800, color: "#20262B",
+          offsetCenter: [0, "-4%"], fontSize: 24, fontWeight: 700, color: "#16191C",
           formatter: (v: number) => String(Math.round(v)),
         },
         title: { show: false },

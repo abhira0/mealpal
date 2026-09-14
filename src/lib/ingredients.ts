@@ -174,15 +174,40 @@ export function deleteIngredient(
       reason: `Can't delete: ${recipeRefCount} ${recipeRefCount === 1 ? "recipe uses" : "recipes use"} this ingredient.`,
     };
   }
-  const rows = db
-    .delete(schema.ingredients)
-    .where(
-      and(
-        eq(schema.ingredients.id, id),
-        eq(schema.ingredients.householdId, householdId),
-      ),
-    )
-    .returning()
-    .all();
-  return { ok: true, deleted: rows.length > 0 };
+  // stock_movements.ingredientId is a NOT NULL FK — can't null it out like the
+  // nullable references below, so block instead (same as products/recipes above).
+  const movementCount = db
+    .select()
+    .from(schema.stockMovements)
+    .where(and(eq(schema.stockMovements.householdId, householdId), eq(schema.stockMovements.ingredientId, id)))
+    .all().length;
+  if (movementCount > 0) {
+    return {
+      ok: false,
+      reason: `Can't delete: ${movementCount} stock ${movementCount === 1 ? "movement references" : "movements reference"} this ingredient.`,
+    };
+  }
+  const deleted = db.transaction((tx) => {
+    // Direct-ingredient plan/rule/batch rows keep their row, minus the link.
+    tx.update(schema.mealEvents).set({ ingredientId: null })
+      .where(and(eq(schema.mealEvents.householdId, householdId), eq(schema.mealEvents.ingredientId, id)))
+      .run();
+    tx.update(schema.mealRules).set({ ingredientId: null })
+      .where(and(eq(schema.mealRules.householdId, householdId), eq(schema.mealRules.ingredientId, id)))
+      .run();
+    tx.update(schema.batchItems).set({ ingredientId: null })
+      .where(eq(schema.batchItems.ingredientId, id))
+      .run();
+    return tx
+      .delete(schema.ingredients)
+      .where(
+        and(
+          eq(schema.ingredients.id, id),
+          eq(schema.ingredients.householdId, householdId),
+        ),
+      )
+      .returning()
+      .all();
+  });
+  return { ok: true, deleted: deleted.length > 0 };
 }

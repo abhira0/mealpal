@@ -63,3 +63,8 @@ next-env.d.ts
 # cached recipe video clips (downloaded + trimmed from YouTube on demand)
 /public/clips/
 /.cache/
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+.beads-credential-key
+.beads/proxieddb/

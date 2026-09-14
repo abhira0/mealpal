@@ -8,6 +8,7 @@ type SheetProps = {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  wide?: boolean; // desktop: roomy centered modal instead of the 520px one
 };
 
 const FOCUSABLE =
@@ -18,7 +19,7 @@ const FOCUSABLE =
  * into the sheet on open, Escape + scrim-click close, focus returns to the
  * triggering element on close. Reduced-motion is handled in globals.css.
  */
-export function Sheet({ open, title, onClose, children }: SheetProps) {
+export function Sheet({ open, title, onClose, children, wide = false }: SheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const titleId = useId();
@@ -91,7 +92,7 @@ export function Sheet({ open, title, onClose, children }: SheetProps) {
     <>
       <div className="scrim" onClick={onClose} aria-hidden="true" />
       <div
-        className="sheet"
+        className={`sheet${wide ? " wide" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

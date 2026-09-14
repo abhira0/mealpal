@@ -1,4 +1,4 @@
-# MealPal Catalog Implementation Plan
+# Platr Catalog Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -129,7 +129,7 @@ npm run db:migrate
 Expected: a new `drizzle/0001_*.sql` is created and applied. Verify:
 
 ```bash
-sqlite3 mealpal.db ".tables"
+sqlite3 platr.db ".tables"
 ```
 
 Expected output includes `ingredients`, `shops`, `branches`, `products`, `prices`.

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { QuantityChip } from "@/components/QuantityChip";
 import { Favicon } from "@/components/Favicon";
 import { centsToDollars } from "@/lib/money";
-import { formatQty } from "@/lib/units";
+import { formatQty, packsNeeded } from "@/lib/units";
 
 export type ShopLine = {
   ingredientId: number;
@@ -144,10 +144,14 @@ function ShopLineRow({
     setBusy(true);
     setError(null);
     if (!struck) {
+      // Buy however many packs actually cover what's needed (same count shown
+      // in the "buy ×N" chip) — a single tap should fully restock the line,
+      // not just one pack when several are needed.
+      const quantity = line.product.packSize ? packsNeeded(line.needed, line.product.packSize) : 1;
       const res = await fetch("/api/purchases", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ productId: line.product.id, quantity: 1 }),
+        body: JSON.stringify({ productId: line.product.id, quantity }),
       });
       setBusy(false);
       if (res.ok) onChange(true, (await res.json()).id);
@@ -187,7 +191,7 @@ function ShopLineRow({
           ) : (
             <>
               {line.product?.packSize ? (
-                <QuantityChip value={`buy ×${Math.ceil(line.needed / line.product.packSize)}`} tone="default" />
+                <QuantityChip value={`buy ×${packsNeeded(line.needed, line.product.packSize)}`} tone="default" />
               ) : null}
               <QuantityChip value={`need ${formatNeeded(line)}`} tone="default" />
             </>

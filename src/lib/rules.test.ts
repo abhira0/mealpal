@@ -4,8 +4,9 @@ import { seedHousehold } from "@/test/fixtures";
 import { createRecipe } from "@/lib/recipes";
 import { createSlot } from "@/lib/slots";
 import { addEvent, listEvents, deleteEvent } from "@/lib/plan";
-import { matchingDates, createRule, topUpRules } from "@/lib/rules";
+import { matchingDates, createRule, topUpRules, listRules, updateRuleRecurrence } from "@/lib/rules";
 import { schema } from "@/db";
+import { eq } from "drizzle-orm";
 
 let db: TestDb;
 let hid: number;
@@ -135,5 +136,55 @@ describe("rule materialization", () => {
     expect(listEvents(db, hid, "2026-06-01", "2026-06-30")).toHaveLength(0);
     topUpRules(db, hid, "2026-06-30");
     expect(listEvents(db, hid, "2026-06-01", "2026-06-30")).toHaveLength(0);
+  });
+});
+
+describe("listRules", () => {
+  it("returns only this household's rules", () => {
+    createRule(db, hid, "2026-06-01", { slotId, recipeId, servings: 1, ...base });
+    const otherHid = seedHousehold(db);
+    const otherSlot = createSlot(db, otherHid, "Dinner", "18:00").id;
+    const otherRecipe = createRecipe(db, otherHid, {
+      name: "Soup", baseServings: 1, notes: null, ingredients: [], steps: [], media: [],
+    }).id;
+    createRule(db, otherHid, "2026-06-01", { slotId: otherSlot, recipeId: otherRecipe, servings: 1, ...base });
+
+    const mine = listRules(db, hid);
+    expect(mine).toHaveLength(1);
+    expect(mine[0].recipeId).toBe(recipeId);
+  });
+});
+
+describe("updateRuleRecurrence", () => {
+  it("re-spaces future occurrences and keeps cooked history", () => {
+    const today = "2026-06-01";
+    const rule = createRule(db, hid, today, {
+      slotId, recipeId, servings: 1, ...base, unit: "day", intervalN: 3, startDate: today,
+    });
+    // pretend the first occurrence was cooked
+    db.update(schema.mealEvents).set({ status: "cooked" })
+      .where(eq(schema.mealEvents.date, today)).run();
+
+    updateRuleRecurrence(db, hid, rule.id, today, { intervalN: 1, unit: "day", daysOfWeek: "1111111" });
+
+    const dates = listEvents(db, hid, "2026-06-01", "2026-06-05").map((e) => e.date);
+    expect(dates).toEqual(["2026-06-01", "2026-06-02", "2026-06-03", "2026-06-04", "2026-06-05"]);
+    expect(listEvents(db, hid, today, today)[0].status).toBe("cooked");
+  });
+
+  it("moves every item added in the same meal, not just the edited one", () => {
+    const today = "2026-06-01";
+    const rice = createRecipe(db, hid, {
+      name: "Rice", baseServings: 1, notes: null, ingredients: [], steps: [], media: [],
+    }).id;
+    const a = createRule(db, hid, today, { slotId, recipeId, servings: 1, ...base, unit: "day", intervalN: 3, startDate: today });
+    const b = createRule(db, hid, today, { slotId, recipeId: rice, servings: 1, ...base, unit: "day", intervalN: 3, startDate: today });
+
+    updateRuleRecurrence(db, hid, a.id, today, { intervalN: 1, unit: "day", daysOfWeek: "1111111" });
+
+    const rules = listRules(db, hid);
+    expect(rules.find((r) => r.id === a.id)!.intervalN).toBe(1);
+    expect(rules.find((r) => r.id === b.id)!.intervalN).toBe(1);
+    expect(listEvents(db, hid, "2026-06-02", "2026-06-02").length).toBe(2); // both items on an off-cadence day
   });
 });

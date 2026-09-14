@@ -7,6 +7,7 @@ import { CalorieMacroRing } from "@/components/CalorieMacroRing";
 // Daily calorie/macro goals form for /manage/goals; auto-saves via /api/nutrition/goals.
 export function GoalsEditor() {
   const [form, setForm] = useState<Goals | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/nutrition/goals", { cache: "no-store" })
@@ -23,18 +24,28 @@ export function GoalsEditor() {
     const t = setTimeout(() => {
       fetch("/api/nutrition/goals", {
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form),
-      });
+      })
+        .then((r) => setError(r.ok ? null : "Couldn't save — check your goal values."))
+        .catch(() => setError("Couldn't save — check your connection."));
     }, 500);
     return () => clearTimeout(t);
   }, [form]);
 
   if (!form) return <p style={{ opacity: 0.6 }}>Loading…</p>;
 
+  // Number inputs let a user type "-" or clear the box entirely; `min` only
+  // affects the spinner/native validity, not what the keystroke produces. A
+  // negative or non-finite goal would sail past the field, break the ring's
+  // percentages, and get rejected by the API with no visible feedback — so
+  // clamp to a non-negative integer here, at the one place values enter state.
   const field = (key: keyof Goals, label: string) => (
     <label className="field">
       <span className="field-label">{label}</span>
       <input className="input" type="number" min={0} value={form[key]}
-        onChange={(e) => setForm({ ...form, [key]: Number(e.target.value) })} />
+        onChange={(e) => {
+          const n = Math.round(Number(e.target.value));
+          setForm({ ...form, [key]: Number.isFinite(n) ? Math.max(0, n) : 0 });
+        }} />
     </label>
   );
 
@@ -45,6 +56,7 @@ export function GoalsEditor() {
 
   return (
     <>
+      {error && <p className="notice" role="alert">{error}</p>}
       {field("calorieGoal", "Calories")}
       {field("proteinG", "Protein (g)")}
       {field("carbsG", "Carbs (g)")}

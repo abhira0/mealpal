@@ -4,7 +4,8 @@ import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
 import { createRecipe } from "@/lib/recipes";
 import { createSlot } from "@/lib/slots";
-import { addEvent, updateEvent, listEvents, cookEvent, uncookEvent, serveEvent, unserveEvent, deleteEvent, plannedConsumption, runOutDates } from "@/lib/plan";
+import { addEvent, updateEvent, listEvents, cookEvent, uncookEvent, serveEvent, unserveEvent, deleteEvent, plannedConsumption, runOutDates, cookBatch, cookScope, ShortStock } from "@/lib/plan";
+import { createRule } from "@/lib/rules";
 import { currentStock } from "@/lib/stock";
 import { createProduct } from "@/lib/products";
 import { createVariant } from "@/lib/variants";
@@ -47,11 +48,84 @@ describe("meal plan", () => {
     expect(listEvents(db, hid, "2026-07-05", "2026-07-05")).toHaveLength(1);
   });
 
+  it("scoped edit of a repeating meal updates the rule and its occurrences", () => {
+    const rule = createRule(db, hid, "2026-07-01", {
+      slotId, recipeId, servings: 2, intervalN: 1, unit: "day",
+      daysOfWeek: "1111111", startDate: "2026-07-01", untilDate: "2026-07-05",
+    });
+    const evs = listEvents(db, hid, "2026-07-01", "2026-07-05");
+    expect(evs).toHaveLength(5);
+    const third = evs[2]; // 2026-07-03
+
+    updateEvent(db, hid, third.id, { date: third.date, slotId, recipeId, servings: 5 }, "following");
+    const after = listEvents(db, hid, "2026-07-01", "2026-07-05");
+    expect(after.map((e) => e.servings)).toEqual([2, 2, 5, 5, 5]);
+    expect(db.select().from(schema.mealRules).all().find((r) => r.id === rule.id)?.servings).toBe(5);
+
+    updateEvent(db, hid, third.id, { date: third.date, slotId, recipeId, servings: 1 }, "all");
+    expect(listEvents(db, hid, "2026-07-01", "2026-07-05").map((e) => e.servings)).toEqual([1, 1, 1, 1, 1]);
+  });
+
+  it("cookScope cooks by recurring scope (one / following / all)", () => {
+    const rule = createRule(db, hid, "2026-07-01", {
+      slotId, recipeId, servings: 2, intervalN: 1, unit: "day",
+      daysOfWeek: "1111111", startDate: "2026-07-01", untilDate: "2026-07-05",
+    });
+    void rule;
+    const evs = listEvents(db, hid, "2026-07-01", "2026-07-05");
+    expect(evs).toHaveLength(5);
+    const statuses = () => listEvents(db, hid, "2026-07-01", "2026-07-05").map((e) => e.status);
+
+    // one: only the third day cooks (force → no stock needed).
+    cookScope(db, hid, evs[2].id, "one", undefined, true);
+    expect(statuses()).toEqual(["planned", "planned", "cooked", "planned", "planned"]);
+
+    // following: from day 2 onward, still-planned ones cook (day 3 already cooked).
+    cookScope(db, hid, evs[1].id, "following", undefined, true);
+    expect(statuses()).toEqual(["planned", "cooked", "cooked", "cooked", "cooked"]);
+
+    // all: the remaining planned day 1 cooks too.
+    cookScope(db, hid, evs[0].id, "all", undefined, true);
+    expect(statuses()).toEqual(["cooked", "cooked", "cooked", "cooked", "cooked"]);
+  });
+
+  it("cookScope without force throws ShortStock and rolls back the whole batch", () => {
+    createRule(db, hid, "2026-07-01", {
+      slotId, recipeId, servings: 2, intervalN: 1, unit: "day",
+      daysOfWeek: "1111111", startDate: "2026-07-01", untilDate: "2026-07-03",
+    });
+    const evs = listEvents(db, hid, "2026-07-01", "2026-07-03");
+    expect(() => cookScope(db, hid, evs[0].id, "all")).toThrow(ShortStock);
+    // nothing committed
+    expect(listEvents(db, hid, "2026-07-01", "2026-07-03").every((e) => e.status === "planned")).toBe(true);
+  });
+
   it("refuses to edit a cooked/served event (returns null)", () => {
     const ev = addEvent(db, hid, { date: "2026-07-01", slotId, recipeId, servings: 2 });
     cookEvent(db, hid, ev.id);
     expect(updateEvent(db, hid, ev.id, { date: "2026-07-01", slotId, recipeId, servings: 4 })).toBeNull();
     expect(listEvents(db, hid, "2026-07-01", "2026-07-01")[0].servings).toBe(2); // unchanged
+  });
+
+  it("rejects addEvent/updateEvent refs (slot, recipe, ingredient, product) from another household", () => {
+    const otherHid = seedHousehold(db);
+    const otherSlot = createSlot(db, otherHid, "Dinner", "18:00").id;
+    const otherIngredient = db.insert(schema.ingredients)
+      .values({ householdId: otherHid, name: "Sugar", canonicalUnit: "g" }).returning().all()[0].id;
+    const otherRecipe = createRecipe(db, otherHid, {
+      name: "Cake", baseServings: 1, notes: null, ingredients: [], steps: [], media: [],
+    }).id;
+
+    expect(() => addEvent(db, hid, { date: "2026-07-01", slotId: otherSlot, servings: 1 }))
+      .toThrow(/slot not found/);
+    expect(() => addEvent(db, hid, { date: "2026-07-01", slotId, recipeId: otherRecipe, servings: 1 }))
+      .toThrow(/recipe not found/);
+    expect(() => addEvent(db, hid, { date: "2026-07-01", slotId, ingredientId: otherIngredient, amount: 10, servings: 1 }))
+      .toThrow(/ingredient not found/);
+
+    const ev = addEvent(db, hid, { date: "2026-07-01", slotId, recipeId, servings: 2 });
+    expect(() => updateEvent(db, hid, ev.id, { date: "2026-07-01", slotId: otherSlot, recipeId, servings: 2 }))
+      .toThrow(/slot not found/);
   });
 
   it("sums planned consumption across the horizon (scaled by servings)", () => {
@@ -243,5 +317,44 @@ describe("direct items in a planner slot", () => {
     expect(ev.amount).toBe(86);
     cookEvent(db, hid, ev.id);
     expect(currentStock(db, hid, flourId)).toBe(914); // 1000 - 86, attributed to this product
+  });
+});
+
+describe("cookBatch (cook once, cover N planned days)", () => {
+  let productId: number;
+  beforeEach(() => {
+    const shopId = db.insert(schema.shops).values({ householdId: hid, name: "Costco" }).returning().all()[0].id;
+    productId = createProduct(db, hid, {
+      ingredientId: flourId, shopId, name: "AP Flour", packSize: 3000, priority: 1, url: null,
+    }).id;
+  });
+
+  it("cooks the next N matching planned days and depletes stock per day, leaving others planned", () => {
+    recordPurchase(db, hid, { productId, quantity: 1 }); // +3000g
+    const lunch = createSlot(db, hid, "Lunch", "12:00").id;
+    const d1 = addEvent(db, hid, { date: "2026-07-01", slotId, recipeId, servings: 2 }); // 500g
+    addEvent(db, hid, { date: "2026-07-02", slotId, recipeId, servings: 2 });            // 500g
+    addEvent(db, hid, { date: "2026-07-03", slotId, recipeId, servings: 2 });            // stays planned
+    addEvent(db, hid, { date: "2026-07-01", slotId: lunch, recipeId, servings: 2 });     // other slot: untouched
+
+    const cooked = cookBatch(db, hid, d1.id, 2);
+    expect(cooked).toHaveLength(2);
+    const dinners = listEvents(db, hid, "2026-07-01", "2026-07-03").filter((e) => e.slotId === slotId);
+    expect(dinners.map((e) => e.status)).toEqual(["cooked", "cooked", "planned"]);
+    expect(listEvents(db, hid, "2026-07-01", "2026-07-01").find((e) => e.slotId === lunch)?.status).toBe("planned");
+    expect(currentStock(db, hid, flourId)).toBe(2000); // 3000 - 2×500
+  });
+
+  it("rolls the whole batch back when a later day is short on stock (no force)", () => {
+    // Only enough for one day; day 2's stock check fails → transaction rolls back.
+    const shopId = db.insert(schema.shops).values({ householdId: hid, name: "Aldi" }).returning().all()[0].id;
+    const small = createProduct(db, hid, { ingredientId: flourId, shopId, name: "Flour 500", packSize: 500, priority: 2, url: null }).id;
+    recordPurchase(db, hid, { productId: small, quantity: 1 }); // +500g, exactly one meal
+    const d1 = addEvent(db, hid, { date: "2026-07-01", slotId, recipeId, servings: 2 });
+    addEvent(db, hid, { date: "2026-07-02", slotId, recipeId, servings: 2 });
+
+    expect(() => cookBatch(db, hid, d1.id, 2)).toThrow(ShortStock);
+    expect(listEvents(db, hid, "2026-07-01", "2026-07-02").map((e) => e.status)).toEqual(["planned", "planned"]);
+    expect(currentStock(db, hid, flourId)).toBe(500); // untouched
   });
 });

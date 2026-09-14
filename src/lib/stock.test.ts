@@ -4,7 +4,7 @@ import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
 import {
   recordMovement, currentStock, stockByIngredient, expiryByIngredient,
-  lotsByProduct, allocateFEFO, adjustStock, stockByProduct,
+  lotsByProduct, allocateFEFO, adjustStock, stockByProduct, ownsStockRefs,
 } from "@/lib/stock";
 
 let db: TestDb;
@@ -64,6 +64,36 @@ describe("stock ledger", () => {
       .values({ householdId: hid, productId, quantity: 1, expiresAt: "2026-08-19" }).returning().all()[0].id;
     recordMovement(db, hid, { ingredientId: flourId, productId, delta: 1000, reason: "purchase", purchaseId: newLot });
     expect(expiryByIngredient(db, hid).get(flourId)).toBe("2026-08-19");
+  });
+});
+
+describe("ownsStockRefs", () => {
+  it("accepts refs that belong to the household, rejects ones from another", () => {
+    const otherHid = seedHousehold(db);
+    const shopId = db.insert(schema.shops).values({ householdId: hid, name: "Mart" }).returning().all()[0].id;
+    const productId = db.insert(schema.products)
+      .values({ householdId: hid, ingredientId: flourId, shopId, name: "Flour 1kg", packSize: 1000 })
+      .returning().all()[0].id;
+    const purchaseId = db.insert(schema.purchases)
+      .values({ householdId: hid, productId, quantity: 1 }).returning().all()[0].id;
+
+    expect(ownsStockRefs(db, hid, flourId, productId, purchaseId)).toBe(true);
+    expect(ownsStockRefs(db, hid, flourId)).toBe(true); // productId/purchaseId optional
+
+    const otherIngredient = db.insert(schema.ingredients)
+      .values({ householdId: otherHid, name: "Sugar", canonicalUnit: "g" }).returning().all()[0].id;
+    expect(ownsStockRefs(db, hid, otherIngredient)).toBe(false);
+    expect(ownsStockRefs(db, otherHid, flourId)).toBe(false);
+
+    const otherShopId = db.insert(schema.shops).values({ householdId: otherHid, name: "Other Mart" }).returning().all()[0].id;
+    const otherProductId = db.insert(schema.products)
+      .values({ householdId: otherHid, ingredientId: otherIngredient, shopId: otherShopId, name: "Sugar 1kg", packSize: 1000 })
+      .returning().all()[0].id;
+    expect(ownsStockRefs(db, hid, flourId, otherProductId)).toBe(false);
+
+    const otherPurchaseId = db.insert(schema.purchases)
+      .values({ householdId: otherHid, productId: otherProductId, quantity: 1 }).returning().all()[0].id;
+    expect(ownsStockRefs(db, hid, flourId, productId, otherPurchaseId)).toBe(false);
   });
 });
 

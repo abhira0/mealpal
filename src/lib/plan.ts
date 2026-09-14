@@ -1,7 +1,7 @@
 import { and, asc, eq, gte, inArray, lte } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
-import { type CookAllocations, consumptionLinesForEvent, recordCookedForEvent } from "@/lib/consumption";
+import { type CookAllocations, consumptionLinesForEvent, recordCookedForEvent, unstockedIngredients } from "@/lib/consumption";
 import { skipDay, endSeriesFrom, deleteRule } from "@/lib/rules";
 
 type Db = BetterSQLite3Database<typeof schema>;
@@ -47,7 +47,48 @@ function resolveQuantity(db: Db, householdId: number, input: EventInput): { serv
   return { servings, amount };
 }
 
+// Every id on EventInput is a foreign key coming straight off a request body
+// (slotId, recipeId, ingredientId, productId, variantId). resolveQuantity
+// only *reads* productId/variantId scoped to the household — a missing row
+// there quietly falls back to perServing=1 rather than rejecting, so an id
+// belonging to another household would otherwise sail through and get
+// written onto this household's mealEvents row. Route-level checks cover
+// some of these per-endpoint, but not all (e.g. ingredientId is unchecked in
+// both POST and PATCH /api/events); guard here so the guarantee holds
+// regardless of the caller.
+function assertOwnedRefs(db: Db, householdId: number, input: EventInput) {
+  const owns = (exists: boolean, what: string) => {
+    if (!exists) throw new Error(`${what} not found in household`);
+  };
+  if (input.slotId != null) {
+    const [row] = db.select({ id: schema.mealSlots.id }).from(schema.mealSlots)
+      .where(and(eq(schema.mealSlots.id, input.slotId), eq(schema.mealSlots.householdId, householdId))).all();
+    owns(!!row, "slot");
+  }
+  if (input.recipeId != null) {
+    const [row] = db.select({ id: schema.recipes.id }).from(schema.recipes)
+      .where(and(eq(schema.recipes.id, input.recipeId), eq(schema.recipes.householdId, householdId))).all();
+    owns(!!row, "recipe");
+  }
+  if (input.ingredientId != null) {
+    const [row] = db.select({ id: schema.ingredients.id }).from(schema.ingredients)
+      .where(and(eq(schema.ingredients.id, input.ingredientId), eq(schema.ingredients.householdId, householdId))).all();
+    owns(!!row, "ingredient");
+  }
+  if (input.productId != null) {
+    const [row] = db.select({ id: schema.products.id }).from(schema.products)
+      .where(and(eq(schema.products.id, input.productId), eq(schema.products.householdId, householdId))).all();
+    owns(!!row, "product");
+  }
+  if (input.variantId != null) {
+    const [row] = db.select({ id: schema.productVariants.id }).from(schema.productVariants)
+      .where(and(eq(schema.productVariants.id, input.variantId), eq(schema.productVariants.householdId, householdId))).all();
+    owns(!!row, "variant");
+  }
+}
+
 export function addEvent(db: Db, householdId: number, input: EventInput) {
+  assertOwnedRefs(db, householdId, input);
   const { servings, amount } = resolveQuantity(db, householdId, input);
   const [row] = db.insert(schema.mealEvents)
     .values({
@@ -70,10 +111,32 @@ export function getEvent(db: Db, householdId: number, eventId: number) {
  * slot, date, or quantity. Refuses once cooked/served (stock is committed then —
  * undo first). Returns the updated row, or null if missing / not planned.
  */
-export function updateEvent(db: Db, householdId: number, eventId: number, input: EventInput) {
+export function updateEvent(
+  db: Db, householdId: number, eventId: number, input: EventInput, scope: DeleteScope = "one",
+) {
   const existing = getEvent(db, householdId, eventId);
   if (!existing || existing.status !== "planned") return null;
+  assertOwnedRefs(db, householdId, input);
   const { servings, amount } = resolveQuantity(db, householdId, input);
+  // Rule-generated meal edited with a wider scope: change the rule itself (so
+  // future materialization matches) plus its still-planned occurrences. Each
+  // occurrence keeps its own date — only the item/slot/quantity travels.
+  if (existing.ruleId && scope !== "one") {
+    const item = {
+      slotId: input.slotId, servings,
+      recipeId: input.recipeId ?? null, ingredientId: input.ingredientId ?? null,
+      productId: input.productId ?? null, variantId: input.variantId ?? null, amount,
+    };
+    db.update(schema.mealRules).set(item)
+      .where(and(eq(schema.mealRules.id, existing.ruleId), eq(schema.mealRules.householdId, householdId))).run();
+    db.update(schema.mealEvents).set(item).where(and(
+      eq(schema.mealEvents.householdId, householdId),
+      eq(schema.mealEvents.ruleId, existing.ruleId),
+      eq(schema.mealEvents.status, "planned"),
+      ...(scope === "following" ? [gte(schema.mealEvents.date, existing.date)] : []),
+    )).run();
+    return getEvent(db, householdId, eventId);
+  }
   const [row] = db.update(schema.mealEvents)
     .set({
       date: input.date, slotId: input.slotId, servings,
@@ -230,6 +293,103 @@ export function cookEvent(
   recordCookedForEvent(db, householdId, effective, allocations);
   db.update(schema.mealEvents).set({ status: "cooked", cookedAhead })
     .where(eq(schema.mealEvents.id, ev.id)).run();
+}
+
+/** Thrown by cookBatch when an event lacks stock and the caller didn't force. */
+export class ShortStock extends Error {
+  constructor(public missing: string[], public date: string) {
+    super(`Not enough stock on ${date}: ${missing.join(", ")}`);
+  }
+}
+
+/**
+ * Batch-cook: cook this event plus the next planned occurrences of the SAME meal
+ * (same recipe/product/ingredient + slot), up to `days` total, in one transaction.
+ * Cook once, cover several planned days — those days flip to 'cooked'. Cooking is
+ * sequential so each day's stock check sees the running depletion; unstocked +
+ * !force rolls the whole batch back via ShortStock. Returns the cooked event ids.
+ */
+export function cookBatch(
+  db: Db, householdId: number, eventId: number, days: number,
+  allocations?: CookAllocations, force = false,
+): number[] {
+  const [anchor] = db.select().from(schema.mealEvents)
+    .where(and(eq(schema.mealEvents.id, eventId), eq(schema.mealEvents.householdId, householdId))).all();
+  if (!anchor) return [];
+
+  // The same meal on later planned days: identical item identity + slot.
+  const matchId = (col: number | null) => (v: number | null) => (col == null ? v == null : v === col);
+  const siblings = db.select().from(schema.mealEvents)
+    .where(and(
+      eq(schema.mealEvents.householdId, householdId),
+      eq(schema.mealEvents.slotId, anchor.slotId),
+      eq(schema.mealEvents.status, "planned"),
+      gte(schema.mealEvents.date, anchor.date),
+    ))
+    .orderBy(asc(schema.mealEvents.date), asc(schema.mealEvents.id)).all()
+    .filter((e) =>
+      matchId(anchor.recipeId)(e.recipeId) &&
+      matchId(anchor.productId)(e.productId) &&
+      matchId(anchor.ingredientId)(e.ingredientId))
+    .slice(0, Math.max(1, days));
+
+  return db.transaction((tx) => {
+    const cooked: number[] = [];
+    for (const ev of siblings) {
+      if (!force) {
+        const missing = unstockedIngredients(tx as unknown as Db, householdId, ev.id);
+        if (missing.length) throw new ShortStock(missing, ev.date);
+      }
+      cookEvent(tx as unknown as Db, householdId, ev.id, allocations, true);
+      cooked.push(ev.id);
+    }
+    return cooked;
+  });
+}
+
+/**
+ * Cook a recurring meal by scope, mirroring updateEvent/deleteEvent:
+ * - "one": just this event.
+ * - "following": this event + later planned occurrences of the same rule (date >= this).
+ * - "all": every still-planned occurrence of the same rule.
+ * A non-recurring event (no ruleId), or scope "one", only cooks itself. One
+ * transaction, sequential stock checks; ShortStock (unless force) rolls back.
+ * Returns the cooked event ids.
+ */
+export function cookScope(
+  db: Db, householdId: number, eventId: number, scope: DeleteScope,
+  allocations?: CookAllocations, force = false,
+): number[] {
+  const [anchor] = db.select().from(schema.mealEvents)
+    .where(and(eq(schema.mealEvents.id, eventId), eq(schema.mealEvents.householdId, householdId))).all();
+  if (!anchor) return [];
+
+  let targets: (typeof anchor)[];
+  if (scope === "one" || anchor.ruleId == null) {
+    targets = anchor.status === "planned" ? [anchor] : [];
+  } else {
+    const conds = [
+      eq(schema.mealEvents.householdId, householdId),
+      eq(schema.mealEvents.ruleId, anchor.ruleId),
+      eq(schema.mealEvents.status, "planned"),
+    ];
+    if (scope === "following") conds.push(gte(schema.mealEvents.date, anchor.date));
+    targets = db.select().from(schema.mealEvents).where(and(...conds))
+      .orderBy(asc(schema.mealEvents.date), asc(schema.mealEvents.id)).all();
+  }
+
+  return db.transaction((tx) => {
+    const cooked: number[] = [];
+    for (const ev of targets) {
+      if (!force) {
+        const missing = unstockedIngredients(tx as unknown as Db, householdId, ev.id);
+        if (missing.length) throw new ShortStock(missing, ev.date);
+      }
+      cookEvent(tx as unknown as Db, householdId, ev.id, allocations, true);
+      cooked.push(ev.id);
+    }
+    return cooked;
+  });
 }
 
 /** Reverse cookEvent: drop the stock movements it logged and flip status back. */

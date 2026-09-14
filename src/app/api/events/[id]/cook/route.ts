@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { cookEvent, uncookEvent } from "@/lib/plan";
+import { cookEvent, uncookEvent, cookBatch, cookScope, ShortStock, type DeleteScope } from "@/lib/plan";
 import { cookChoices, unstockedIngredients } from "@/lib/consumption";
 
 // Which ingredients need the user to pick a product before cooking (>1 in stock).
@@ -25,6 +25,37 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         return [Number(k), { productId: Number(a.productId), variantId: a.variantId == null ? null : Number(a.variantId) }];
       }))
     : undefined;
+  // Scoped cook-ahead (recurring): "following"/"all" cook the rule's planned
+  // occurrences. Takes precedence over the older `days` count when present.
+  const scope = body?.scope as DeleteScope | undefined;
+  if (scope === "one" || scope === "following" || scope === "all") {
+    try {
+      const cooked = cookScope(db, session.user.householdId, Number(id), scope, allocations, !!body?.force);
+      return NextResponse.json({ ok: true, cooked: cooked.length });
+    } catch (e) {
+      if (e instanceof ShortStock) {
+        return NextResponse.json(
+          { error: `Not enough stock on ${e.date}: ${e.missing.join(", ")}`, missing: e.missing }, { status: 409 },
+        );
+      }
+      throw e;
+    }
+  }
+  // Batch cook-ahead: `days` > 1 cooks this meal on the next N planned days too.
+  const days = Math.max(1, Math.floor(Number(body?.days) || 1));
+  if (days > 1) {
+    try {
+      const cooked = cookBatch(db, session.user.householdId, Number(id), days, allocations, !!body?.force);
+      return NextResponse.json({ ok: true, cooked: cooked.length });
+    } catch (e) {
+      if (e instanceof ShortStock) {
+        return NextResponse.json(
+          { error: `Not enough stock on ${e.date}: ${e.missing.join(", ")}`, missing: e.missing }, { status: 409 },
+        );
+      }
+      throw e;
+    }
+  }
   // Block cooking unless every ingredient has stock on hand (trustworthy totals),
   // unless the user chose to cook anyway (lets stock go negative).
   const missing = body?.force ? [] : unstockedIngredients(db, session.user.householdId, Number(id));

@@ -45,4 +45,16 @@ describe("logEaten", () => {
     expect(currentStock(db, hid, ingId)).toBe(before - 43);
     expect(listEaten(db, hid, "2026-07-01")[0].count).toBe(43); // stored in canonical units
   });
+
+  it("rejects a variantId that belongs to a different product", () => {
+    const otherIngId = db.insert(schema.ingredients)
+      .values({ householdId: hid, name: "Granola", canonicalUnit: "count" }).returning().all()[0].id;
+    const shop = db.insert(schema.shops).values({ householdId: hid, name: "Costco" }).returning().all()[0].id;
+    const otherProductId = createProduct(db, hid, { ingredientId: otherIngId, shopId: shop, name: "Granola Bag", packSize: 16, priority: 1, url: null }).id;
+    const otherVariantId = createVariant(db, hid, otherProductId, { name: "Big Serving", servingSize: 43, calories: 4 })!.id;
+    // Passing another product's (much larger) serving-size variant must not
+    // silently borrow its packet size for this product's consumption.
+    expect(() => logEaten(db, hid, { date: "2026-07-01", productId, variantId: otherVariantId, count: 1 }))
+      .toThrow();
+  });
 });

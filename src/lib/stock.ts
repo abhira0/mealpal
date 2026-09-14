@@ -1,6 +1,7 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
+import { nutrientSnapshot } from "@/lib/products";
 
 type Db = BetterSQLite3Database<typeof schema>;
 
@@ -16,14 +17,47 @@ export interface MovementInput {
   expiresAt?: string | null;
 }
 
+/**
+ * True iff ingredientId, and productId/purchaseId when given, actually belong
+ * to householdId. Callers accept these ids straight from a request body —
+ * without this check a household can plant a stock movement (or, via
+ * adjustStock's new-lot insert, a `purchases` row) that points at another
+ * household's ingredient/product/purchase, corrupting that record's
+ * household scoping.
+ */
+export function ownsStockRefs(
+  db: Db, householdId: number,
+  ingredientId: number, productId?: number | null, purchaseId?: number | null,
+): boolean {
+  const [ing] = db.select({ id: schema.ingredients.id }).from(schema.ingredients)
+    .where(and(eq(schema.ingredients.id, ingredientId), eq(schema.ingredients.householdId, householdId))).all();
+  if (!ing) return false;
+  if (productId != null) {
+    const [p] = db.select({ id: schema.products.id }).from(schema.products)
+      .where(and(eq(schema.products.id, productId), eq(schema.products.householdId, householdId))).all();
+    if (!p) return false;
+  }
+  if (purchaseId != null) {
+    const [pu] = db.select({ id: schema.purchases.id }).from(schema.purchases)
+      .where(and(eq(schema.purchases.id, purchaseId), eq(schema.purchases.householdId, householdId))).all();
+    if (!pu) return false;
+  }
+  return true;
+}
+
 export function recordMovement(db: Db, householdId: number, m: MovementInput) {
+  // Consumption movements freeze the label they were cooked/eaten with; purchases
+  // and manual adjustments don't feed nutrition, so they stay null.
+  const nutrientsJson = m.reason === "cooked" || m.reason === "eaten"
+    ? nutrientSnapshot(db, householdId, m.productId ?? null, m.variantId ?? null)
+    : null;
   const [row] = db.insert(schema.stockMovements)
     .values({
       householdId, ingredientId: m.ingredientId, productId: m.productId ?? null,
       variantId: m.variantId ?? null,
       delta: m.delta, reason: m.reason,
       mealEventId: m.mealEventId ?? null, batchId: m.batchId ?? null, purchaseId: m.purchaseId ?? null,
-      expiresAt: m.expiresAt ?? null,
+      expiresAt: m.expiresAt ?? null, nutrientsJson,
     }).returning().all();
   return row;
 }

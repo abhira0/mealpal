@@ -63,10 +63,15 @@ export function buildIcs(cooks: NextCook[], stamp = new Date()): string {
   const lines: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//mealpal//meal plan//EN",
+    "PRODID:-//platr//meal plan//EN",
     "CALSCALE:GREGORIAN",
-    "NAME:MealPal",
-    "X-WR-CALNAME:MealPal",
+    "NAME:Platr",
+    "X-WR-CALNAME:Platr",
+    // Tells subscribing clients (Apple/Google/Outlook) how often to re-poll,
+    // matching the route's hour-long Cache-Control so a plan change shows up
+    // without the user having to manually refresh the subscription.
+    "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
+    "X-PUBLISHED-TTL:PT1H",
     ...VTIMEZONE,
   ];
   for (const c of cooks) {
@@ -77,7 +82,7 @@ export function buildIcs(cooks: NextCook[], stamp = new Date()): string {
         : [`DTSTART;TZID=${TZID}:${ymd(c.cookDate)}T${clock(hours[0])}`, `DTEND;TZID=${TZID}:${ymd(c.cookDate)}T${clock(hours[1])}`];
     lines.push(
       "BEGIN:VEVENT",
-      `UID:cook-${c.slotId}-${c.cookDate}@mealpal`,
+      `UID:cook-${c.slotId}-${c.cookDate}@platr`,
       `DTSTAMP:${dtstamp}`,
       start,
       end,

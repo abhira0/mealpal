@@ -418,7 +418,7 @@ export function EntityForm({
       )}
 
       <div className={embedded ? "stack" : "content"}>
-        {error && <p className="notice" style={{ marginBottom: 12 }}>{error}</p>}
+        {error && <p className="notice" role="alert" style={{ marginBottom: 12 }}>{error}</p>}
 
         <form onSubmit={onSubmit} className="card stack">
           {config.importPath && !editing && (
@@ -429,7 +429,7 @@ export function EntityForm({
 
           {values.imageUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={values.imageUrl} alt="" style={{ display: "block", maxHeight: 160, borderRadius: 8, margin: "0 auto" }} />
+            <img src={values.imageUrl} alt="" loading="lazy" style={{ display: "block", maxHeight: 160, borderRadius: 8, margin: "0 auto" }} />
           )}
 
           {visibleFields.map((f) => (

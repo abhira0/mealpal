@@ -158,6 +158,12 @@ export function createRule(db: Db, householdId: number, today: string, input: Ru
   return rule;
 }
 
+/** All recurring rules for a household — for a management/listing UI. */
+export function listRules(db: Db, householdId: number) {
+  return db.select().from(schema.mealRules)
+    .where(eq(schema.mealRules.householdId, householdId)).all();
+}
+
 /** Extend every household rule up to the current horizon. Idempotent; cheap when nothing new. */
 export function topUpRules(db: Db, householdId: number, today: string) {
   const rules = db.select().from(schema.mealRules)
@@ -188,6 +194,69 @@ export function endSeriesFrom(db: Db, householdId: number, ruleId: number, fromD
     eq(schema.mealEvents.status, "planned"),
     gte(schema.mealEvents.date, fromDate),
   )).run();
+}
+
+/**
+ * Rules added in one submission of the meal builder (one rule per item) share a
+ * slot, a start date, and a creation instant. There is no group id, so treat
+ * that triple as the group — a recurrence edit on one item should move all the
+ * items of that meal.
+ * ponytail: 5s window instead of a groupId column; add the column if meals ever
+ * get created in bulk/imports where unrelated rules can land in the same second.
+ */
+function mealSiblings(db: Db, rule: typeof schema.mealRules.$inferSelect) {
+  return db.select().from(schema.mealRules)
+    .where(and(
+      eq(schema.mealRules.householdId, rule.householdId),
+      eq(schema.mealRules.slotId, rule.slotId),
+      eq(schema.mealRules.startDate, rule.startDate),
+    )).all()
+    .filter((r) => Math.abs(r.createdAt.getTime() - rule.createdAt.getTime()) <= 5_000);
+}
+
+/**
+ * Change a live rule's recurrence (interval/unit/days/until). Past and already
+ * cooked/served occurrences are left alone; still-planned ones from `today`
+ * forward are dropped and regenerated on the new cadence.
+ */
+export function updateRuleRecurrence(
+  db: Db, householdId: number, ruleId: number, today: string,
+  patch: Pick<RuleInput, "intervalN" | "unit" | "daysOfWeek"> & { untilDate?: string | null },
+) {
+  const [rule] = db.select().from(schema.mealRules)
+    .where(and(eq(schema.mealRules.id, ruleId), eq(schema.mealRules.householdId, householdId))).all();
+  if (!rule) return null;
+  // Apply to every item of the same meal, not just the one card that was opened.
+  const edited = mealSiblings(db, rule).map((r) => applyRecurrence(db, r, today, patch));
+  return edited.find((r) => r.id === ruleId) ?? null;
+}
+
+function applyRecurrence(
+  db: Db, rule: typeof schema.mealRules.$inferSelect, today: string,
+  patch: Pick<RuleInput, "intervalN" | "unit" | "daysOfWeek"> & { untilDate?: string | null },
+) {
+  const ruleId = rule.id;
+  db.delete(schema.mealEvents).where(and(
+    eq(schema.mealEvents.ruleId, ruleId),
+    eq(schema.mealEvents.status, "planned"),
+    gte(schema.mealEvents.date, today),
+  )).run();
+  // Tombstones were "don't regenerate this day of the old cadence"; the new
+  // cadence hits different days, so future skips would silently punch holes.
+  db.delete(schema.mealRuleSkips).where(and(
+    eq(schema.mealRuleSkips.ruleId, ruleId),
+    gte(schema.mealRuleSkips.date, today),
+  )).run();
+  const [updated] = db.update(schema.mealRules).set({
+    intervalN: Math.max(1, patch.intervalN),
+    unit: patch.unit,
+    daysOfWeek: patch.daysOfWeek,
+    untilDate: patch.untilDate ?? null,
+    generatedThrough: null,
+  }).where(eq(schema.mealRules.id, ruleId)).returning().all();
+  const from = today > updated.startDate ? today : updated.startDate;
+  materialize(db, updated, from, horizonEnd(today));
+  return updated;
 }
 
 /** Delete a generated meal: tombstone the day so it never regenerates, then remove the row. */

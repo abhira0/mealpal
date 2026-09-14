@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make MealPal usable as a real web app on desktop (sidebar nav, wider 2-column content, centered modals) while leaving mobile pixel-identical.
+**Goal:** Make Platr usable as a real web app on desktop (sidebar nav, wider 2-column content, centered modals) while leaving mobile pixel-identical.
 
 **Architecture:** One `@media (min-width: 900px)` block appended to `src/app/globals.css` restyles the existing shell (`.app`, `.nav`, `.sheet`) and flows row/card lists into a 2-column grid via `:has()`. The only markup change is a wordmark `<span>` in `BottomNav` (hidden on mobile). No page logic, JS behavior, or API changes.
 
@@ -31,7 +31,7 @@ In `src/components/BottomNav.tsx`, right after `<nav className="nav" aria-label=
 ```tsx
     <nav className="nav" aria-label="Primary">
       <span className="nav-brand" aria-hidden="true">
-        MealPal
+        Platr
       </span>
 ```
 
@@ -65,7 +65,7 @@ At the end of `src/app/globals.css` (before the `prefers-reduced-motion` rule is
 
 Run: `npm run dev` and open `http://localhost:3000`.
 
-- At a ≥900px-wide window: nav is a left sidebar (enamel, "MealPal" wordmark on top, icon+label rows, active page highlighted with a darker pill), content sits in a centered ~840px column to the right of it, no bottom bar.
+- At a ≥900px-wide window: nav is a left sidebar (enamel, "Platr" wordmark on top, icon+label rows, active page highlighted with a darker pill), content sits in a centered ~840px column to the right of it, no bottom bar.
 - Narrow the window below 900px: bottom nav bar returns, no wordmark, layout identical to before.
 - Open `http://localhost:3000/login` at desktop width: content is centered, not shifted right.
 

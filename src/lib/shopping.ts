@@ -1,6 +1,9 @@
 import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
+import { expiryByIngredient, stockByIngredient } from "@/lib/stock";
+import { plannedConsumption, runOutDates } from "@/lib/plan";
+import { toISODate, todayISO } from "@/lib/dates";
 
 type Db = BetterSQLite3Database<typeof schema>;
 
@@ -14,6 +17,11 @@ export function recordPurchase(db: Db, householdId: number, input: PurchaseInput
     const [product] = tx.select().from(schema.products)
       .where(and(eq(schema.products.id, input.productId), eq(schema.products.householdId, householdId))).all();
     if (!product) throw new Error("product not found in household");
+    if (input.shopId != null) {
+      const [shop] = tx.select().from(schema.shops)
+        .where(and(eq(schema.shops.id, input.shopId), eq(schema.shops.householdId, householdId))).all();
+      if (!shop) throw new Error("shop not found in household");
+    }
     const [purchase] = tx.insert(schema.purchases)
       .values({ householdId, productId: input.productId, quantity: input.quantity, cents: input.cents ?? null, expiresAt: input.expiresAt ?? null, shopId: input.shopId ?? null, manual: input.manual ?? false, ...(input.purchasedAt ? { purchasedAt: input.purchasedAt } : {}) })
       .returning().all();
@@ -95,6 +103,12 @@ export function updatePurchase(
       .where(and(eq(schema.purchases.id, id), eq(schema.purchases.householdId, householdId))).all();
     if (!purchase) return undefined;
 
+    if (patch.shopId != null) {
+      const [shop] = tx.select().from(schema.shops)
+        .where(and(eq(schema.shops.id, patch.shopId), eq(schema.shops.householdId, householdId))).all();
+      if (!shop) throw new Error("shop not found in household");
+    }
+
     // Swapping the product (e.g. the milk you wanted was out, you grabbed another)
     // or changing quantity re-points/re-sizes the linked restock so stock stays right.
     const newProductId = patch.productId ?? purchase.productId;
@@ -105,7 +119,7 @@ export function updatePurchase(
       if (!product) throw new Error("product not found in household");
       tx.update(schema.stockMovements)
         .set({ productId: product.id, ingredientId: product.ingredientId, delta: product.packSize * quantity })
-        .where(eq(schema.stockMovements.purchaseId, id)).run();
+        .where(and(eq(schema.stockMovements.purchaseId, id), eq(schema.stockMovements.reason, "purchase"))).run();
     }
 
     const [row] = tx.update(schema.purchases)
@@ -156,7 +170,14 @@ export function learnedShelfLife(db: Db, householdId: number): Map<number, numbe
   const daysByIngredient = new Map<number, number[]>();
   for (const r of rows) {
     if (!r.expiresAt) continue;
-    const days = Math.round((Date.parse(r.expiresAt) - r.purchasedAt.getTime()) / 86_400_000);
+    // Floor purchasedAt to its UTC calendar day before diffing — expiresAt is
+    // a bare date string (Date.parse reads it as UTC midnight), so leaving
+    // purchasedAt's time-of-day in the subtraction shorts (or zeroes) the
+    // learned shelf life depending what time of day the purchase happened.
+    const purchaseDay = Date.UTC(
+      r.purchasedAt.getUTCFullYear(), r.purchasedAt.getUTCMonth(), r.purchasedAt.getUTCDate(),
+    );
+    const days = Math.round((Date.parse(r.expiresAt) - purchaseDay) / 86_400_000);
     if (days <= 0) continue; // ignore already-expired / same-day junk
     const list = daysByIngredient.get(r.ingredientId) ?? [];
     list.push(days);
@@ -196,6 +217,16 @@ export function addExtra(
   db: Db, householdId: number,
   input: { productId?: number | null; title?: string | null; shopId?: number | null; quantity?: number },
 ) {
+  if (input.shopId != null) {
+    const [shop] = db.select().from(schema.shops)
+      .where(and(eq(schema.shops.id, input.shopId), eq(schema.shops.householdId, householdId))).all();
+    if (!shop) throw new Error("shop not found in household");
+  }
+  if (input.productId != null) {
+    const [product] = db.select().from(schema.products)
+      .where(and(eq(schema.products.id, input.productId), eq(schema.products.householdId, householdId))).all();
+    if (!product) throw new Error("product not found in household");
+  }
   const [row] = db.insert(schema.shoppingExtras)
     .values({
       householdId,
@@ -279,4 +310,60 @@ export function buyRecommendation(
     result.get(shopKey)!.push(line);
   }
   return result;
+}
+
+/**
+ * The full shopping list: buy recommendations over `horizon` days, spoilage-
+ * adjusted and urgency-tagged, plus manually-added extras — grouped by shop.
+ *
+ * Extracted from the /api/shopping route so the MCP server and the web app
+ * return the same list; the route is now a thin auth + JSON wrapper.
+ */
+export function shoppingList(db: Db, householdId: number, horizon = 14) {
+  const days = Math.min(90, Math.max(1, horizon));
+  const from = todayISO();
+  const to = toISODate(new Date(Date.now() + days * 86_400_000));
+  const stock = stockByIngredient(db, householdId);
+  const target = plannedConsumption(db, householdId, from, to, learnedShelfLife(db, householdId));
+  // Stock past its expiry date is spoiled: only what the plan consumes before
+  // expiry counts, so replacements show up as soon as expiry (not depletion) demands.
+  // Past dates are dropped — expiryByIngredient mins over ALL purchases ever, and a
+  // long-consumed pack's old date must not zero out the fresh stock on hand.
+  const expiry = new Map([...expiryByIngredient(db, householdId)].filter(([, d]) => d >= from));
+  const expiryDays = new Map([...expiry].map(([id, d]) =>
+    [id, Math.round((Date.parse(d) - Date.parse(from)) / 86_400_000)] as const));
+  const useBeforeExpiry = plannedConsumption(db, householdId, from, to, expiryDays);
+  const usable = new Map(stock);
+  for (const [id] of expiryDays)
+    usable.set(id, Math.min(stock.get(id) ?? 0, useBeforeExpiry.get(id) ?? 0));
+  const grouped = buyRecommendation(db, householdId, usable, target);
+  const runOut = runOutDates(db, householdId, from, to, stock, expiry);
+  for (const lines of grouped.values())
+    for (const line of lines)
+      (line as typeof line & { urgency?: unknown }).urgency =
+        urgency(runOut.get(line.ingredientId), expiry.get(line.ingredientId), from);
+
+  // Fold in manually-added lines. extraId marks them so the UI deletes (not "buys") them.
+  for (const e of listExtras(db, householdId)) {
+    const shopKey = e.shopName ?? "Unassigned";
+    if (!grouped.has(shopKey)) grouped.set(shopKey, []);
+    grouped.get(shopKey)!.push({
+      ingredientId: 0,
+      ingredientName: e.title ?? e.productName ?? "Item",
+      needed: e.quantity,
+      product: e.productId ? { id: e.productId, name: e.productName ?? "" } : null,
+      extraId: e.id,
+      urgency: null,
+    } as never);
+  }
+
+  // Most time-sensitive first within each shop, so the items you can't put
+  // off surface at the top of the list instead of wherever the map iterated.
+  const rank = { run: 0, low: 1 } as Record<string, number>;
+  for (const lines of grouped.values())
+    lines.sort((a, b) =>
+      (rank[(a as { urgency?: { tone?: string } | null }).urgency?.tone ?? ""] ?? 2) -
+      (rank[(b as { urgency?: { tone?: string } | null }).urgency?.tone ?? ""] ?? 2));
+
+  return grouped;
 }

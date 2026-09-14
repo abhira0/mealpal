@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { stockByIngredient, stockByProduct, expiryByIngredient, expiryByProduct, adjustStock, lotsByProduct, recordMovement } from "@/lib/stock";
+import { stockByIngredient, stockByProduct, expiryByIngredient, expiryByProduct, adjustStock, lotsByProduct, recordMovement, ownsStockRefs } from "@/lib/stock";
 import { DATE_RE } from "@/lib/dates";
 
 export async function GET() {
@@ -29,6 +29,8 @@ export async function POST(req: Request) {
   if (!ingredientId || !Number.isFinite(delta))
     return NextResponse.json({ error: "ingredientId and numeric delta required" }, { status: 400 });
   const hid = session.user.householdId;
+  if (!ownsStockRefs(db, hid, ingredientId, productId, purchaseId))
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (purchaseId) {
     // Per-lot correction / zero (trash button): targets the exact lot, no FEFO.
     recordMovement(db, hid, { ingredientId, productId, purchaseId, delta, reason: "manual" });

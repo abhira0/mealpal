@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import { makeTestDb, type TestDb } from "@/test/db";
 import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
-import { createRecipe } from "@/lib/recipes";
+import { createRecipe, updateRecipe } from "@/lib/recipes";
 import { recordPurchase } from "@/lib/shopping";
 import { recordCooked, unstockedIngredients } from "@/lib/consumption";
-import { dayNutrition, scorecards, zeroNutrients, mondayOf, macroSplit, dayIngredientTable, weekIngredientTable, batchServingNutrients } from "@/lib/nutrition";
+import { dayNutrition, scorecards, zeroNutrients, mondayOf, macroSplit, dayIngredientTable, weekIngredientTable, weekNutrition, batchServingNutrients } from "@/lib/nutrition";
 import { createVariant } from "@/lib/variants";
 import { logEaten } from "@/lib/eaten";
 import { createProduct } from "@/lib/products";
@@ -195,6 +196,28 @@ describe("weekIngredientTable", () => {
   });
 });
 
+describe("weekNutrition", () => {
+  it("averages `average` over days actually served, not days with only a planned meal", () => {
+    const pid = flourProduct({ calories: 2 }); // 2 kcal/g × 500g/serving = 1000 kcal
+    recordPurchase(db, hid, { productId: pid, quantity: 1 });
+    const r = bread().id;
+    const served = db.insert(schema.mealEvents)
+      .values({ householdId: hid, date: "2026-06-30", slotId, recipeId: r, servings: 1, status: "served" })
+      .returning().all()[0];
+    recordCooked(db, hid, r, served.servings, served.id); // 1000 kcal actually eaten, day 1
+    // Same week, a second day with only a planned (not yet eaten) meal.
+    db.insert(schema.mealEvents)
+      .values({ householdId: hid, date: "2026-07-02", slotId, recipeId: r, servings: 1, status: "planned" })
+      .run();
+    const week = weekNutrition(db, hid, mondayOf("2026-06-30"));
+    expect(week.daysWithMeals).toBe(2); // both days count as "has meals"
+    // Before the fix, `average` divided the 1000 served kcal by daysWithMeals (2),
+    // undercounting to 500 instead of the true per-served-day average of 1000.
+    expect(week.average.calories).toBe(1000);
+    expect(week.plannedAverage.calories).toBe(1000); // planned counts both days too, (1000+1000)/2
+  });
+});
+
 describe("mondayOf", () => {
   it("returns the Monday of the week (June 2026 starts on a Monday)", () => {
     expect(mondayOf("2026-06-29")).toBe("2026-06-29"); // a Monday
@@ -247,6 +270,69 @@ describe("batchServingNutrients", () => {
     });
     expect(batchServingNutrients(db, hid, batch.id).calories).toBe(1000); // 500g × 2
   });
+
+  it("a variant with no nutrition filled in falls back to the product's, not zero", () => {
+    const pid = flourProduct({ calories: 2 }); // 2 kcal/g product
+    recordPurchase(db, hid, { productId: pid, quantity: 1 });
+    // Variant only has a name + serving size — no nutrient fields set.
+    const variantId = createVariant(db, hid, pid, { name: "Family Pack", servingSize: 100 })!.id;
+    const batch = packBatch(db, hid, {
+      slotId, label: "Dal", cookedDate: "2026-07-01", mealsTotal: 4,
+      items: [{ productId: pid, variantId, amount: 100 }],
+    });
+    expect(batchServingNutrients(db, hid, batch.id).calories).toBe(200); // falls back to 2 × 100
+  });
+});
+
+describe("recipe edits don't rewrite history", () => {
+  it("a cooked event and a packed batch keep the nutrition they were cooked with", () => {
+    const pid = flourProduct({ calories: 2 });
+    recordPurchase(db, hid, { productId: pid, quantity: 3 });
+    const recipe = bread(); // 500 g flour
+    const ev = event(recipe.id, "cooked");
+    recordCooked(db, hid, recipe.id, ev.servings, ev.id);
+    const batch = packBatch(db, hid, {
+      slotId, label: "Bread batch", cookedDate: "2026-07-01", mealsTotal: 1,
+      items: [{ recipeId: recipe.id, amount: 1 }],
+    });
+
+    // Double the recipe's flour AFTER both were cooked.
+    updateRecipe(db, hid, recipe.id, {
+      name: "Bread", baseServings: 1, notes: null,
+      ingredients: [{ ingredientId: flourId, amount: 1000 }], steps: [], media: [],
+    });
+
+    const cooked = dayNutrition(db, hid, "2026-07-01").meals.find((m) => m.eventId === ev.id)!;
+    expect(cooked.nutrients.calories).toBe(1000); // 500g × 2, not 2000
+    expect(batchServingNutrients(db, hid, batch.id).calories).toBe(1000);
+  });
+});
+
+describe("label edits don't rewrite history", () => {
+  it("a served meal, a batch and a quick-log keep the label they were logged with", () => {
+    const pid = flourProduct({ calories: 2 }); // 2 kcal/g at cook time
+    recordPurchase(db, hid, { productId: pid, quantity: 5 });
+    const recipe = bread();
+    const ev = event(recipe.id, "served");
+    recordCooked(db, hid, recipe.id, ev.servings, ev.id); // 500 g → 1000 kcal
+    const batch = packBatch(db, hid, {
+      slotId, label: "Bread batch", cookedDate: "2026-07-01", mealsTotal: 1,
+      items: [{ recipeId: recipe.id, amount: 1 }],
+    });
+    eatFromBatch(db, hid, batch.id, "2026-07-01");
+    logEaten(db, hid, { date: "2026-07-01", productId: pid, count: 100 }); // 200 kcal
+
+    // Relabel the product AFTER all three were logged.
+    db.update(schema.products).set({ calories: 10 })
+      .where(eq(schema.products.id, pid)).run();
+
+    const day = dayNutrition(db, hid, "2026-07-01");
+    expect(day.total.calories).toBe(1000 + 1000 + 200); // not re-valued at 10 kcal/g
+    // the ingredient table must still reconcile with those totals
+    const table = dayIngredientTable(db, hid, "2026-07-01", "served");
+    const tableCals = table.reduce((a, r) => a + (r.values.calories ?? 0), 0);
+    expect(Math.round(tableCals)).toBe(Math.round(day.total.calories));
+  });
 });
 
 describe("dayNutrition counts batch servings eaten", () => {
@@ -281,5 +367,60 @@ describe("dayNutrition includes direct planner items", () => {
     addEvent(db, hid, { date: "2026-07-01", slotId, ingredientId: flourId, amount: 100, servings: 1 });
     const day = dayNutrition(db, hid, "2026-07-01");
     expect(day.meals[0].nutrients.calories).toBe(200); // 2 × 100 (planned → on card, not in total)
+  });
+});
+
+describe("dayIngredientTable counts batch servings eaten", () => {
+  it("includes a product-item batch serving, matching dayNutrition", () => {
+    const pid = flourProduct({ calories: 2 }); // 2 kcal/g → 100g serving = 200 kcal
+    recordPurchase(db, hid, { productId: pid, quantity: 1 });
+    const batch = packBatch(db, hid, {
+      slotId, label: "Dal", cookedDate: "2026-07-01", mealsTotal: 4,
+      items: [{ productId: pid, amount: 100 }],
+    });
+    // cooked but not eaten: nothing on the table yet
+    expect(dayIngredientTable(db, hid, "2026-07-01")).toHaveLength(0);
+
+    eatFromBatch(db, hid, batch.id, "2026-07-01");
+    const rows = dayIngredientTable(db, hid, "2026-07-01");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].qty).toBe(100);
+    expect(rows[0].values.calories).toBe(200);
+  });
+
+  it("scales a recipe-item batch serving by baseServings", () => {
+    const pid = flourProduct({ calories: 2 });
+    recordPurchase(db, hid, { productId: pid, quantity: 10 });
+    const recipe = bread(); // baseServings 1, 500g flour
+    const batch = packBatch(db, hid, {
+      slotId, label: "Loaf", cookedDate: "2026-07-01", mealsTotal: 2,
+      items: [{ recipeId: recipe.id, amount: 1 }], // one serving of a 1-serving recipe
+    });
+    eatFromBatch(db, hid, batch.id, "2026-07-01");
+    const rows = dayIngredientTable(db, hid, "2026-07-01");
+    expect(rows[0].qty).toBe(500);
+    expect(rows[0].values.calories).toBe(1000);
+  });
+
+  // The invariant that matters: the breakdown must reconcile with the totals.
+  // Before batch expansion the table silently dropped every batch meal.
+  it("ingredient calories reconcile with dayNutrition totals", () => {
+    const pid = flourProduct({ calories: 2 });
+    recordPurchase(db, hid, { productId: pid, quantity: 10 });
+    const recipe = bread();
+    const ev = event(recipe.id);
+    recordCooked(db, hid, recipe.id, 1, ev.id);
+    db.update(schema.mealEvents).set({ status: "served" }).run();
+    const batch = packBatch(db, hid, {
+      slotId, label: "Dal", cookedDate: "2026-07-01", mealsTotal: 4,
+      items: [{ productId: pid, amount: 100 }],
+    });
+    eatFromBatch(db, hid, batch.id, "2026-07-01");
+
+    const total = dayNutrition(db, hid, "2026-07-01").total.calories;
+    const fromTable = dayIngredientTable(db, hid, "2026-07-01")
+      .reduce((sum, r) => sum + (r.values.calories ?? 0), 0);
+    expect(total).toBe(1200); // 1000 recipe + 200 batch
+    expect(fromTable).toBe(total);
   });
 });

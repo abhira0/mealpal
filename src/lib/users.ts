@@ -12,8 +12,16 @@ export interface RegisterInput {
   householdName: string;
 }
 
+// Emails are stored lower-cased so lookups/uniqueness are case-insensitive
+// ("User@x.com" and "user@x.com" are the same account). SQLite's default
+// TEXT collation is case-sensitive, so this must happen at every write/read.
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
 export async function registerHousehold(db: Db, input: RegisterInput) {
   const passwordHash = await hashPassword(input.password);
+  const email = normalizeEmail(input.email);
   return db.transaction((tx) => {
     const [household] = tx
       .insert(schema.households)
@@ -29,7 +37,7 @@ export async function registerHousehold(db: Db, input: RegisterInput) {
       .insert(schema.users)
       .values({
         householdId: household.id,
-        email: input.email,
+        email,
         passwordHash,
         name: input.name,
       })
@@ -40,5 +48,5 @@ export async function registerHousehold(db: Db, input: RegisterInput) {
 }
 
 export async function findUserByEmail(db: Db, email: string) {
-  return db.query.users.findFirst({ where: eq(schema.users.email, email) });
+  return db.query.users.findFirst({ where: eq(schema.users.email, normalizeEmail(email)) });
 }

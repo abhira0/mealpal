@@ -100,7 +100,8 @@ export function Dropdown({
       else if (shown.length) setActive((i) => (i + 1) % shown.length);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      if (shown.length) setActive((i) => (i - 1 + shown.length) % shown.length);
+      if (!open) openMenu();
+      else if (shown.length) setActive((i) => (i - 1 + shown.length) % shown.length);
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (open && shown[active]) commit(shown[active].id);
@@ -152,6 +153,7 @@ export function Dropdown({
               ref={searchRef}
               className="input dropdown-search"
               type="text"
+              aria-label={label ? `Search ${label.toLowerCase()}` : "Search options"}
               placeholder="Search…"
               value={query}
               onChange={(e) => {

@@ -23,7 +23,10 @@ export function predictRunout(input: RunoutInput): RunoutResult {
   // collapse the range to the point estimate when history is too thin to trust
   const sigma = historyDays >= MIN_HISTORY_DAYS ? dailyStdDev : 0;
   const highRate = dailyRate + sigma;            // faster use -> sooner run-out
-  const lowRate = Math.max(dailyRate - sigma, 1); // slower use -> later run-out (avoid /0)
+  // Slower use -> later run-out. Floor near zero (not 1) to avoid /0 — a hard
+  // floor of 1 canonical unit/day inverted the range for slow-consumption
+  // items (e.g. dailyRate 0.5/day), making highDays < pointDays < lowDays.
+  const lowRate = Math.max(dailyRate - sigma, dailyRate * 1e-6);
   const lowDays = Math.max(Math.floor(stock / highRate) - bufferDays, 0);
   const highDays = Math.round(stock / lowRate);
   return { pointDays, lowDays, highDays };

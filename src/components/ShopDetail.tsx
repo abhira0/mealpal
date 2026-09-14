@@ -25,7 +25,7 @@ const money = (c: number | null) => (c == null ? "—" : `$${(c / 100).toFixed(2
 export function ShopDetail({ id }: { id: string }) {
   const [shop, setShop] = useState<Shop | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
-  const [ingredients, setIngredients] = useState<Record<number, string>>({});
+  const [ingredients, setIngredients] = useState<Record<number, { name: string; unit: string }>>({});
   const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,8 +46,8 @@ export function ShopDetail({ id }: { id: string }) {
     const all: Product[] = await prodRes.json();
     setProducts(all.filter((p) => p.shopId === Number(id)));
     if (ingRes.ok) {
-      const ings: { id: number; name: string }[] = await ingRes.json();
-      setIngredients(Object.fromEntries(ings.map((i) => [i.id, i.name])));
+      const ings: { id: number; name: string; canonicalUnit: string }[] = await ingRes.json();
+      setIngredients(Object.fromEntries(ings.map((i) => [i.id, { name: i.name, unit: i.canonicalUnit }])));
     }
   }, [id]);
 
@@ -59,7 +59,7 @@ export function ShopDetail({ id }: { id: string }) {
   if (!shop) {
     return (
       <div className="content">
-        {error ? <p className="notice">{error}</p> : <p className="loading">Loading…</p>}
+        {error ? <p className="notice" role="alert">{error}</p> : <p className="loading">Loading…</p>}
       </div>
     );
   }
@@ -75,7 +75,7 @@ export function ShopDetail({ id }: { id: string }) {
       />
 
       <div className="content stack-sm">
-        {error && <p className="notice">{error}</p>}
+        {error && <p className="notice" role="alert">{error}</p>}
 
         <span className="section-label">Details</span>
         <section className="card stack-sm">
@@ -115,7 +115,7 @@ export function ShopDetail({ id }: { id: string }) {
                       {!p.available && <span className="chip run" style={{ marginLeft: 8 }}>unavailable</span>}
                     </span>
                     <span className="meta" style={{ display: "block" }}>
-                      {ingredients[p.ingredientId] ?? "—"} · pack {p.packSize}
+                      {ingredients[p.ingredientId]?.name ?? "—"} · pack {p.packSize}{ingredients[p.ingredientId]?.unit ?? ""}
                     </span>
                   </span>
                 </Link>
