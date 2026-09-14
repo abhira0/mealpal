@@ -43,13 +43,13 @@ export function MobileShop() {
             <div className="filter">
               <span className="lbl">Buy ahead</span>
               {[7, 14, 30, 60, 90].map((d) => (
-                <button key={d} onClick={() => s.setHorizon(d)} aria-pressed={s.horizon === d}>
+                <button key={d} type="button" onClick={() => s.setHorizon(d)} aria-pressed={s.horizon === d}>
                   {d}d
                 </button>
               ))}
             </div>
 
-            {s.error && <p className="notice">{s.error}</p>}
+            {s.error && <p className="notice" role="alert">{s.error}</p>}
 
             {s.data === null && !s.error && <p className="loading">Loading…</p>}
 

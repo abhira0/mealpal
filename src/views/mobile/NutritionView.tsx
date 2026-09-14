@@ -53,9 +53,9 @@ export function MobileNutrition() {
         )}
 
         {loading || !data ? (
-          <p style={{ opacity: 0.6 }}>Loading…</p>
+          <p className="loading">Loading…</p>
         ) : noMeals ? (
-          <p style={{ opacity: 0.6 }}>No meals planned this week.</p>
+          <p className="empty">No meals planned this week.</p>
         ) : tab === "overview" ? (
           <OverviewBody data={data} mode={mode} openCard={openCard} setOpenCard={setOpenCard} />
         ) : (

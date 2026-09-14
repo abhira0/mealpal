@@ -62,14 +62,16 @@ export function PantryDetail({
   const editUnattributed = editTotal - editAttributed;
 
   // The single soonest-expiring lot across all this ingredient's products — gets
-  // the "next" badge, but only when there are 2+ lots total (spec, Layout A).
+  // the "next" badge, but only when there are 2+ lots total (spec, Layout A) AND
+  // at least one of them is actually dated — badging an arbitrary undated lot
+  // "next" would imply an eat-first priority the data doesn't support.
   const allEditLots = editProducts.flatMap((p) => lots[String(p.id)] ?? []);
   const nextLot =
     allEditLots.length >= 2
-      ? (allEditLots.filter((l) => l.expiresAt).reduce<Lot | null>(
+      ? allEditLots.filter((l) => l.expiresAt).reduce<Lot | null>(
           (min, l) => (min === null || l.expiresAt! < min.expiresAt! ? l : min),
           null,
-        ) ?? allEditLots[0])
+        )
       : null;
   // Urgency tone for the "next" badge: paprika ≤3d/expired, turmeric ≤7d, else plain.
   const nextBadgeTone = (exp: string | null) => {
@@ -93,7 +95,7 @@ export function PantryDetail({
           const productLots = lots[String(p.id)] ?? [];
           return (
             <div key={p.id} className="pantry-prod">
-              {p.imageUrl && <img src={p.imageUrl} alt="" className="pantry-prod-img" />}
+              {p.imageUrl && <img src={p.imageUrl} alt={p.name} loading="lazy" className="pantry-prod-img" />}
               <div className="pantry-prod-info">
                 <span className="body" style={{ color: "var(--sage)" }}>{p.name}</span>
                 <div className="pantry-lots">

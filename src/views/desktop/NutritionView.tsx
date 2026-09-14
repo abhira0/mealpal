@@ -49,9 +49,9 @@ export function DesktopNutrition() {
         </div>
 
         {loading || !data ? (
-          <p style={{ opacity: 0.6 }}>Loading…</p>
+          <p className="loading">Loading…</p>
         ) : noMeals ? (
-          <p style={{ opacity: 0.6 }}>No meals planned this week.</p>
+          <p className="empty">No meals planned this week.</p>
         ) : (
           <div className="dash-grid dash-nutrition" data-testid="dash">
             <section className="dash-col">

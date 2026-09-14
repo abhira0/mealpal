@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { addDays, useAgenda } from "@/views/agenda-data";
+import { addDays, useAgenda, type AgendaMeal } from "@/views/agenda-data";
 import { AgendaSheets } from "@/views/AgendaSheets";
 import { MealRow, DOW } from "@/views/agenda-parts";
+import { Sheet } from "@/components/Sheet";
+import { PlanInspector } from "@/components/PlanInspector";
 import { todayISO } from "@/lib/dates";
 
 const dowOf = (iso: string) => new Date(iso + "T00:00:00").getDay();
@@ -14,8 +16,8 @@ const longLabel = (iso: string) =>
 // Planner: pick a day on the week strip, arrange that day's meals. Distinct
 // from Today (which is the operational timeline of the next few days).
 export function MobilePlan() {
-  const [start, setStart] = useState(() => todayISO());
-  const [selected, setSelected] = useState(() => todayISO());
+  const [start, setStart] = useState(() => addDays(todayISO(), -1));
+  const [selected, setSelected] = useState(() => addDays(todayISO(), -1));
   const end = useMemo(() => addDays(start, 6), [start]);
   const agenda = useAgenda(null, { from: start, to: end });
   const today = todayISO();
@@ -34,6 +36,9 @@ export function MobilePlan() {
 
   const day = byDate.get(selected);
   const meals = day?.meals ?? [];
+
+  // Tapping a meal's manage control opens the full Inspector in a bottom sheet.
+  const [sheetMeal, setSheetMeal] = useState<AgendaMeal | null>(null);
 
   return (
     <div data-testid="mobile-plan">
@@ -58,8 +63,9 @@ export function MobilePlan() {
                   <button
                     key={d}
                     type="button"
+                    role="tab"
                     className={cls}
-                    aria-pressed={d === selected}
+                    aria-selected={d === selected}
                     onClick={() => setSelected(d)}
                   >
                     <span className="dow">{DOW[dowOf(d)]}</span>
@@ -94,6 +100,7 @@ export function MobilePlan() {
                           meal={m}
                           date={selected}
                           agenda={agenda}
+                          onInspect={setSheetMeal}
                         />
                       ))}
                     </div>
@@ -104,6 +111,19 @@ export function MobilePlan() {
           </>
         )}
       </main>
+
+      <Sheet open={sheetMeal !== null} title={sheetMeal?.name ?? "Meal"} onClose={() => setSheetMeal(null)}>
+        {sheetMeal && (
+          <PlanInspector
+            key={sheetMeal.eventId!}
+            meal={sheetMeal}
+            agenda={agenda}
+            focusDate={selected}
+            hideHeader
+            onClose={() => setSheetMeal(null)}
+          />
+        )}
+      </Sheet>
 
       <AgendaSheets agenda={agenda} />
     </div>

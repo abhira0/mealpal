@@ -107,9 +107,9 @@ function IngredientsTable({ date, mode, eventIds }: { date: string; mode: "day" 
     </div>
   );
 
-  if (loaded?.key !== key) return <>{basisPill}<p style={{ opacity: 0.6 }}>Loading…</p></>;
+  if (loaded?.key !== key) return <>{basisPill}<p className="loading">Loading…</p></>;
   const rows = loaded.rows;
-  if (rows.length === 0) return <>{basisPill}<p style={{ opacity: 0.6 }}>No ingredients {basis === "served" ? "eaten" : "planned"} this {mode === "week" ? "week" : "day"}.</p></>;
+  if (rows.length === 0) return <>{basisPill}<p className="empty">No ingredients {basis === "served" ? "eaten" : "planned"} this {mode === "week" ? "week" : "day"}.</p></>;
 
   return (
     <>
@@ -164,7 +164,7 @@ function IngredientsTable({ date, mode, eventIds }: { date: string; mode: "day" 
 function MissingNotice({ missing }: { missing: string[] }) {
   if (missing.length === 0) return null;
   return (
-    <p className="notice" style={{ margin: 0 }}>
+    <p className="notice" role="alert" style={{ margin: 0 }}>
       Missing nutrition for: {missing.join(", ")}. Totals undercount until their products are filled in.
     </p>
   );
@@ -285,10 +285,9 @@ function MacroBar({ label, served, planned, goal, unit, color }: {
           {Math.round(served)} served · {Math.round(planned)} planned / {goal}{unit}
         </span>
       </div>
-      <div title={`${Math.round(served)} served · ${Math.round(planned)} planned / ${goal}${unit} goal`}
-        style={{ display: "flex", height: 8, borderRadius: 99, background: "#EDEEF1", overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${servedW}%`, background: color }} />
-        <div style={{ height: "100%", width: `${remW}%`, background: color, opacity: 0.45 }} />
+      <div className="macro-track" title={`${Math.round(served)} served · ${Math.round(planned)} planned / ${goal}${unit} goal`}>
+        <div className="macro-seg" style={{ background: color, opacity: 0.45, transform: `scaleX(${(servedW + remW) / 100})` }} />
+        <div className="macro-seg" style={{ background: color, transform: `scaleX(${servedW / 100})` }} />
       </div>
     </div>
   );
@@ -341,7 +340,7 @@ function NutrientTable({ n, goals }: { n: Nutrients; goals: Goals }) {
               <th scope="row" style={{ textAlign: "left", fontWeight: r.bold ? 700 : 400, padding: "4px 8px 4px 0", paddingLeft: r.indent ? 14 : 0 }}>{r.label}</th>
               <td style={{ textAlign: "right", padding: "4px 8px", fontWeight: r.bold ? 700 : 400 }}>{nfmt(n[r.key])}{r.unit}</td>
               <td style={{ textAlign: "right", padding: "4px 8px", color: "var(--sage)" }}>{goal != null ? `${goal}${r.unit}` : "—"}</td>
-              <td style={{ textAlign: "right", padding: "4px 0", fontWeight: 600, color: over ? "#DC2B2B" : "var(--ink)" }}>{pct != null ? `${pct}%` : "—"}</td>
+              <td style={{ textAlign: "right", padding: "4px 0", fontWeight: 600, color: over ? "var(--danger)" : "var(--ink)" }}>{pct != null ? `${pct}%` : "—"}</td>
             </tr>
           );
         })}
@@ -406,7 +405,7 @@ function GroupedNutrientTable({ n, goals, meals, basis, groupBy, onGroupClick }:
                 <th scope="row" style={{ ...STICKY, textAlign: "left", fontWeight: r.bold ? 700 : 400, padding: "4px 10px 4px 0", paddingLeft: r.indent ? 14 : 0 }}>{r.label}</th>
                 <td style={{ textAlign: "right", padding: "4px 8px", fontWeight: r.bold ? 700 : 400 }}>{nfmt(n[r.key])}{r.unit}</td>
                 <td style={{ textAlign: "right", padding: "4px 8px", color: "var(--sage)" }}>{goal != null ? `${goal}${r.unit}` : "—"}</td>
-                <td style={{ textAlign: "right", padding: "4px 8px", fontWeight: 600, color: over ? "#DC2B2B" : "var(--ink)" }}>{pct != null ? `${pct}%` : "—"}</td>
+                <td style={{ textAlign: "right", padding: "4px 8px", fontWeight: 600, color: over ? "var(--danger)" : "var(--ink)" }}>{pct != null ? `${pct}%` : "—"}</td>
                 {slots.map((s) => (
                   <td key={s.slot} style={{ textAlign: "right", padding: "4px 8px" }}>{nfmt(s.value(r.key))}{r.unit}</td>
                 ))}

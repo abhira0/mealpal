@@ -8,10 +8,44 @@ export type Recipe = { id: number; name: string; baseServings: number };
 export type Product = { id: number; name: string; servingSize: number | null; canonicalUnit: string };
 export type Ingredient = { id: number; name: string; canonicalUnit: string };
 
-export type ItemKind = "recipe" | "product";
-export type PackItem = { kind: ItemKind; refId: number | null; amount: string };
+export type ItemKind = "recipe" | "product" | "ingredient";
+// One line of a meal being composed in the Add sheet. A meal is just a
+// collection of these. `servings` drives recipe/product; `amount` is canonical
+// units (e.g. grams) for an ingredient, or an optional override for a product.
+export type MealItem = { kind: ItemKind; refId: number | null; servings: number; amount: string };
+// Legacy alias kept for the batch-edit path (recipe|product only).
+export type PackItem = { kind: "recipe" | "product"; refId: number | null; amount: string };
 
 export type AddKind = "recipe" | "product" | "ingredient" | "batch";
+
+// The request body for one meal item, shared by submitAdd and its test.
+export function mealItemBody(it: MealItem): Record<string, unknown> {
+  if (it.kind === "recipe") return { recipeId: it.refId, servings: it.servings };
+  if (it.kind === "product") {
+    const amount = it.amount !== "" ? Number(it.amount) : undefined;
+    return amount != null
+      ? { productId: it.refId, amount }
+      : { productId: it.refId, servings: it.servings };
+  }
+  return { ingredientId: it.refId, amount: Number(it.amount) };
+}
+
+// Compact identity of a recurrence, for "did the cadence change?" comparisons.
+function recurrenceKey(intervalN: number, unit: string, daysOfWeek: string, untilDate: string) {
+  return `${intervalN}|${unit}|${daysOfWeek}|${untilDate}`;
+}
+
+// Default item for a freshly-chosen kind (used by the builder's kind toggle).
+export function defaultMealItem(
+  kind: ItemKind,
+  refs: { recipes: Recipe[]; products: Product[]; ingredients: Ingredient[] },
+): MealItem {
+  if (kind === "recipe")
+    return { kind, refId: refs.recipes[0]?.id ?? null, servings: refs.recipes[0]?.baseServings ?? 2, amount: "" };
+  if (kind === "product")
+    return { kind, refId: refs.products[0]?.id ?? null, servings: 2, amount: "" };
+  return { kind, refId: refs.ingredients[0]?.id ?? null, servings: 1, amount: "" };
+}
 
 export type AgendaMeal = {
   eventId: number | null; // null for a synthetic batch-projected row (no meal_event backs it)
@@ -72,7 +106,16 @@ export function useAgenda(
   // time-derived text is client-only to avoid hydration drift.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  const todayIso = useMemo(todayISO, []);
+  const [todayIso, setTodayIso] = useState(todayISO);
+  // A tab left open past midnight would otherwise keep yesterday's "today" —
+  // recheck on tab-return (same trigger CookMode/PlanEditor use).
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") setTodayIso(todayISO());
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
   // Today uses a fixed 5-day look-ahead; the Plan page passes an explicit
   // (navigable) range that may reach into the past.
   const defaultTo = useMemo(() => addDays(todayIso, 5), [todayIso]);
@@ -88,10 +131,19 @@ export function useAgenda(
   const [loading, setLoading] = useState(true);
   const [analysis, setAnalysis] = useState<DayAnalysis | null>(null);
 
+  // Tracks the range the most recently *issued* loadAgenda call was for, so a
+  // response can tell whether a newer request has superseded it — otherwise
+  // rapid Plan week navigation can let a stale response overwrite fresher
+  // state (see PlanEditor's rangeRef for the same pattern).
+  const rangeRef = useRef({ from, to });
+  rangeRef.current = { from, to };
+
   const loadAgenda = useCallback(async () => {
-    const res = await fetch(`/api/agenda?from=${from}&to=${to}&today=${todayIso}`, { cache: "no-store" });
+    const reqFrom = from, reqTo = to;
+    const res = await fetch(`/api/agenda?from=${reqFrom}&to=${reqTo}&today=${todayIso}`, { cache: "no-store" });
     if (res.ok) {
       const data = (await res.json()) as AgendaResponse;
+      if (reqFrom !== rangeRef.current.from || reqTo !== rangeRef.current.to) return;
       setDays(data.days);
       setNextCooks(data.nextCooks);
     }
@@ -129,7 +181,13 @@ export function useAgenda(
 
   const todayRef = useRef<HTMLDivElement | null>(null);
 
-  const [acting, setActing] = useState<number | null>(null);
+  // Namespaced so a batch and an event that happen to share a numeric id
+  // can't disable/no-op each other's action.
+  const [acting, setActing] = useState<string | null>(null);
+  // Set when an optimistic eat/cook/serve mutation is rejected by the server.
+  // The action's own `finally` reload resyncs the row to server truth (so the
+  // optimistic flip reverts); this just tells the user it didn't take.
+  const [actionError, setActionError] = useState<string | null>(null);
   // When serving a product/ingredient meal whose ingredient has >1 in-stock
   // product or has variants, ask which one was actually eaten before cooking.
   const [cookChoice, setCookChoice] = useState<
@@ -141,7 +199,8 @@ export function useAgenda(
     // they're projected onto, so the optimistic update below must also scope
     // by date — otherwise toggling today's serving would flip every other
     // day's row for the same batch too.
-    const key = meal.batchBacked && meal.batchId != null ? meal.batchId : meal.eventId;
+    const key =
+      meal.batchBacked && meal.batchId != null ? `batch:${meal.batchId}` : `event:${meal.eventId}`;
     if (acting === key) return;
     // Currently served? Then this tap UNDOES it (un-serve); otherwise it serves.
     const served = meal.phase === "served";
@@ -162,6 +221,7 @@ export function useAgenda(
       }
     }
     setActing(key);
+    setActionError(null);
     // optimistic toggle
     setDays((prev) =>
       prev.map((d) => ({
@@ -201,30 +261,37 @@ export function useAgenda(
       })),
     );
     const method = served ? "DELETE" : "POST";
+    let ok = true;
     try {
       if (meal.batchBacked && meal.batchId != null) {
-        await fetch(`/api/batches/${meal.batchId}/eat`, {
+        const r = await fetch(`/api/batches/${meal.batchId}/eat`, {
           method,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ date }),
         });
+        ok = r.ok;
       } else if (meal.eventId != null) {
-        await fetch(`/api/events/${meal.eventId}/serve`, {
+        const r = await fetch(`/api/events/${meal.eventId}/serve`, {
           method,
           ...(served ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ force: true }) }),
         });
+        ok = r.ok;
       }
+    } catch {
+      ok = false;
     } finally {
       await Promise.all([loadAgenda(), loadAnalysis()]);
       setActing(null);
     }
+    if (!ok) setActionError(served ? "Couldn't undo that meal — please try again." : "Couldn't update that meal — please try again.");
   }
 
   // Serve an event with a chosen product/variant pick (from the cook sheet).
   async function serveWithPicks(meal: AgendaMeal, _date: string, picked: Record<number, CookPick>) {
     if (meal.eventId == null) return;
     const eventId = meal.eventId;
-    setActing(eventId);
+    setActing(`event:${eventId}`);
+    setActionError(null);
     setDays((prev) =>
       prev.map((d) => ({
         ...d,
@@ -233,16 +300,21 @@ export function useAgenda(
         ),
       })),
     );
+    let ok = true;
     try {
-      await fetch(`/api/events/${eventId}/serve`, {
+      const r = await fetch(`/api/events/${eventId}/serve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ allocations: picked, force: true }),
       });
+      ok = r.ok;
+    } catch {
+      ok = false;
     } finally {
       await Promise.all([loadAgenda(), loadAnalysis()]);
       setActing(null);
     }
+    if (!ok) setActionError("Couldn't serve that meal — please try again.");
   }
 
   // Confirm the variant/product pick from the sheet, then serve.
@@ -259,8 +331,10 @@ export function useAgenda(
   async function cookAhead(meal: AgendaMeal) {
     if (meal.eventId == null || meal.batchBacked) return;
     const eventId = meal.eventId;
-    if (acting === eventId) return;
-    setActing(eventId);
+    const key = `event:${eventId}`;
+    if (acting === key) return;
+    setActing(key);
+    setActionError(null);
     setDays((prev) =>
       prev.map((d) => ({
         ...d,
@@ -269,24 +343,57 @@ export function useAgenda(
         ),
       })),
     );
+    let ok = true;
     try {
-      await fetch(`/api/events/${eventId}/cook`, {
+      const r = await fetch(`/api/events/${eventId}/cook`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ force: true }),
       });
+      ok = r.ok;
+    } catch {
+      ok = false;
     } finally {
       await Promise.all([loadAgenda(), loadAnalysis()]);
       setActing(null);
     }
+    if (!ok) setActionError("Couldn't cook that ahead — please try again.");
+  }
+
+  // Move one planned occurrence to another day/slot (drag-and-drop on the Plan
+  // grid, or the inspector's fields). Fetches the row to preserve its item, then
+  // PATCHes scope=one (the API won't shift a whole series' dates). No-op result
+  // for cooked/served (the API refuses those).
+  async function rescheduleEvent(eventId: number, date: string, slotId: number) {
+    const res = await fetch(`/api/events/${eventId}`);
+    if (!res.ok) return;
+    const ev = (await res.json()) as {
+      slotId: number; date: string; servings: number; amount: number | null;
+      recipeId: number | null; productId: number | null; ingredientId: number | null; variantId: number | null;
+    };
+    if (ev.date === date && ev.slotId === slotId) return;
+    const item = ev.recipeId != null
+      ? { recipeId: ev.recipeId, servings: ev.servings }
+      : ev.productId != null
+        ? (ev.amount != null
+            ? { productId: ev.productId, variantId: ev.variantId, amount: ev.amount }
+            : { productId: ev.productId, variantId: ev.variantId, servings: ev.servings })
+        : { ingredientId: ev.ingredientId, amount: ev.amount };
+    await fetch(`/api/events/${eventId}?scope=one`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date, slotId, ...item }),
+    });
+    await Promise.all([loadAgenda(), loadAnalysis()]);
   }
 
   // Undo a cook-ahead: back to 'planned', backing out the stock it depleted.
   async function uncookAhead(meal: AgendaMeal) {
     if (meal.eventId == null || meal.batchBacked) return;
     const eventId = meal.eventId;
-    if (acting === eventId) return;
-    setActing(eventId);
+    const key = `event:${eventId}`;
+    if (acting === key) return;
+    setActing(key);
+    setActionError(null);
     setDays((prev) =>
       prev.map((d) => ({
         ...d,
@@ -295,12 +402,17 @@ export function useAgenda(
         ),
       })),
     );
+    let ok = true;
     try {
-      await fetch(`/api/events/${eventId}/cook`, { method: "DELETE" });
+      const r = await fetch(`/api/events/${eventId}/cook`, { method: "DELETE" });
+      ok = r.ok;
+    } catch {
+      ok = false;
     } finally {
       await Promise.all([loadAgenda(), loadAnalysis()]);
       setActing(null);
     }
+    if (!ok) setActionError("Couldn't undo cooking — please try again.");
   }
 
   // Remove-meal flow: a rule-generated event asks which occurrences to drop,
@@ -360,22 +472,31 @@ export function useAgenda(
   const [addIntervalN, setAddIntervalN] = useState(1);
   const [addUnit, setAddUnit] = useState<"day" | "week">("day");
   const [addUntil, setAddUntil] = useState("");
+  // Recurrence as it was when an existing rule was opened for editing, so save
+  // only touches the series when the user actually changed the cadence.
+  const [editRuleSeed, setEditRuleSeed] = useState<string | null>(null);
   const [addSaving, setAddSaving] = useState(false);
   // When set, the Add sheet is editing an existing meal/batch (PATCH, not POST).
   const [editEventId, setEditEventId] = useState<number | null>(null);
   const [editBatchId, setEditBatchId] = useState<number | null>(null);
+  // Editing a rule-generated meal: which occurrences the save applies to.
+  const [editRuleId, setEditRuleId] = useState<number | null>(null);
+  const [editScope, setEditScope] = useState<"one" | "following" | "all">("one");
   const isEditing = editEventId != null || editBatchId != null;
 
-  // Batch-only fields (addKind === "batch").
+  // Batch-only fields (addKind === "batch", edit path only now).
   const [addLabel, setAddLabel] = useState("");
   const [addMeals, setAddMeals] = useState(4);
-  const [addItems, setAddItems] = useState<PackItem[]>([{ kind: "recipe", refId: null, amount: "" }]);
+  // The items of the meal being composed (creation), reused by the batch-edit form.
+  const [addItems, setAddItems] = useState<MealItem[]>([
+    { kind: "recipe", refId: null, servings: 2, amount: "" },
+  ]);
 
   function addBatchItem() {
-    setAddItems((prev) => [...prev, { kind: "recipe", refId: recipes[0]?.id ?? null, amount: "" }]);
+    setAddItems((prev) => [...prev, defaultMealItem("recipe", { recipes, products, ingredients })]);
   }
 
-  function updateBatchItem(i: number, patch: Partial<PackItem>) {
+  function updateBatchItem(i: number, patch: Partial<MealItem>) {
     setAddItems((prev) => prev.map((it, j) => (j === i ? { ...it, ...patch } : it)));
   }
 
@@ -386,6 +507,8 @@ export function useAgenda(
   function openAdd(opts?: { date?: string; slotId?: number; type?: AddKind }) {
     setEditEventId(null);
     setEditBatchId(null);
+    setEditRuleId(null);
+    setEditScope("one");
     setAddDate(opts?.date ?? todayIso);
     setAddSlotId(opts?.slotId ?? slots[0]?.id ?? null);
     setAddKind(opts?.type ?? "recipe");
@@ -402,9 +525,10 @@ export function useAgenda(
     setAddIntervalN(1);
     setAddUnit("day");
     setAddUntil("");
+    setEditRuleSeed(null);
     setAddLabel("");
     setAddMeals(4);
-    setAddItems([{ kind: "recipe", refId: recipes[0]?.id ?? null, amount: "" }]);
+    setAddItems([defaultMealItem(opts?.type && opts.type !== "batch" ? opts.type : "recipe", { recipes, products, ingredients })]);
     setAddOpen(true);
   }
 
@@ -415,14 +539,38 @@ export function useAgenda(
     const res = await fetch(`/api/events/${meal.eventId}`);
     if (!res.ok) return;
     const ev = (await res.json()) as {
-      date: string; slotId: number; servings: number; amount: number | null;
+      date: string; slotId: number; servings: number; amount: number | null; status: string;
       recipeId: number | null; productId: number | null; variantId: number | null; ingredientId: number | null;
     };
+    // A cooked event is locked server-side (its cook already depleted stock), so
+    // reverse the cook first — uncookEvent restores the FEFO allocations exactly.
+    if (ev.status === "cooked") {
+      const un = await fetch(`/api/events/${meal.eventId}/cook`, { method: "DELETE" });
+      if (!un.ok) { setActionError("Could not un-cook this meal to edit it."); return; }
+      await Promise.all([loadAgenda(), loadAnalysis()]);
+    }
     setEditBatchId(null);
     setEditEventId(meal.eventId);
+    setEditRuleId(meal.ruleId);
+    setEditScope("one");
     setAddDate(ev.date);
     setAddSlotId(ev.slotId);
     setAddRepeat(false);
+    setEditRuleSeed(null);
+    if (meal.ruleId != null) {
+      const rres = await fetch("/api/rules");
+      const rule = rres.ok
+        ? ((await rres.json()) as { id: number; intervalN: number; unit: "day" | "week"; daysOfWeek: string; untilDate: string | null }[])
+            .find((r) => r.id === meal.ruleId)
+        : undefined;
+      if (rule) {
+        setAddIntervalN(rule.intervalN);
+        setAddUnit(rule.unit);
+        setAddRepeatDays(rule.daysOfWeek.split("").map((c) => c === "1"));
+        setAddUntil(rule.untilDate ?? "");
+        setEditRuleSeed(recurrenceKey(rule.intervalN, rule.unit, rule.daysOfWeek, rule.untilDate ?? ""));
+      }
+    }
     setAddProductAmount("");
     setAddAmount("");
     if (ev.recipeId != null) {
@@ -433,6 +581,10 @@ export function useAgenda(
       setAddKind("product");
       setAddProductId(ev.productId);
       setAddServings(Math.max(1, Math.round(ev.servings)));
+      // Restore the exact canonical amount so re-saving without touching this
+      // field preserves it — otherwise submitAdd falls back to the rounded
+      // (min 1) servings above, silently inflating a fractional-serving event.
+      setAddProductAmount(ev.amount != null ? String(ev.amount) : "");
       const vres = await fetch(`/api/products/${ev.productId}/variants`);
       setAddVariants(vres.ok ? ((await vres.json()) as { id: number; name: string }[]) : []);
       setAddVariantId(ev.variantId);
@@ -453,6 +605,7 @@ export function useAgenda(
       items: { recipeId: number | null; productId: number | null; amount: number | null }[];
     };
     setEditEventId(null);
+    setEditRuleId(null);
     setEditBatchId(batchId);
     setAddKind("batch");
     setAddDate(batch.cookedDate);
@@ -464,9 +617,10 @@ export function useAgenda(
         ? batch.items.map((it) => ({
             kind: it.recipeId != null ? ("recipe" as const) : ("product" as const),
             refId: it.recipeId ?? it.productId ?? null,
+            servings: 1,
             amount: it.amount != null ? String(it.amount) : "",
           }))
-        : [{ kind: "recipe", refId: recipes[0]?.id ?? null, amount: "" }],
+        : [defaultMealItem("recipe", { recipes, products, ingredients })],
     );
     setAddOpen(true);
   }
@@ -503,15 +657,29 @@ export function useAgenda(
     addMeals >= 1 &&
     addItems.length > 0 &&
     addItems.every((it) => it.refId != null);
-  const addValid = addKind === "batch" ? addBatchValid : addMealValid;
+  // Creating a meal: every item must resolve to a valid one-of body.
+  const addItemsValid =
+    addSlotId != null &&
+    !addRepeatInvalid &&
+    addItems.length > 0 &&
+    addItems.every((it) =>
+      it.refId != null &&
+      (it.kind === "ingredient"
+        ? Number(it.amount) > 0
+        : it.kind === "product"
+          ? it.amount === "" || Number(it.amount) > 0
+          : true));
+  const addValid = editBatchId != null ? addBatchValid : editEventId != null ? addMealValid : addItemsValid;
 
   async function submitAdd() {
     if (!addValid || addSaving || addSlotId == null) return;
     setAddSaving(true);
     try {
-      if (addKind === "batch") {
-        const res = await fetch(editBatchId != null ? `/api/batches/${editBatchId}` : "/api/batches", {
-          method: editBatchId != null ? "PATCH" : "POST",
+      // Editing an existing batch: full re-pack (batches are no longer created,
+      // only edited until they're retired).
+      if (editBatchId != null) {
+        const res = await fetch(`/api/batches/${editBatchId}`, {
+          method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             slotId: addSlotId,
@@ -533,28 +701,38 @@ export function useAgenda(
         return;
       }
 
-      let item: Record<string, unknown>;
-      if (addKind === "recipe") {
-        if (addRecipeId == null) return;
-        item = { recipeId: addRecipeId, servings: addServings };
-      } else if (addKind === "product") {
-        if (addProductId == null) return;
-        const amount = addProductAmount !== "" ? Number(addProductAmount) : undefined;
-        item = amount != null
-          ? { productId: addProductId, variantId: addVariantId, amount }
-          : { productId: addProductId, variantId: addVariantId, servings: addServings };
-      } else {
-        const amount = Number(addAmount);
-        if (addIngredientId == null || !Number.isFinite(amount) || amount <= 0) return;
-        item = { ingredientId: addIngredientId, amount };
-      }
-
       // Editing a single planned meal: PATCH it in place (recurrence unchanged).
       if (editEventId != null) {
-        const res = await fetch(`/api/events/${editEventId}`, {
+        let item: Record<string, unknown>;
+        if (addKind === "recipe") {
+          if (addRecipeId == null) return;
+          item = { recipeId: addRecipeId, servings: addServings };
+        } else if (addKind === "product") {
+          if (addProductId == null) return;
+          const amount = addProductAmount !== "" ? Number(addProductAmount) : undefined;
+          item = amount != null
+            ? { productId: addProductId, variantId: addVariantId, amount }
+            : { productId: addProductId, variantId: addVariantId, servings: addServings };
+        } else {
+          const amount = Number(addAmount);
+          if (addIngredientId == null || !Number.isFinite(amount) || amount <= 0) return;
+          item = { ingredientId: addIngredientId, amount };
+        }
+        const res = await fetch(`/api/events/${editEventId}?scope=${editScope}`, {
           method: "PATCH", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ date: addDate, slotId: addSlotId, ...item }),
         });
+        // Recurrence lives on the rule, not the event — save it separately, and
+        // only when it changed (the PATCH regenerates future occurrences).
+        const dow = addRepeatDays.map((d) => (d ? "1" : "0")).join("");
+        if (res.ok && editRuleId != null && editRuleSeed != null
+            && recurrenceKey(addIntervalN, addUnit, dow, addUntil) !== editRuleSeed) {
+          const rres = await fetch(`/api/rules/${editRuleId}`, {
+            method: "PATCH", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ intervalN: addIntervalN, unit: addUnit, daysOfWeek: dow, untilDate: addUntil || null }),
+          });
+          if (!rres.ok) setActionError("Meal saved, but the repeat schedule could not be updated.");
+        }
         if (res.ok) {
           setAddOpen(false);
           await Promise.all([loadAgenda(), loadAnalysis()]);
@@ -562,23 +740,30 @@ export function useAgenda(
         return;
       }
 
+      // Creating: a meal is a collection of items. Post each one — a one-off to
+      // /api/events, or a per-item recurring rule to /api/rules when repeating.
+      // ponytail: sequential posts; a mid-list failure leaves earlier items
+      // added. Fine for a single-user household; make it a transactional bulk
+      // endpoint if partial adds ever bite.
       const url = addRepeat ? "/api/rules" : "/api/events";
-      const body = addRepeat
-        ? {
-            ...item, slotId: addSlotId, startDate: addDate,
-            intervalN: addIntervalN, unit: addUnit,
-            daysOfWeek: addRepeatDays.map((d) => (d ? "1" : "0")).join(""),
-            untilDate: addUntil || null,
-          }
-        : { date: addDate, slotId: addSlotId, ...item };
-
-      const res = await fetch(url, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-      });
-      if (res.ok) {
-        setAddOpen(false);
-        await Promise.all([loadAgenda(), loadAnalysis()]);
+      let ok = true;
+      for (const it of addItems) {
+        const item = mealItemBody(it);
+        const body = addRepeat
+          ? {
+              ...item, slotId: addSlotId, startDate: addDate,
+              intervalN: addIntervalN, unit: addUnit,
+              daysOfWeek: addRepeatDays.map((d) => (d ? "1" : "0")).join(""),
+              untilDate: addUntil || null,
+            }
+          : { date: addDate, slotId: addSlotId, ...item };
+        const res = await fetch(url, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+        });
+        if (!res.ok) { ok = false; break; }
       }
+      if (ok) setAddOpen(false);
+      await Promise.all([loadAgenda(), loadAnalysis()]);
     } finally {
       setAddSaving(false);
     }
@@ -598,11 +783,17 @@ export function useAgenda(
     ingredients,
     loading,
     analysis,
+    // Re-fetch agenda + analysis (used by components that mutate via their own
+    // fetches, e.g. the Plan inspector, and need the board to refresh after).
+    reload: async () => { await Promise.all([loadAgenda(), loadAnalysis()]); },
     // row actions
     acting,
+    actionError,
+    setActionError,
     toggleMeal,
     cookAhead,
     uncookAhead,
+    rescheduleEvent,
     requestRemove,
     removeBatch,
     // cook-choice sheet
@@ -648,9 +839,13 @@ export function useAgenda(
     addUnit,
     setAddUnit,
     addUntil,
+    editRuleSeed,
     setAddUntil,
     addSaving,
     editBatchId,
+    editRuleId,
+    editScope,
+    setEditScope,
     isEditing,
     addLabel,
     setAddLabel,

@@ -64,7 +64,7 @@ export function DesktopPantry() {
     <DeskPage title="Pantry" testId="desktop-pantry">
       <div className="md-layout" data-testid="md-layout">
         <div className="md-list stack-sm">
-            {error && <p className="notice">{error}</p>}
+            {error && <p className="notice" role="alert">{error}</p>}
 
             {ingredients === null && !error && <p className="loading">Loading…</p>}
 
@@ -76,6 +76,7 @@ export function DesktopPantry() {
               <input
                 type="search"
                 className="input"
+                aria-label="Search pantry"
                 placeholder="Search pantry…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Pencil, X, AlertTriangle } from "lucide-react";
+import { Pencil, X, AlertTriangle, SlidersHorizontal } from "lucide-react";
 import { localNoon } from "@/lib/dates";
 import type { AgendaMeal, AgendaState, DayAnalysis, NextCook } from "@/views/agenda-data";
 
@@ -11,9 +11,9 @@ export const DOW = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 // cooked (amber, batch serving ready but not eaten today), served (green,
 // eaten/counts toward nutrition).
 const PHASE_CHIP: Record<AgendaMeal["phase"], { bg: string; fg: string }> = {
-  planned: { bg: "#EDEEF1", fg: "#5B6069" },
-  cooked: { bg: "#FBF1DC", fg: "#B26B00" },
-  served: { bg: "#E8F3EB", fg: "#2F8F52" },
+  planned: { bg: "var(--surface-3)", fg: "var(--ink-2)" },
+  cooked: { bg: "var(--warn-weak)", fg: "var(--warn)" },
+  served: { bg: "var(--ok-weak)", fg: "var(--ok)" },
 };
 
 export function initials(name: string | null | undefined): string {
@@ -29,6 +29,7 @@ export function dayHeaderLabel(date: string, todayIso: string): string {
   if (date === todayIso) return "Today";
   const diffDays = Math.round((localNoon(date).getTime() - localNoon(todayIso).getTime()) / 86_400_000);
   if (diffDays === -1) return "Yesterday";
+  if (diffDays === 1) return "Tomorrow";
   return localNoon(date).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
 }
 
@@ -38,16 +39,21 @@ export function MealRow({
   date,
   agenda,
   manage = true,
+  onInspect,
 }: {
   meal: AgendaMeal;
   date: string;
   agenda: AgendaState;
   // Today passes manage=false: status changes only (eat / cook), no edit/remove.
   manage?: boolean;
+  // When set (Plan), an event-backed row shows a control that opens the full
+  // meal Inspector instead of the scattered inline edit/remove buttons.
+  onInspect?: (meal: AgendaMeal) => void;
 }) {
   const { acting, toggleMeal, cookAhead, uncookAhead, openEditBatch, openEditMeal, requestRemove, removeBatch } = agenda;
   const checked = meal.phase === "served";
-  const key = meal.batchBacked && meal.batchId != null ? meal.batchId : meal.eventId;
+  const key =
+    meal.batchBacked && meal.batchId != null ? `batch:${meal.batchId}` : `event:${meal.eventId}`;
   // "Cook ahead" only makes sense for a real, not-yet-touched rotation meal —
   // batch rows already consumed their stock at pack time.
   const showCook = !meal.batchBacked && meal.phase === "planned" && meal.eventId != null;
@@ -128,6 +134,10 @@ export function MealRow({
         </button>
       )}
       <span
+        // Remount on phase change so the entry "pop" fires; the bg/color also
+        // ease between states. One authored moment for the core loop.
+        key={meal.phase}
+        className="phase-chip"
         aria-label={`Status: ${meal.phase}`}
         style={{
           background: meal.outOfStock ? "var(--danger)" : PHASE_CHIP[meal.phase].bg,
@@ -145,8 +155,21 @@ export function MealRow({
       </span>
       {/* Edit/remove are management actions — hidden on Today (manage=false),
           which is status-changes only. */}
+      {/* Plan: one control opens the full Inspector for an event-backed meal,
+          replacing the inline edit/remove pair. */}
+      {onInspect && meal.eventId != null && (
+        <button
+          type="button"
+          className="btn-add"
+          aria-label={`Manage ${meal.name}`}
+          style={{ padding: "4px 10px", minHeight: "auto" }}
+          onClick={() => onInspect(meal)}
+        >
+          <SlidersHorizontal size={16} />
+        </button>
+      )}
       {manage &&
-        ((!meal.batchBacked && meal.phase === "planned" && meal.eventId != null) ||
+        ((!onInspect && !meal.batchBacked && meal.phase !== "served" && meal.eventId != null) ||
           (meal.batchBacked && meal.batchId != null)) && (
           <button
             type="button"
@@ -158,7 +181,7 @@ export function MealRow({
             <Pencil size={15} />
           </button>
         )}
-      {manage && meal.eventId != null && (
+      {manage && !onInspect && meal.eventId != null && (
         <button
           type="button"
           className="btn-add"
@@ -200,9 +223,9 @@ export function MacroBar({ label, cooked, planned, goal, unit, color }: {
           {Math.round(cooked)} / {goal}{unit}
         </span>
       </div>
-      <div style={{ display: "flex", height: 8, borderRadius: 99, background: "#EDEEF1", overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${cookedW}%`, background: color }} />
-        <div style={{ height: "100%", width: `${remW}%`, background: color, opacity: 0.45 }} />
+      <div className="macro-track">
+        <div className="macro-seg" style={{ background: color, opacity: 0.45, transform: `scaleX(${(cookedW + remW) / 100})` }} />
+        <div className="macro-seg" style={{ background: color, transform: `scaleX(${cookedW / 100})` }} />
       </div>
     </div>
   );
@@ -227,12 +250,15 @@ export function NextCooking({ nextCooks }: { nextCooks: NextCook[] }) {
           const dateLabel = localNoon(nc.cookDate)
             .toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
             .replace(/^(\w{3})\./, "$1"); // strip a trailing period on the weekday, if any
-          const inLabel = nc.daysAway === 0 ? "today" : nc.daysAway === 1 ? "tomorrow" : `in ${nc.daysAway} days`;
+          const overdue = nc.daysAway < 0;
+          const inLabel = overdue
+            ? nc.daysAway === -1 ? "overdue by 1 day" : `overdue by ${-nc.daysAway} days`
+            : nc.daysAway === 0 ? "today" : nc.daysAway === 1 ? "tomorrow" : `in ${nc.daysAway} days`;
           return (
             <div
-              key={nc.slotId}
+              key={`${nc.slotId}-${nc.label}-${nc.cookDate}`}
               className="card"
-              style={{ flex: "1 1 0", minWidth: 140, padding: 12 }}
+              style={{ flex: "1 1 0", minWidth: 140, padding: 12, ...(overdue ? { borderColor: "var(--danger-line)" } : {}) }}
             >
               <div style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--ink-3)" }}>
                 {nc.slotName.toLowerCase()} prep
@@ -243,8 +269,8 @@ export function NextCooking({ nextCooks }: { nextCooks: NextCook[] }) {
                 style={{
                   display: "inline-block",
                   marginTop: 8,
-                  background: "var(--accent-2-weak)",
-                  color: "var(--accent-2-ink)",
+                  background: overdue ? "var(--danger-weak)" : "var(--accent-2-weak)",
+                  color: overdue ? "var(--danger)" : "var(--accent-2-ink)",
                   fontSize: 11,
                   fontWeight: 600,
                   borderRadius: 999,

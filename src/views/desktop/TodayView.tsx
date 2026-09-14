@@ -41,6 +41,7 @@ export function DesktopToday({ userName }: { userName?: string | null }) {
               <p className="section-label" style={{ margin: 0, padding: 0, border: "none" }}>
                 Agenda
               </p>
+              {agenda.actionError && <p className="notice" role="alert">{agenda.actionError}</p>}
               <AgendaList agenda={agenda} manage={false} />
             </div>
 

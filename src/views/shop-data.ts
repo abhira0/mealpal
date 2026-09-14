@@ -2,16 +2,31 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ShopLine, PriceMap } from "@/components/ShopTicket";
+import { packsNeeded } from "@/lib/units";
 
 export type RawLine = {
   ingredientId: number;
   ingredientName: string;
   needed: number;
-  product: { id: number; name: string } | null;
+  product: { id: number; name: string; packSize?: number } | null;
   urgency?: { label: string; tone: "run" | "low" } | null;
   extraId?: number;
 };
 export type ShoppingMap = Record<string, RawLine[]>;
+
+/**
+ * Total cost (cents) of a set of shopping lines: each line's product price
+ * multiplied by the whole packs needed to cover `needed` — a multi-pack line
+ * (e.g. needing 2 packs of a 500g product) must count both packs, not just one.
+ */
+export function sumLines(lines: RawLine[], prices: PriceMap): number {
+  return lines.reduce((sum, l) => {
+    if (!l.product) return sum;
+    const cents = prices[l.product.id] ?? 0;
+    const packs = l.product.packSize ? packsNeeded(l.needed, l.product.packSize) : 1;
+    return sum + cents * packs;
+  }, 0);
+}
 
 export type Product = { id: number; name: string; effectiveCents: number | null };
 type Ingredient = { id: number; canonicalUnit: string };
@@ -36,6 +51,7 @@ export function useShopData() {
 
   const loadShopping = useCallback(() => {
     setData(null);
+    setError(null);
     fetch(`/api/shopping?horizon=${horizon}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((j) => setData(j as ShoppingMap))
@@ -80,11 +96,7 @@ export function useShopData() {
     [data],
   );
 
-  const shopTotal = useCallback(
-    (lines: RawLine[]): number =>
-      lines.reduce((sum, l) => sum + (l.product ? prices[l.product.id] ?? 0 : 0), 0),
-    [prices],
-  );
+  const shopTotal = useCallback((lines: RawLine[]): number => sumLines(lines, prices), [prices]);
 
   const tripTotal = shops.reduce((sum, [, lines]) => sum + shopTotal(lines), 0);
 

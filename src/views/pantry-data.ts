@@ -86,6 +86,7 @@ export function usePantryData() {
       .then(([ings, , prods]) => {
         setIngredients(ings as Ingredient[]);
         setProducts(prods as Product[]);
+        setError(null);
       })
       .catch(() => setError("Couldn't load the pantry yet."));
   }, [loadStock]);
@@ -121,6 +122,7 @@ export function usePantryData() {
             .filter((l) => l.remaining !== 0);
           return { ...prev, [key]: next };
         });
+        setError(null);
       } else setError("Couldn't save.");
     },
     [applyDelta],
@@ -153,6 +155,7 @@ export function usePantryData() {
           if (patch.expiresAt !== undefined) next = sortLots(next);
           return { ...prev, [key]: next };
         });
+        setError(null);
       } else setError("Couldn't save.");
     },
     [],
@@ -184,6 +187,7 @@ export function usePantryData() {
           });
       }
       await loadStock();
+      setError(null);
     },
     [loadStock],
   );
