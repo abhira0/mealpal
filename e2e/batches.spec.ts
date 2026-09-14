@@ -13,9 +13,9 @@ test.describe("batch tracker (merged Today agenda)", () => {
 
   test.afterAll(() => {
     // Self-clean: the pack flow below writes real rows into the dev DB
-    // (./mealpal.db), so delete anything E2E-labelled in FK order once the
+    // (./platr.db), so delete anything E2E-labelled in FK order once the
     // test is done — pass or fail — to stop polluting the demo household.
-    const db = new Database(path.join(process.cwd(), "mealpal.db"));
+    const db = new Database(path.join(process.cwd(), "platr.db"));
     try {
       db.exec(`
         DELETE FROM batch_eaten WHERE batch_id IN (SELECT id FROM batches WHERE label LIKE 'E2E%');
