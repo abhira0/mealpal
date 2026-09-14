@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Dropdown } from "@/components/Dropdown";
 import { Stepper } from "@/components/Stepper";
@@ -68,12 +68,23 @@ function initials(name: string | null | undefined): string {
 }
 
 export function PlanEditor({ userName }: { userName?: string | null }) {
-  const todayIso = useMemo(todayISO, []);
+  const [todayIso, setTodayIso] = useState<string>(todayISO);
   const [selected, setSelected] = useState<string>(todayIso);
   // ponytail: server can't know the client's date/timezone, so all time-derived
   // text (today, greeting, locale dates, the strip) is client-only to avoid hydration drift.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  // A tab left open past midnight would otherwise keep yesterday's "today" —
+  // the Today button, isToday highlight, and header date all go stale. Cheap
+  // to recheck on tab-return (same trigger CookMode uses for its wake lock).
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") setTodayIso(todayISO());
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
 
   // The strip slides to keep `selected` in view; the events range follows it.
   const days = useMemo(() => windowAround(selected), [selected]);
@@ -87,9 +98,8 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
   const [events, setEvents] = useState<MealEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Add wizard state: one bottom-right button → slot → type → details.
+  // Add form state: one bottom-right button → single sheet (slot + type + details).
   const [adding, setAdding] = useState(false);
-  const [step, setStep] = useState<"slot" | "type" | "details">("slot");
   const [addSlot, setAddSlot] = useState<Slot | null>(null);
   const [kind, setKind] = useState<AddKind>("recipe");
   const [pickRecipe, setPickRecipe] = useState<number | null>(null);
@@ -113,10 +123,20 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
   const [unit, setUnit] = useState<"day" | "week">("day");
   const [until, setUntil] = useState("");
 
+  // Tracks the range the most recently *issued* loadEvents call was for, so a
+  // response can tell whether a newer request has superseded it (see below).
+  const rangeRef = useRef({ from, to });
+  rangeRef.current = { from, to };
+
   const loadEvents = useCallback(async () => {
-    const res = await fetch(`/api/events?from=${from}&to=${to}`);
+    const reqFrom = from, reqTo = to;
+    const res = await fetch(`/api/events?from=${reqFrom}&to=${reqTo}`);
     if (!res.ok) return;
-    setEvents((await res.json()) as MealEvent[]);
+    const data = (await res.json()) as MealEvent[];
+    // Fast day-taps can fire several loadEvents calls before earlier ones
+    // resolve; only apply the response if it's still the latest range being
+    // viewed, so an older in-flight request can't overwrite newer results.
+    if (reqFrom === rangeRef.current.from && reqTo === rangeRef.current.to) setEvents(data);
   }, [from, to]);
 
   // Slots, recipes, products, ingredients don't depend on the date range — fetch once.
@@ -196,21 +216,15 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
       ));
   }
 
-  // Step 1 of the Add wizard: open the sheet and ask for a slot.
+  // Open the add sheet, defaulted to the first slot + a recipe.
   function openAdd() {
-    setAddSlot(null);
-    setStep("slot");
+    setAddSlot(slots[0] ?? null);
+    applyKind("recipe");
     setAdding(true);
   }
 
-  // Step 1 → 2: slot chosen, ask for the kind.
-  function chooseSlot(slot: Slot) {
-    setAddSlot(slot);
-    setStep("type");
-  }
-
-  // Step 2 → 3: kind chosen, show the matching picker with sensible defaults.
-  function chooseKind(k: AddKind) {
+  // Switch the item kind, resetting that kind's pickers to sensible defaults.
+  function applyKind(k: AddKind) {
     setKind(k);
     setPickRecipe(recipes[0]?.id ?? null);
     setPickServings(k === "recipe" ? recipes[0]?.baseServings ?? 2 : 1);
@@ -226,7 +240,6 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
     setIntervalN(1);
     setUnit("day");
     setUntil("");
-    setStep("details");
   }
 
   // Load a chosen product's variants (assorted packs need a variant pick).
@@ -237,7 +250,15 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
     setPickProductServings("");
     setPickProductAmount("");
     const res = await fetch(`/api/products/${id}/variants`);
-    if (res.ok) setVariants((await res.json()) as { id: number; name: string; servingSize: number | null }[]);
+    if (!res.ok) return;
+    const data = (await res.json()) as { id: number; name: string; servingSize: number | null }[];
+    // If the user re-opened the picker and chose a different product before
+    // this resolved, an older response landing later must not populate
+    // variants for a product that's no longer selected.
+    setPickProduct((cur) => {
+      if (cur === id) setVariants(data);
+      return cur;
+    });
   }
 
   const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
@@ -305,68 +326,62 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
     }
   }
 
-  // Repeat toggle + recurrence controls, shared across all item kinds.
+  // Recurrence controls, shown only once "Schedule…" is chosen (repeat === true).
   const repeatBlock = (
     <>
-      <div className="servings-row">
-        <span className="field-label" style={{ marginBottom: 0 }}>Repeat</span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={repeat}
-          className={repeat ? "btn" : "btn-add"}
-          onClick={() => setRepeat((v) => !v)}
-        >
-          {repeat ? "On" : "Off"}
-        </button>
-      </div>
-      {repeat && (
-        <>
-          {unit === "week" && (
-            <div className="week week--repeat" role="group" aria-label="Repeat on">
-              {DOW.map((label, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  aria-pressed={repeatDays[i]}
-                  className={repeatDays[i] ? "day on" : "day"}
-                  onClick={() => setRepeatDays((ds) => ds.map((d, j) => (j === i ? !d : d)))}
-                >
-                  <span className="dow">{label[0]}</span>
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="servings-row">
-            <span className="field-label" style={{ marginBottom: 0 }}>Every</span>
-            <Stepper value={intervalN} min={1} onChange={setIntervalN} />
-            <Dropdown
-              label="Unit"
-              value={unit}
-              options={[
-                { id: "week", label: intervalN > 1 ? "weeks" : "week" },
-                { id: "day", label: intervalN > 1 ? "days" : "day" },
-              ]}
-              onChange={(id) => setUnit(id === "day" ? "day" : "week")}
-            />
-          </div>
-          <div className="field">
-            <span className="field-label">Until (optional)</span>
-            <input
-              type="date"
-              className="input"
-              data-empty={until ? undefined : ""}
-              value={until}
-              min={selected}
-              onChange={(e) => setUntil(e.target.value)}
-            />
-          </div>
-        </>
+      {unit === "week" && (
+        <div className="week week--repeat" role="group" aria-label="Repeat on">
+          {DOW.map((label, i) => (
+            <button
+              key={i}
+              type="button"
+              aria-pressed={repeatDays[i]}
+              className={repeatDays[i] ? "day on" : "day"}
+              onClick={() => setRepeatDays((ds) => ds.map((d, j) => (j === i ? !d : d)))}
+            >
+              <span className="dow">{label[0]}</span>
+            </button>
+          ))}
+        </div>
       )}
+      <div className="servings-row">
+        <span className="field-label" style={{ marginBottom: 0 }}>Every</span>
+        <Stepper value={intervalN} min={1} onChange={setIntervalN} />
+        <Dropdown
+          label="Unit"
+          value={unit}
+          options={[
+            { id: "week", label: intervalN > 1 ? "weeks" : "week" },
+            { id: "day", label: intervalN > 1 ? "days" : "day" },
+          ]}
+          onChange={(id) => setUnit(id === "day" ? "day" : "week")}
+        />
+      </div>
+      <div className="field">
+        <span className="field-label">Until (optional)</span>
+        <input
+          type="date"
+          className="input"
+          data-empty={until ? undefined : ""}
+          value={until}
+          min={selected}
+          onChange={(e) => setUntil(e.target.value)}
+        />
+      </div>
     </>
   );
   // weekly repeat needs at least one day selected before we can save
   const repeatInvalid = repeat && unit === "week" && !repeatDays.some(Boolean);
+
+  const canSave = !saving && addSlot != null && !repeatInvalid && (
+    kind === "recipe" ? pickRecipe != null
+    : kind === "product" ? pickProduct != null
+        && !(pickProductAmount !== "" && !(Number(pickProductAmount) > 0))
+        && !(pickProductServings !== "" && !(Number(pickProductServings) > 0))
+    : pickIngredient != null && Number(pickAmount) > 0
+  );
+  const oneoffLabel = kind === "recipe" ? "Add meal" : "Add";
+  const scheduleLabel = kind === "recipe" ? "Schedule meal" : "Schedule item";
 
   if (!mounted) {
     return (
@@ -503,185 +518,154 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
         </button>
       )}
 
-      <Sheet
-        open={adding}
-        title={
-          step === "slot" ? "Add to which meal?"
-          : step === "type" ? `${addSlot?.name ?? ""} — what are you adding?`
-          : `Add to ${addSlot?.name ?? ""}`
-        }
-        onClose={() => setAdding(false)}
-      >
-        {step === "slot" && (
-          <div className="sh-body stack-sm">
-            {slots.map((slot) => (
-              <button key={slot.id} type="button" className="btn block" onClick={() => chooseSlot(slot)}>
-                {slot.name}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {step === "type" && (
-          <div className="sh-body stack-sm">
-            <button type="button" className="btn block" onClick={() => chooseKind("recipe")}>Meal (recipe)</button>
-            <button type="button" className="btn block" onClick={() => chooseKind("product")}>Product</button>
-            <button type="button" className="btn block" onClick={() => chooseKind("ingredient")}>Ingredient</button>
-            <button type="button" className="btn-add" onClick={() => setStep("slot")}>← Back</button>
-          </div>
-        )}
-
-        {step === "details" && kind === "recipe" && (
+      <Sheet open={adding} title="Add to the plan" onClose={() => setAdding(false)}>
         <div className="sh-body">
           <div className="field">
-            <span className="field-label">Recipe</span>
+            <span className="field-label">Meal</span>
             <Dropdown
-              label="Recipe"
-              value={pickRecipe}
-              options={recipes.map((r) => ({ id: r.id, label: r.name }))}
-              onChange={(id) => setPickRecipe(Number(id))}
+              label="Meal slot"
+              value={addSlot?.id ?? null}
+              options={slots.map((s) => ({ id: s.id, label: s.name }))}
+              onChange={(id) => setAddSlot(slots.find((s) => s.id === Number(id)) ?? null)}
             />
           </div>
-          <div className="servings-row">
-            <span className="field-label" style={{ marginBottom: 0 }}>
-              Servings
-            </span>
-            <Stepper value={pickServings} min={1} onChange={setPickServings} />
+
+          <div className="unit-radio">
+            <button type="button" aria-pressed={kind === "recipe"} onClick={() => applyKind("recipe")}>Meal</button>
+            <button type="button" aria-pressed={kind === "product"} onClick={() => applyKind("product")}>Product</button>
+            <button type="button" aria-pressed={kind === "ingredient"} onClick={() => applyKind("ingredient")}>Ingredient</button>
           </div>
 
-          {repeatBlock}
-
-          <button
-            type="button"
-            className="btn block"
-            onClick={saveMeal}
-            disabled={saving || pickRecipe == null || repeatInvalid}
-          >
-            {saving ? "Adding…" : repeat ? "Add repeating meal" : "Add meal"}
-          </button>
-          <button type="button" className="btn-add" onClick={() => setStep("type")}>← Back</button>
-        </div>
-        )}
-
-        {step === "details" && kind === "product" && (
-          <div className="sh-body">
-            <div className="field">
-              <span className="field-label">Product</span>
-              <Dropdown
-                label="Product"
-                value={pickProduct}
-                options={products.map((p) => ({ id: p.id, label: p.name }))}
-                onChange={(id) => selectProduct(Number(id))}
-              />
-            </div>
-            {variants.length > 0 && (
+          {kind === "recipe" && (
+            <>
               <div className="field">
-                <span className="field-label">Variant (optional)</span>
+                <span className="field-label">Recipe</span>
                 <Dropdown
-                  label="Variant"
-                  value={pickVariant}
-                  options={variants.map((v) => ({ id: v.id, label: v.name }))}
-                  onChange={(id) => setPickVariant(Number(id))}
+                  label="Recipe"
+                  value={pickRecipe}
+                  options={recipes.map((r) => ({ id: r.id, label: r.name }))}
+                  onChange={(id) => setPickRecipe(Number(id))}
                 />
               </div>
-            )}
-            {(() => {
-              const info = servingInfo();
-              const round = (n: number) => (Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100));
+              <div className="servings-row">
+                <span className="field-label" style={{ marginBottom: 0 }}>Servings</span>
+                <Stepper value={pickServings} min={1} onChange={setPickServings} />
+              </div>
+            </>
+          )}
 
-              // Each field only ever holds what the user typed into it. The
-              // sibling's conversion is shown passively as its placeholder,
-              // never written into its value — so typing never disturbs focus.
-              const typedServings = Number(pickProductServings);
-              const typedAmount = Number(pickProductAmount);
-              const servingsPlaceholder =
-                info && pickProductAmount !== "" && Number.isFinite(typedAmount) && typedAmount > 0
-                  ? round(typedAmount / info.perServing)
-                  : "1";
-              const amountPlaceholder =
-                info && pickProductServings !== "" && Number.isFinite(typedServings) && typedServings > 0
-                  ? round(typedServings * info.perServing)
-                  : info ? round(info.perServing) : "150";
-
-              return (
-                <div style={{ display: "flex", gap: 12 }}>
-                  <div className="field" style={{ flex: 1 }}>
-                    <span className="field-label">Servings</span>
-                    <input
-                      className="input mono"
-                      inputMode="decimal"
-                      value={pickProductServings}
-                      onChange={(e) => setPickProductServings(e.target.value.replace(/[^0-9.]/g, ""))}
-                      placeholder={servingsPlaceholder}
-                    />
-                  </div>
-                  <div className="field" style={{ flex: 1 }}>
-                    <span className="field-label">Amount{info ? ` (${info.unit})` : ""}</span>
-                    <input
-                      className="input mono"
-                      inputMode="decimal"
-                      value={pickProductAmount}
-                      onChange={(e) => setPickProductAmount(e.target.value.replace(/[^0-9.]/g, ""))}
-                      placeholder={info ? `${amountPlaceholder} ${info.unit}` : amountPlaceholder}
-                    />
-                  </div>
+          {kind === "product" && (
+            <>
+              <div className="field">
+                <span className="field-label">Product</span>
+                <Dropdown
+                  label="Product"
+                  value={pickProduct}
+                  options={products.map((p) => ({ id: p.id, label: p.name }))}
+                  onChange={(id) => selectProduct(Number(id))}
+                />
+              </div>
+              {variants.length > 0 && (
+                <div className="field">
+                  <span className="field-label">Variant (optional)</span>
+                  <Dropdown
+                    label="Variant"
+                    value={pickVariant}
+                    options={variants.map((v) => ({ id: v.id, label: v.name }))}
+                    onChange={(id) => setPickVariant(Number(id))}
+                  />
                 </div>
-              );
-            })()}
-            {repeatBlock}
-            <button
-              type="button"
-              className="btn block"
-              onClick={saveMeal}
-              disabled={
-                saving ||
-                pickProduct == null ||
-                (pickProductAmount !== "" && !(Number(pickProductAmount) > 0)) ||
-                (pickProductServings !== "" && !(Number(pickProductServings) > 0)) ||
-                repeatInvalid
-              }
-            >
-              {saving ? "Adding…" : repeat ? "Add repeating item" : "Add"}
-            </button>
-            <button type="button" className="btn-add" onClick={() => setStep("type")}>← Back</button>
-          </div>
-        )}
+              )}
+              {(() => {
+                const info = servingInfo();
+                const round = (n: number) => (Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100));
 
-        {step === "details" && kind === "ingredient" && (
-          <div className="sh-body">
-            <div className="field">
-              <span className="field-label">Ingredient</span>
-              <Dropdown
-                label="Ingredient"
-                value={pickIngredient}
-                options={ingredients.map((i) => ({ id: i.id, label: i.name }))}
-                onChange={(id) => setPickIngredient(Number(id))}
-              />
+                // Each field only ever holds what the user typed into it. The
+                // sibling's conversion is shown passively as its placeholder,
+                // never written into its value — so typing never disturbs focus.
+                const typedServings = Number(pickProductServings);
+                const typedAmount = Number(pickProductAmount);
+                const servingsPlaceholder =
+                  info && pickProductAmount !== "" && Number.isFinite(typedAmount) && typedAmount > 0
+                    ? round(typedAmount / info.perServing)
+                    : "1";
+                const amountPlaceholder =
+                  info && pickProductServings !== "" && Number.isFinite(typedServings) && typedServings > 0
+                    ? round(typedServings * info.perServing)
+                    : info ? round(info.perServing) : "150";
+
+                return (
+                  <div style={{ display: "flex", gap: 12 }}>
+                    <label className="field" style={{ flex: 1 }}>
+                      <span className="field-label">Servings</span>
+                      <input
+                        className="input mono"
+                        inputMode="decimal"
+                        value={pickProductServings}
+                        onChange={(e) => setPickProductServings(e.target.value.replace(/[^0-9.]/g, ""))}
+                        placeholder={servingsPlaceholder}
+                      />
+                    </label>
+                    <label className="field" style={{ flex: 1 }}>
+                      <span className="field-label">Amount{info ? ` (${info.unit})` : ""}</span>
+                      <input
+                        className="input mono"
+                        inputMode="decimal"
+                        value={pickProductAmount}
+                        onChange={(e) => setPickProductAmount(e.target.value.replace(/[^0-9.]/g, ""))}
+                        placeholder={info ? `${amountPlaceholder} ${info.unit}` : amountPlaceholder}
+                      />
+                    </label>
+                  </div>
+                );
+              })()}
+            </>
+          )}
+
+          {kind === "ingredient" && (
+            <>
+              <div className="field">
+                <span className="field-label">Ingredient</span>
+                <Dropdown
+                  label="Ingredient"
+                  value={pickIngredient}
+                  options={ingredients.map((i) => ({ id: i.id, label: i.name }))}
+                  onChange={(id) => setPickIngredient(Number(id))}
+                />
+              </div>
+              <label className="field">
+                <span className="field-label">
+                  Amount{pickIngredient != null && ingredientUnit.get(pickIngredient) ? ` (${ingredientUnit.get(pickIngredient)})` : ""}
+                </span>
+                <input
+                  className="input mono"
+                  inputMode="decimal"
+                  value={pickAmount}
+                  onChange={(e) => setPickAmount(e.target.value.replace(/[^0-9.]/g, ""))}
+                  placeholder="e.g. 43"
+                />
+              </label>
+            </>
+          )}
+
+          {repeat && repeatBlock}
+
+          {!repeat ? (
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="button" className="btn block" onClick={saveMeal} disabled={!canSave}>
+                {saving ? "Adding…" : oneoffLabel}
+              </button>
+              <button type="button" className="btn-add" onClick={() => setRepeat(true)}>Schedule…</button>
             </div>
-            <div className="field">
-              <span className="field-label">
-                Amount{pickIngredient != null && ingredientUnit.get(pickIngredient) ? ` (${ingredientUnit.get(pickIngredient)})` : ""}
-              </span>
-              <input
-                className="input mono"
-                inputMode="decimal"
-                value={pickAmount}
-                onChange={(e) => setPickAmount(e.target.value.replace(/[^0-9.]/g, ""))}
-                placeholder="e.g. 43"
-              />
-            </div>
-            {repeatBlock}
-            <button
-              type="button"
-              className="btn block"
-              onClick={saveMeal}
-              disabled={saving || pickIngredient == null || !(Number(pickAmount) > 0) || repeatInvalid}
-            >
-              {saving ? "Adding…" : repeat ? "Add repeating item" : "Add"}
-            </button>
-            <button type="button" className="btn-add" onClick={() => setStep("type")}>← Back</button>
-          </div>
-        )}
+          ) : (
+            <>
+              <button type="button" className="btn block" onClick={saveMeal} disabled={!canSave}>
+                {saving ? "Scheduling…" : scheduleLabel}
+              </button>
+              <button type="button" className="btn-add" onClick={() => setRepeat(false)}>← One-off instead</button>
+            </>
+          )}
+        </div>
       </Sheet>
     </>
   );

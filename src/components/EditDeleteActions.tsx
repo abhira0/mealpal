@@ -54,7 +54,7 @@ export function EditDeleteActions({
           <Trash2 size={18} />
         </button>
       </div>
-      {error && <p className="notice" style={{ marginTop: 0 }}>{error}</p>}
+      {error && <p className="notice" role="alert" style={{ marginTop: 0 }}>{error}</p>}
       <dialog ref={dialogRef} className="confirm">
         <p>Delete this {singular}?</p>
         <div className="row">

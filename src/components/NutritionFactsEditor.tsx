@@ -109,9 +109,9 @@ export function NutritionFactsEditor({
     else setMsg((await res.json().catch(() => ({}))).error ?? "Save failed");
   }
 
-  const numInput = (k: Key) => (
+  const numInput = (k: Key, label: string) => (
     <input style={inputStyle} type="number" inputMode="decimal" step="any"
-      value={vals[k]} onChange={(e) => setVal(k, e.target.value)} aria-label={k} />
+      value={vals[k]} onChange={(e) => setVal(k, e.target.value)} aria-label={label} />
   );
 
   return (
@@ -132,7 +132,7 @@ export function NutritionFactsEditor({
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 2, ...rule(4) }}>
         <strong style={{ fontSize: 18 }}>Calories</strong>
-        {numInput("calories")}
+        {numInput("calories", "Calories")}
       </div>
 
       <div style={{ textAlign: "right", fontSize: 12, padding: "2px 0", ...rule(1) }}>% Daily Value*</div>
@@ -144,7 +144,7 @@ export function NutritionFactsEditor({
           <div key={n.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "2px 0", ...rule(last ? 4 : 1) }}>
             <span style={{ paddingLeft: "indent" in n && n.indent ? 16 : 0 }}>
               <strong style={{ fontWeight: "bold" in n && n.bold ? 700 : 400 }}>{n.label}</strong>{" "}
-              {numInput(n.key)}{n.unit}
+              {numInput(n.key, n.label)}{n.unit}
             </span>
             <strong>{pct != null ? `${pct}%` : ""}</strong>
           </div>
@@ -161,7 +161,7 @@ export function NutritionFactsEditor({
       <button type="button" className="btn-link danger" style={{ width: "auto" }} disabled={busy} onClick={clear}>
         Clear
       </button>
-      {msg && <p className="notice" style={{ margin: "8px 0 0" }}>{msg}</p>}
+      {msg && <p className="notice" role="alert" style={{ margin: "8px 0 0" }}>{msg}</p>}
     </div>
   );
 }

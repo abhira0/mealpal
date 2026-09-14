@@ -209,7 +209,7 @@ export function RecipeSheet({
   return (
     <Sheet open={open} title={editing ? "Edit recipe" : "New recipe"} onClose={onClose}>
       <div className="sh-body">
-        <div className="tabs" role="tablist" style={{ marginBottom: 4 }}>
+        <div className="tabs" style={{ marginBottom: 4 }}>
           <button type="button" aria-pressed={tab === "details"} onClick={() => setTab("details")}>Details</button>
           <button type="button" aria-pressed={tab === "ingredients"} onClick={() => setTab("ingredients")}>Ingredients</button>
           <button type="button" aria-pressed={tab === "steps"} onClick={() => setTab("steps")}>Steps</button>
@@ -250,7 +250,7 @@ export function RecipeSheet({
               {photo ? (
                 <div className="media" style={{ marginBottom: 8 }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={photo} alt="Recipe" />
+                  <img src={photo} alt="" loading="lazy" />
                 </div>
               ) : null}
               <div className="stack-sm" style={{ flexDirection: "row", gap: 8 }}>
@@ -379,7 +379,7 @@ export function RecipeSheet({
           </div>
         )}
 
-        {error ? <p className="notice">{error}</p> : null}
+        {error ? <p className="notice" role="alert">{error}</p> : null}
 
         <button type="button" className="btn block" disabled={saving} onClick={submit}>
           {saving ? "Saving…" : editing ? "Save changes" : "Save recipe"}

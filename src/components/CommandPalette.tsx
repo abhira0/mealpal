@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
+import { useFocusTrap } from "@/lib/useFocusTrap";
 
 type Item = { key: string; label: string; sub?: string; href: string; group: string };
 
@@ -65,6 +66,9 @@ export function CommandPalette() {
   const [entities, setEntities] = useState<Item[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, open);
 
   const all = useMemo(() => [...NAV, ...entities], [entities]);
   const results = useMemo(() => rank(all, query.trim()), [all, query]);
@@ -91,10 +95,10 @@ export function CommandPalette() {
       setOpen(true);
     };
     window.addEventListener("keydown", onKey);
-    window.addEventListener("mealpal:open-cmdk", onOpen);
+    window.addEventListener("platr:open-cmdk", onOpen);
     return () => {
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener("mealpal:open-cmdk", onOpen);
+      window.removeEventListener("platr:open-cmdk", onOpen);
     };
   }, []);
 
@@ -111,6 +115,13 @@ export function CommandPalette() {
       document.body.style.overflow = prevOverflow;
     };
   }, [open, entities.length]);
+
+  // Keep the highlighted row visible as arrow keys move it past the
+  // scrollable list's edge (up to 40 results can overflow the panel height).
+  useEffect(() => {
+    if (!open) return;
+    listRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
+  }, [open, active]);
 
   if (pathname === "/login" || !open) return null;
 
@@ -134,6 +145,7 @@ export function CommandPalette() {
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"
+        ref={dialogRef}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <input
@@ -143,16 +155,20 @@ export function CommandPalette() {
           value={query}
           placeholder="Jump to a page, recipe, ingredient…"
           aria-label="Search"
+          role="combobox"
+          aria-expanded="true"
           aria-controls="cmdk-list"
+          aria-autocomplete="list"
+          aria-activedescendant={results[active] ? `cmdk-opt-${results[active].key}` : undefined}
           onChange={(e) => { setQuery(e.target.value); setActive(0); }}
           onKeyDown={onKeyDown}
         />
-        <ul className="cmdk-list" id="cmdk-list" role="listbox">
+        <ul className="cmdk-list" id="cmdk-list" role="listbox" ref={listRef}>
           {results.length === 0 && <li className="cmdk-empty">No matches.</li>}
           {results.map((it, i) => {
             const showGroup = i === 0 || results[i - 1].group !== it.group;
             return (
-              <li key={it.key} role="option" aria-selected={i === active}>
+              <li key={it.key} id={`cmdk-opt-${it.key}`} role="option" aria-selected={i === active}>
                 {showGroup && <span className="cmdk-group">{it.group}</span>}
                 <button
                   type="button"

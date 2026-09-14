@@ -89,12 +89,12 @@ export function BottomNav() {
   return (
     <nav className="nav" aria-label="Primary">
       <span className="nav-brand" aria-hidden="true">
-        MealPal
+        Platr
       </span>
       <button
         type="button"
         className="nav-search"
-        onClick={() => window.dispatchEvent(new CustomEvent("mealpal:open-cmdk"))}
+        onClick={() => window.dispatchEvent(new CustomEvent("platr:open-cmdk"))}
       >
         <span>Search…</span>
         <kbd>⌘K</kbd>

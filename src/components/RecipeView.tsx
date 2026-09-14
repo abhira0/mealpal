@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { QuantityChip } from "@/components/QuantityChip";
 import { Stepper } from "@/components/Stepper";
@@ -156,7 +156,7 @@ export function RecipeView({ id }: { id: string }) {
           )}
         </div>
 
-        <div className="tabs" role="tablist">
+        <div className="tabs">
           <button type="button" aria-pressed={tab === "ingredients"} onClick={() => setTab("ingredients")}>
             Ingredients
           </button>
@@ -206,19 +206,29 @@ export function RecipeView({ id }: { id: string }) {
                     s.startSeconds != null &&
                     s.endSeconds != null &&
                     s.endSeconds > s.startSeconds;
+                  const playClip = hasClip
+                    ? () => {
+                        setSeek({ start: s.startSeconds!, end: s.endSeconds! });
+                        setYtLoaded(true);
+                        galleryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }
+                    : undefined;
                   return (
                     <li
                       key={s.position ?? i}
                       className={`step${hasClip ? " step-clickable" : ""}`}
-                      onClick={
-                        hasClip
-                          ? () => {
-                              setSeek({ start: s.startSeconds!, end: s.endSeconds! });
-                              setYtLoaded(true);
-                              galleryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                            }
-                          : undefined
-                      }
+                      onClick={playClip}
+                      {...(hasClip && {
+                        role: "button",
+                        tabIndex: 0,
+                        "aria-label": `Play clip for step ${i + 1}`,
+                        onKeyDown: (e: KeyboardEvent<HTMLLIElement>) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            playClip!();
+                          }
+                        },
+                      })}
                     >
                       <span className="num" aria-hidden="true">{i + 1}</span>
                       <span className="step-text">{s.text}</span>
@@ -383,7 +393,7 @@ function Gallery({
             >
               {m.kind === "photo" ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={m.url} alt="" />
+                <img src={m.url} alt="" loading="lazy" />
               ) : (
                 <span aria-hidden="true">▶</span>
               )}
@@ -414,7 +424,7 @@ function MediaBlock({
       return (
         <button type="button" className="media yt-facade" onClick={onLoad} aria-label={`Play video: ${title}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`https://img.youtube.com/vi/${yt}/hqdefault.jpg`} alt="" />
+          <img src={`https://img.youtube.com/vi/${yt}/hqdefault.jpg`} alt="" loading="lazy" />
           <span className="yt-play" aria-hidden="true">▶</span>
         </button>
       );
@@ -446,7 +456,7 @@ function MediaBlock({
   return (
     <div className="media">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={media.url} alt={title} />
+      <img src={media.url} alt={title} loading="lazy" />
     </div>
   );
 }

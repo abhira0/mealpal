@@ -15,13 +15,16 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     setBusy(true);
+    // Emails are stored/matched case-insensitively (server normalizes too) —
+    // trim here so what's echoed back on error matches what's expected.
+    const trimmedEmail = email.trim();
 
     try {
       if (mode === "register") {
         const res = await fetch("/api/register", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ email, password, householdName }),
+          body: JSON.stringify({ email: trimmedEmail, password, householdName }),
         });
         if (!res.ok) {
           setError((await res.json()).error ?? "Registration failed");
@@ -30,7 +33,7 @@ export default function LoginPage() {
       }
 
       const result = await signIn("credentials", {
-        email,
+        email: trimmedEmail,
         password,
         redirect: false,
       });
@@ -48,12 +51,12 @@ export default function LoginPage() {
     <div className="login-page">
       <div className="login-card">
       <header className="chrome">
-        <p className="eb">MealPal</p>
+        <p className="eb">Platr</p>
         <h1>{mode === "login" ? "Welcome back" : "Set up your household"}</h1>
       </header>
 
       <div className="content stack">
-        {error && <p className="notice">{error}</p>}
+        {error && <p className="notice" role="alert">{error}</p>}
 
         <form onSubmit={onSubmit} className="stack">
           <label className="field">
@@ -65,6 +68,7 @@ export default function LoginPage() {
               placeholder="you@household.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
               required
             />
           </label>
@@ -78,6 +82,8 @@ export default function LoginPage() {
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete={mode === "register" ? "new-password" : "current-password"}
+              minLength={mode === "register" ? 6 : undefined}
               required
             />
           </label>

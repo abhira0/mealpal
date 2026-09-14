@@ -33,8 +33,12 @@ export function StockAdjust({
   const [error, setError] = useState<string | null>(null);
 
   async function save() {
+    if (busy) return;
     const target = Number(draft);
-    if (!Number.isFinite(target) || busy) return;
+    if (draft.trim() === "" || !Number.isFinite(target)) {
+      setError("Enter a number.");
+      return;
+    }
     const delta = target - current;
     if (delta === 0 && !expiresAt) {
       setOpen(false);
@@ -80,6 +84,7 @@ export function StockAdjust({
         inputMode="decimal"
         autoFocus
         className="input"
+        aria-label={`New total (${unit})`}
         style={{ width: 90 }}
         value={draft}
         disabled={busy}
@@ -111,7 +116,7 @@ export function StockAdjust({
       >
         cancel
       </button>
-      {error && <p className="notice">{error}</p>}
+      {error && <p className="notice" role="alert">{error}</p>}
     </div>
   );
 }

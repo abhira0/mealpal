@@ -109,7 +109,7 @@ export function ProductDetail({ id }: { id: string }) {
   if (!product) {
     return (
       <div className="content">
-        {error ? <p className="notice">{error}</p> : <p className="loading">Loading…</p>}
+        {error ? <p className="notice" role="alert">{error}</p> : <p className="loading">Loading…</p>}
       </div>
     );
   }
@@ -127,13 +127,13 @@ export function ProductDetail({ id }: { id: string }) {
       />
 
       <div className="content stack-sm">
-        {error && <p className="notice">{error}</p>}
+        {error && <p className="notice" role="alert">{error}</p>}
 
         <span className="section-label">Details</span>
         <section className="card stack-sm">
           {product.imageUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={product.imageUrl} alt="" style={{ display: "block", maxHeight: 160, borderRadius: 8, margin: "0 auto" }} />
+            <img src={product.imageUrl} alt={product.name} loading="lazy" style={{ display: "block", maxHeight: 160, borderRadius: 8, margin: "0 auto" }} />
           )}
           {!product.available && <span className="chip run">unavailable</span>}
           <Field label="Ingredient">{ingredient?.name ?? "—"}</Field>

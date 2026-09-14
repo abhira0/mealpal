@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { parseClip, fmtClip } from "@/lib/clip";
+import { useFocusTrap } from "@/lib/useFocusTrap";
 import type { EditableRecipe } from "@/components/RecipeSheet";
 
 type Step = { text: string; startSeconds: number | null; endSeconds: number | null };
@@ -65,6 +67,8 @@ export function CookMode({
   const lockRef = useRef<WakeLockSentinel | null>(null);
   const playerHostRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<YTPlayer | null>(null);
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+  useFocusTrap(overlayRef, true);
 
   useEffect(() => {
     async function acquire() {
@@ -107,8 +111,10 @@ export function CookMode({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [steps.length, i, editing]);
+    // `go` closes over `steps` (via `save`) — it must be in the deps, or an
+    // edit to step text/clip time followed by an arrow key reverts it by
+    // saving the stale pre-edit `steps` array.
+  }, [steps, i, editing]);
 
   const curStart = steps[i]?.startSeconds ?? null;
   const curEnd = steps[i]?.endSeconds ?? null;
@@ -207,8 +213,10 @@ export function CookMode({
   // overlay for the first few seconds of every clip, no matter the params).
   const clip = hasClip ? `/api/clip/${videoId}/${step.startSeconds}/${step.endSeconds}` : null;
 
-  return (
-    <div className="cook-overlay" role="dialog" aria-label={`Cooking: ${recipe.name}`}>
+  // Portal to body: on desktop this renders inside the sticky, scrolling
+  // .md-pane, which would otherwise clip the fixed overlay to the pane.
+  return createPortal(
+    <div className="cook-overlay" role="dialog" aria-modal="true" aria-label={`Cooking: ${recipe.name}`} ref={overlayRef}>
       <div className="cook-top">
         <span className="cook-title">{recipe.name}</span>
         <div className="cook-top-actions">
@@ -336,6 +344,7 @@ export function CookMode({
           </button>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

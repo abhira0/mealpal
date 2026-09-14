@@ -125,11 +125,11 @@ export function EntityList(props: {
       )}
 
       <div className={bare ? "stack-sm" : "content stack-sm"}>
-        {error && <p className="notice">{error}</p>}
+        {error && <p className="notice" role="alert">{error}</p>}
 
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {rows.length > 0 && (
-            <div className="search" style={{ flex: 1 }}>
+            <div className="search" style={{ flex: 1, position: "relative" }}>
               <span className="search-icon" aria-hidden="true">⌕</span>
               <input
                 type="text"
@@ -139,6 +139,17 @@ export function EntityList(props: {
                 aria-label={`Search ${config.label.toLowerCase()}`}
                 className="input"
               />
+              {query && (
+                <button
+                  type="button"
+                  className="btn-link"
+                  onClick={() => setQuery("")}
+                  aria-label="Clear search"
+                  style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", width: "auto", padding: 0 }}
+                >
+                  ✕
+                </button>
+              )}
             </div>
           )}
           {create.href ? (

@@ -159,7 +159,7 @@ export function IngredientDetail({ id }: { id: string }) {
   if (!detail) {
     return (
       <div className="content">
-        {error ? <p className="notice">{error}</p> : <p className="loading">Loading…</p>}
+        {error ? <p className="notice" role="alert">{error}</p> : <p className="loading">Loading…</p>}
       </div>
     );
   }
@@ -181,7 +181,7 @@ export function IngredientDetail({ id }: { id: string }) {
       />
 
       <div className="content stack-sm">
-        {error && <p className="notice">{error}</p>}
+        {error && <p className="notice" role="alert">{error}</p>}
 
         <span className="section-label">Details</span>
         <section className="card stack-sm">
