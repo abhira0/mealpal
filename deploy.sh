@@ -15,6 +15,11 @@ rsync -az --delete \
   --exclude data --exclude '*.db-wal' --exclude '*.db-shm' \
   ./ "$REMOTE:$DIR/"
 
+# Back up the remote db (if it exists) before anything touches it, so a bad
+# migration or a bad deploy is always one file-copy from being undone.
+# Aborts the deploy (set -e, remote exit code propagates through ssh) if the backup fails.
+ssh "$REMOTE" "if [ -f $DIR/data/platr.db ]; then DATABASE_URL=$DIR/data/platr.db BACKUP_DIR=$DIR/backups bash $DIR/scripts/backup.sh; else echo 'no remote db yet, nothing to back up'; fi"
+
 # One-time db migration: seed ./data from the shipped db, never clobber an existing one.
 ssh "$REMOTE" "mkdir -p $DIR/data && { [ -f $DIR/data/platr.db ] && echo 'remote db exists, kept it'; } || cp $DIR/platr.db $DIR/data/platr.db"
 
