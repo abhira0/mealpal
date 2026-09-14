@@ -34,8 +34,11 @@
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 /* shared 150ms hover feel on interactive surfaces (DESIGN.md: 150-300ms) */
 .filter button,.trigger,.input,.row,.account-row,.nav a,.week .day,.icon-btn,.chrome-back-icon,.avatar,.stepper button,.tab,.unit-radio button,button.row-link,.pantry-row,.dropdown-pop .o,.sheet .o,.gallery-thumb{transition:background-color .15s ease,border-color .15s ease,color .15s ease,box-shadow .15s ease}
-html,body{background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-body{font-size:15px;line-height:1.5}
+html,body{background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;accent-color:var(--accent)}
+body{font-size:15px;line-height:1.5;text-wrap:pretty}
+/* Headings balance across lines; body/labels avoid orphans (text-wrap inherits,
+   so `pretty` on body cascades and headings override to `balance`). */
+.chrome h1,.title,.sh-title,.ticket-head h2,.empty .title,.cook-title,.desk-head h1{text-wrap:balance}
 a,a:link,a:visited{color:inherit;text-decoration:none}
 button{font-family:inherit}
 ::selection{background:var(--accent-weak)}
@@ -81,6 +84,17 @@ button{font-family:inherit}
 .section-label:first-child{margin-top:0;padding-top:0;border-top:none}
 .section-toggle{background:none;border:none;border-top:1px solid var(--line-soft);cursor:pointer;width:100%;text-align:left;font:inherit;letter-spacing:inherit;text-transform:inherit}
 .section-toggle:hover{color:var(--ink-2)}
+/* phase chip (agenda): subtle spring "pop" on state change (planned→cooked→served),
+   plus an eased bg/color morph. One authored moment for the core loop; killed
+   under prefers-reduced-motion by the global rule at the bottom of this file. */
+.phase-chip{animation:phase-pop .34s cubic-bezier(.22,1,.36,1);transition:background-color .3s ease,color .3s ease}
+@keyframes phase-pop{from{transform:scale(.86)}60%{transform:scale(1.08)}to{transform:scale(1)}}
+/* macro/progress bar: two stacked fills (faint planned behind, solid served on
+   top) that grow to the new value when data changes. Animated via transform
+   (scaleX) not width, so it composites on the GPU with no layout thrash. Killed
+   under prefers-reduced-motion by the global rule at file end. */
+.macro-track{position:relative;height:8px;border-radius:99px;background:var(--surface-3);overflow:hidden}
+.macro-seg{position:absolute;inset:0;transform-origin:left;transform:scaleX(0);transition:transform .6s cubic-bezier(.22,1,.36,1)}
 /* loading skeleton: quiet pulsing placeholder (disabled under reduced-motion) */
 .skel{background:var(--surface);border-color:var(--line-soft);animation:skel-pulse 1.4s ease-in-out infinite}
 @keyframes skel-pulse{0%,100%{opacity:1}50%{opacity:.55}}
@@ -115,14 +129,73 @@ button{font-family:inherit}
 .plan-colhead.today .dnum,.plan-colhead.today .dow{color:var(--accent-ink)}
 .plan-coladd{flex:none;width:24px;height:24px;border-radius:var(--r1);border:1px solid var(--line);background:var(--surface);color:var(--ink-3);cursor:pointer;font-size:14px;line-height:1;transition:background-color .15s ease,color .15s ease}
 .plan-coladd:hover{background:var(--accent-weak);color:var(--accent-ink);border-color:var(--accent)}
-.plan-bar{display:flex;align-items:center;gap:7px;margin:0 3px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r2);padding:6px 10px;cursor:pointer;color:var(--ink);font-size:13px;min-width:0;transition:background-color .15s ease}
-.plan-bar:hover{background:var(--surface-3)}
+.plan-bar{display:flex;align-items:center;gap:7px;margin:0 3px;background:var(--bar-bg,var(--surface-2));border:1px solid var(--line);border-radius:var(--r2);padding:6px 10px;cursor:pointer;color:var(--ink);font-size:13px;min-width:0;transition:background-color .15s ease}
+/* Keep the per-day status tint on hover; darken it slightly instead of replacing it. */
+.plan-bar:hover{background:var(--bar-bg,var(--surface-3));filter:brightness(.97)}
+/* The bar is a div wrapping a click-to-edit button plus the remove actions.
+   This inner button carries the layout the bar itself used to. */
+.plan-bar-main{flex:1;display:flex;align-items:center;gap:7px;min-width:0;background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
+/* Visible at rest so the action is discoverable, full strength on hover. */
+.plan-bar-act{flex:none;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;background:none;border:0;padding:0;border-radius:var(--r1);color:var(--ink-3);opacity:.5;cursor:pointer;transition:opacity .15s ease,color .15s ease,background-color .15s ease}
+.plan-bar:hover .plan-bar-act{opacity:1}
+.plan-bar-act:hover{color:var(--danger);background:var(--danger-weak)}
+.plan-bar-act:focus-visible{opacity:1}
 .plan-bar.out{background:var(--danger-weak);border-color:var(--danger-line)}
 .plan-bar .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .plan-bar .plan-left{flex:none;font-family:var(--mono);font-size:11px;color:var(--ink-3)}
 .plan-bar .plan-dot{flex:none;width:7px;height:7px;border-radius:50%;background:var(--ink-3)}
 .plan-bar.cooked .plan-dot{background:var(--warn)}
 .plan-bar.served .plan-dot{background:var(--ok)}
+.plan-bar.selected{border-color:var(--accent);box-shadow:var(--focus)}
+.plan-bar.draggable .plan-bar-main{cursor:grab}
+.plan-drag-ghost{opacity:.92;box-shadow:var(--shadow-pop);cursor:grabbing}
+/* Drop targets: invisible grid over the day area; dnd-kit hit-tests by rect so
+   pointer-events stay off and clicks reach the bars underneath. */
+.plan-cal-row{position:relative}
+.plan-drop-layer{position:absolute;top:5px;bottom:5px;left:96px;right:0;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));pointer-events:none;z-index:0}
+.plan-drop-cell{margin:0 3px;border-radius:var(--r2)}
+.plan-drop-cell.over{background:var(--accent-weak);outline:2px dashed var(--accent);outline-offset:-2px}
+
+/* ---------- Plan: calendar + inspector side panel (desktop) ---------- */
+.plan-workspace{display:flex;gap:16px;align-items:flex-start}
+.plan-workspace .plan-cal{flex:1;min-width:0}
+.insp{border:1px solid var(--line);border-radius:var(--r2);background:var(--surface);overflow:hidden}
+.insp-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line-soft);background:var(--surface-2)}
+.insp-title{font-weight:640;font-size:15px;color:var(--ink)}
+.insp-sub{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-top:2px}
+.insp-sec{padding:10px 14px;border-bottom:1px solid var(--line-soft)}
+.insp-sec .field-label{display:block;margin-bottom:6px}
+.insp-line{font-size:13px;color:var(--ink-2);line-height:1.6}
+.insp-line.short{color:var(--danger)}
+.insp-miss{color:var(--warn)}
+.insp-strip{display:flex;gap:4px;flex-wrap:wrap}
+.insp-day{font-family:var(--mono);font-size:10px;padding:3px 6px;border-radius:var(--r1);background:var(--surface-2);color:var(--ink-3);border:1px solid var(--line)}
+.insp-day.cooked{background:var(--warn-weak);color:var(--warn);border-color:var(--warn-line)}
+.insp-day.served{background:var(--ok-weak);color:var(--ok);border-color:var(--ok-line)}
+.insp-day.focus{outline:2px solid var(--accent)}
+/* Clickable strip (desktop): the day pills retarget the inspector. */
+button.insp-day{cursor:pointer}
+button.insp-day:hover{border-color:var(--accent);color:var(--ink)}
+.insp-scope{display:flex;gap:6px;flex-wrap:wrap}
+/* Inspector tabs (Details / Nutrition) */
+.insp-tabs{display:flex;align-items:center;gap:6px;padding:10px 14px;border-bottom:1px solid var(--line-soft)}
+.insp-tabs .chip{cursor:pointer}
+.insp-tbl{width:100%;max-width:720px;border-collapse:collapse;font-size:13px;color:var(--ink-2)}
+.insp-tbl th{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);text-align:right;font-weight:400;padding:4px 8px}
+.insp-tbl th:first-child,.insp-tbl td:first-child{text-align:left}
+.insp-tbl td{padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums;border-top:1px solid var(--line-soft)}
+.insp-tbl tr.focus td{background:var(--surface-2)}
+.insp-tbl tfoot td{font-weight:640;color:var(--ink);border-top:2px solid var(--line)}
+.insp-tbl td:last-child,.insp-tbl th:last-child{text-align:left}
+.chip.on{background:var(--accent-weak);color:var(--accent-ink);border-color:var(--accent)}
+.chip.phase-planned{background:var(--surface-2);color:var(--ink-2)}
+.chip.phase-cooked{background:var(--warn-weak);color:var(--warn);border-color:var(--warn-line)}
+.chip.phase-served{background:var(--ok-weak);color:var(--ok);border-color:var(--ok-line)}
+.insp-resched{display:flex;flex-direction:column;gap:8px}
+.insp-actions{display:flex;flex-wrap:wrap;gap:8px;padding:12px 14px}
+.insp-actions .btn,.insp-actions .btn-secondary{flex:1;min-width:88px;min-height:38px;padding:8px 12px;font-size:13px}
+.btn-secondary.danger{color:var(--danger);border-color:var(--danger-line)}
+.btn-secondary.danger:hover{background:var(--danger-weak)}
 .btn.secondary{background:var(--surface);color:var(--ink);border-color:var(--line)}
 .btn.secondary:hover{background:var(--surface-2)}
 .btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
@@ -194,7 +267,10 @@ input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:var(--ink-3)
 .trigger.open{border-color:var(--accent);box-shadow:var(--focus)}
 .trigger .caret{color:var(--ink-3);font-size:12px}
 .trigger .placeholder{color:var(--ink-3)}
-.dropdown-pop{background:var(--surface);border:1px solid var(--line);border-radius:var(--r3);box-shadow:var(--shadow-pop);overflow-y:auto;max-height:min(280px,60dvh);z-index:50}
+.dropdown-pop{background:var(--surface);border:1px solid var(--line);border-radius:var(--r3);box-shadow:var(--shadow-pop);overflow-y:auto;max-height:min(280px,60dvh);z-index:50;transform-origin:top;transition:opacity .14s ease,transform .16s cubic-bezier(.22,1,.36,1)}
+/* Snappy mount-time entrance for the dropdown popover (part of the overlay
+   entrance system: sheet, palette, dropdown). Killed under reduced-motion. */
+@starting-style{.dropdown-pop{opacity:0;transform:translateY(-6px)}}
 .dropdown-pop .o{padding:12px 14px;font-size:15px;font-weight:500;display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;background:none;border:none;cursor:pointer;text-align:left;color:var(--ink);min-height:44px}
 .dropdown-pop .o + .o{border-top:1px solid var(--line-soft)}
 .dropdown-pop .o[aria-selected="true"]{color:var(--accent-ink);background:var(--accent-weak)}
@@ -204,8 +280,12 @@ input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:var(--ink-3)
 .dropdown-pop .o .tick{color:var(--accent)}
 
 /* ---------- sheet ---------- */
-.scrim{position:fixed;inset:0;background:rgba(20,22,28,.4);backdrop-filter:blur(2px);z-index:40}
-.sheet{position:fixed;left:0;right:0;bottom:0;max-width:600px;margin:0 auto;background:var(--surface);border-radius:16px 16px 0 0;padding:10px 0 16px;z-index:41;box-shadow:var(--shadow-pop);max-height:85dvh;overflow-y:auto}
+.scrim{position:fixed;inset:0;background:rgba(20,22,28,.4);backdrop-filter:blur(2px);z-index:40;transition:opacity .22s ease}
+@starting-style{.scrim{opacity:0}}
+.sheet{position:fixed;left:0;right:0;bottom:0;max-width:600px;margin:0 auto;background:var(--surface);border-radius:16px 16px 0 0;padding:10px 0 16px;z-index:41;box-shadow:var(--shadow-pop);max-height:85dvh;overflow-y:auto;transition:transform .34s cubic-bezier(.22,1,.36,1),opacity .28s ease}
+/* Mount-time entrance (progressive: no @starting-style support = instant appear;
+   killed under prefers-reduced-motion by the global rule at file end). */
+@starting-style{.sheet{transform:translateY(100%);opacity:0}}
 .sheet .grab{width:36px;height:4px;border-radius:3px;background:var(--surface-3);margin:6px auto 10px}
 .sheet .sh-title{font-weight:640;font-size:16px;letter-spacing:-.01em;padding:4px 18px 8px}
 .sheet .sh-body{padding:4px 18px;display:flex;flex-direction:column;gap:12px}
@@ -232,7 +312,10 @@ input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:var(--ink-3)
 .checkbox{width:22px;height:22px;border:1.6px solid var(--line);border-radius:var(--r1);background:var(--surface);position:relative;flex:none;cursor:pointer;padding:0;transition:background .1s ease,border-color .1s ease}
 .checkbox:hover{border-color:var(--accent)}
 .checkbox[aria-checked="true"]{background:var(--accent);border-color:var(--accent)}
-.checkbox[aria-checked="true"]::after{content:"✓";color:#fff;font-size:14px;position:absolute;inset:0;display:grid;place-items:center}
+/* Checkmark pops in when the meal is marked eaten — completes the core-loop
+   feedback family (checkbox → phase chip → macro bar). Killed under reduced-motion. */
+.checkbox[aria-checked="true"]::after{content:"✓";color:#fff;font-size:14px;position:absolute;inset:0;display:grid;place-items:center;animation:check-pop .2s cubic-bezier(.22,1,.36,1)}
+@keyframes check-pop{from{transform:scale(0);opacity:0}60%{transform:scale(1.15)}to{transform:scale(1);opacity:1}}
 .check-label{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer}
 
 /* ---------- bottom nav (mobile) / sidebar (desktop) ---------- */
@@ -268,7 +351,7 @@ input[type=date][data-empty]::before{content:"mm / dd / yyyy";color:var(--ink-3)
 .week .day .dnum{font-weight:640;font-size:18px;margin-top:2px;font-variant-numeric:tabular-nums}
 .week .day .dot{width:5px;height:5px;border-radius:50%;background:var(--accent-2);margin:3px auto 0}
 .week .day.on{background:var(--accent);border-color:var(--accent);color:#fff}
-.week .day.on .dow{color:rgba(255,255,255,.75)}
+.week .day.on .dow{color:#fff}
 .week .day.on .dot{background:#fff}
 
 /* ---------- list rows (Pantry / Manage / recipes / agenda) ---------- */
@@ -289,7 +372,7 @@ button.row-link{background:none;border:none;width:100%;text-align:left;cursor:po
 /* ---------- shop "tickets" (canon: clean cards, no receipt-scallop novelty) ---------- */
 .ticket{background:var(--surface);border:1px solid var(--line);border-radius:var(--r3);overflow:hidden;box-shadow:var(--shadow-sm)}
 .ticket-head{background:var(--surface-2);color:var(--ink);padding:12px 14px;border-bottom:1px solid var(--line)}
-.ticket-head .eb{margin-bottom:2px}
+.ticket-head .eb{margin-bottom:2px;color:var(--ink-2)}
 .ticket-head h2{font-weight:640;font-size:17px;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
 .ticket-head .tk-total{margin-left:auto;font-size:13px;color:var(--ink-2)}
 .ticket-body{padding:6px 14px 14px}
@@ -329,7 +412,8 @@ button.row-link{background:none;border:none;width:100%;text-align:left;cursor:po
 .yt-facade img{object-fit:cover}
 .yt-play{position:absolute;inset:0;margin:auto;width:56px;height:56px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:22px}
 .step{display:flex;gap:12px;padding:10px 0;align-items:flex-start}
-.step-clickable{cursor:pointer}
+.step-clickable{cursor:pointer;border-radius:var(--r2)}
+.step-clickable:focus-visible{outline:none;box-shadow:var(--focus)}
 .step-clickable:hover .step-text{color:var(--accent-ink)}
 .step .num{flex:none;width:28px;height:28px;border-radius:var(--r1);background:var(--accent-weak);color:var(--accent-ink);font-family:var(--mono);font-weight:700;font-size:13px;display:grid;place-items:center}
 .step .step-text{font-size:15px;line-height:1.5;padding-top:3px}
@@ -407,7 +491,7 @@ button.row-link{background:none;border:none;width:100%;text-align:left;cursor:po
   .chrome{max-width:960px;margin:0 auto;padding:28px 24px 12px}
   .nav{order:-1;flex:none;position:sticky;inset:0 auto auto 0;height:100dvh;width:220px;max-width:none;margin:0;background:var(--surface);border-top:none;border-right:1px solid var(--line);flex-direction:column;justify-content:flex-start;gap:2px;padding:18px 12px}
   .nav-brand{display:block;font-weight:680;font-size:19px;letter-spacing:-.03em;color:var(--ink);padding:6px 12px 10px}
-  .nav-search{display:flex;align-items:center;gap:8px;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r2);padding:8px 10px;margin-bottom:10px;color:var(--ink-3);font-size:13px;cursor:pointer}
+  .nav-search{display:flex;align-items:center;gap:8px;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r2);padding:8px 10px;margin-bottom:10px;color:var(--ink-2);font-size:13px;cursor:pointer}
   .nav-search:hover{background:var(--surface-3);color:var(--ink-2)}
   .nav-search span{flex:1;text-align:left}
   .nav-search kbd{font-family:var(--mono);font-size:11px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r1);padding:1px 5px;color:var(--ink-2)}
@@ -430,7 +514,26 @@ button.row-link{background:none;border:none;width:100%;text-align:left;cursor:po
   .photo-grid > :not(section.card){grid-column:1/-1}
 
   .sheet{top:50%;bottom:auto;left:50%;right:auto;transform:translate(-50%,-50%);width:520px;border-radius:16px}
+  /* Centered modal grows in place instead of sliding up from the bottom edge. */
+  @starting-style{.sheet{transform:translate(-50%,-46%) scale(.97);opacity:0}}
   .sheet .grab{display:none}
+  /* Meal-details modal: near-full-page, sections laid out in columns. */
+  .sheet.wide{width:96vw;max-width:none;height:94dvh;max-height:94dvh;display:flex;flex-direction:column}
+  .sheet.wide .insp{border:0;border-radius:0;flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(3,1fr);align-content:stretch}
+  .sheet.wide .insp-sec{padding:14px 18px;border-right:1px solid var(--line-soft)}
+  .sheet.wide .insp-line{font-size:14px}
+  .sheet.wide .insp-sec:nth-child(3n){border-right:0}
+  /* Tabs and the nutrition table span the whole modal width. */
+  .sheet.wide .insp-tabs,.sheet.wide .insp-full{grid-column:1/-1;border-right:0}
+  /* The nutrition tab is one full-width table, so the 3-column grid (whose rows
+     stretch to fill the modal) would just add dead space — stack instead. */
+  .sheet.wide .insp[data-tab="nutrition"]{display:flex;flex-direction:column}
+  /* align-self:end from the grid layout means "cross axis" here — reset it. */
+  .sheet.wide .insp[data-tab="nutrition"] .insp-actions{margin-top:auto;align-self:stretch}
+  .sheet.wide .insp-actions{grid-column:1/-1;align-items:center;background:var(--surface);border-top:1px solid var(--line-soft)}
+  /* The actions row shouldn't take an equal share of the stretched grid. */
+  .sheet.wide .insp{grid-template-rows:auto}
+  .sheet.wide .insp-actions{align-self:end}
 
   /* ---------- desktop-only layout primitives (separate desktop views) ---------- */
   /* Wide page shell for the bespoke desktop views. Deliberately NOT ".content":
@@ -474,8 +577,12 @@ button.row-link{background:none;border:none;width:100%;text-align:left;cursor:po
 }
 
 /* ---------- command palette (⌘K) ---------- */
-.cmdk-scrim{position:fixed;inset:0;background:rgba(20,22,28,.32);z-index:60;display:flex;justify-content:center;align-items:flex-start;padding:12vh 16px 16px}
-.cmdk{width:100%;max-width:560px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r3);box-shadow:var(--shadow-pop);overflow:hidden;max-height:70vh;display:flex;flex-direction:column}
+.cmdk-scrim{position:fixed;inset:0;background:rgba(20,22,28,.32);z-index:60;display:flex;justify-content:center;align-items:flex-start;padding:12vh 16px 16px;transition:opacity .18s ease}
+@starting-style{.cmdk-scrim{opacity:0}}
+.cmdk{width:100%;max-width:560px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r3);box-shadow:var(--shadow-pop);overflow:hidden;max-height:70vh;display:flex;flex-direction:column;transition:opacity .18s ease,transform .22s cubic-bezier(.22,1,.36,1)}
+/* Command palette drops in from just above; completes the overlay entrance
+   system. Killed under reduced-motion by the global rule at file end. */
+@starting-style{.cmdk{opacity:0;transform:translateY(-8px) scale(.98)}}
 .cmdk-input{font-family:var(--sans);font-size:16px;color:var(--ink);background:var(--surface);border:none;border-bottom:1px solid var(--line);padding:16px 18px;outline:none;width:100%}
 .cmdk-input::placeholder{color:var(--ink-3)}
 .cmdk-list{list-style:none;margin:0;padding:6px;overflow-y:auto;flex:1}
@@ -489,3 +596,13 @@ button.row-link{background:none;border:none;width:100%;text-align:left;cursor:po
 .cmdk-foot kbd{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r1);padding:1px 5px;color:var(--ink-2)}
 
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+
+/* ---------- route view transitions (App Router <ViewTransition>) ---------- */
+/* Restrained crossfade on client navigation; the bottom-nav/sidebar stays put
+   (it lives outside the wrapped <ViewTransition>). ::view-transition-* are
+   document-level pseudo-elements the global `*` reduced-motion rule can't reach,
+   so they need their own guard. */
+::view-transition-old(root),::view-transition-new(root){animation-duration:.2s;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+@media (prefers-reduced-motion: reduce){
+  ::view-transition-old(*),::view-transition-new(*),::view-transition-group(*){animation-duration:0s!important;animation-delay:0s!important}
+}

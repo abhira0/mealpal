@@ -1,21 +1,22 @@
 import type { Metadata, Viewport } from "next";
+import { ViewTransition } from "react";
 import "./globals.css";
 import { BottomNav } from "@/components/BottomNav";
 import { CommandPalette } from "@/components/CommandPalette";
 
 export const metadata: Metadata = {
-  title: "MealPal",
+  title: "Platr",
   description: "Household meal planning — Today, Plan, Pantry, Shop.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "MealPal",
+    title: "Platr",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#FBFBFC",
+  themeColor: "#EEF1F4",
   width: "device-width",
   initialScale: 1,
 };
@@ -29,7 +30,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         {/* impeccable direction contract — seed 3f5e5012 (assigned dir 6, superseded by user-chosen canon)
-        THESIS: MealPal is a household's food operation as one calm, dense productivity tool — the category
+        THESIS: Platr is a household's food operation as one calm, dense productivity tool — the category
           standard at Linear's craft — refusing the friendly rounded-card + food-photo + soft-green planner
           look and its Notion-lite opposite.
         OWN-WORLD: Light cool-neutral canvas (#FBFBFC), white surfaces with hairline borders and 1px shadows,
@@ -41,7 +42,9 @@ export default function RootLayout({
           "Next cooking" and agenda rows as clean white cards; primary action a single indigo button.
         FORM: Category-standard productivity UI (canon, user-chosen craft bar: Linear).
         FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md. */}
-        <div className="app">{children}</div>
+        <div className="app">
+          <ViewTransition>{children}</ViewTransition>
+        </div>
         <BottomNav />
         <CommandPalette />
       </body>
