@@ -133,6 +133,26 @@ describe("agendaDays", () => {
     expect(byDate.get("2026-08-12")!.cookFlags).toEqual([]);
   });
 
+  it("rolls a skipped serving forward: coverage runs off what's left, not the calendar", () => {
+    const batch = packBatch(db, hid, {
+      slotId: dinnerSlot, label: "Chapathi sabzi", cookedDate: "2026-08-09", mealsTotal: 3, items: [],
+    });
+    // Ate on the cook day, then skipped 08-10 entirely. 2 servings still left on 08-11.
+    eatFromBatch(db, hid, batch.id, "2026-08-09");
+
+    const days = agendaDays(db, hid, "2026-08-09", "2026-08-14", "2026-08-11");
+    const byDate = new Map(days.map((d) => [d.date, d]));
+
+    // still on the plate through 08-12, not cut off at the original 08-11 window
+    expect(byDate.get("2026-08-12")!.meals.some((m) => m.batchId === batch.id)).toBe(true);
+    expect(byDate.get("2026-08-13")!.meals.some((m) => m.batchId === batch.id)).toBe(false);
+    // runs out on 08-13, one day later than the original cook + 3 window
+    expect(byDate.get("2026-08-13")!.cookFlags).toEqual([
+      { slotId: dinnerSlot, slotName: "Dinner", label: "Chapathi sabzi" },
+    ]);
+    expect(byDate.get("2026-08-12")!.cookFlags).toEqual([]);
+  });
+
   it("projects a packed batch as a synthetic meal row on every day of its coverage window, and defers to a real event if one exists", () => {
     const batch = packBatch(db, hid, {
       slotId: lunchSlot, label: "Rice Bowl", cookedDate: "2026-08-09", mealsTotal: 3, items: [],
@@ -270,6 +290,18 @@ describe("nextCooks", () => {
 
   it("returns an empty array when there are no active batches", () => {
     expect(nextCooks(db, hid, "2026-08-09")).toEqual([]);
+  });
+
+  it("slides an old batch's cook date forward by what's left, not by when it was cooked", () => {
+    // Cooked 8 days ago but nothing eaten: 2 servings still cover the next 2 days.
+    packBatch(db, hid, {
+      slotId: lunchSlot, label: "Old Rice Bowl", cookedDate: "2026-08-01", mealsTotal: 2, items: [],
+    });
+
+    const result = nextCooks(db, hid, "2026-08-09");
+    expect(result).toHaveLength(1);
+    expect(result[0].cookDate).toBe("2026-08-10"); // 2026-08-09 + 2 left - 1 (lunch cook-lead)
+    expect(result[0].daysAway).toBe(1);
   });
 
   it("surfaces a recurring recipe meal's next planned occurrence as a prep entry", () => {

@@ -144,4 +144,40 @@ describe("products & prices", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toMatch(/purchase/);
   });
+
+  it("blocks deleting a product with variants", () => {
+    const p = createProduct(db, hid, {
+      ingredientId, shopId, name: "Flour", packSize: 1000, priority: 1, url: null,
+    });
+    db.insert(schema.productVariants).values({ householdId: hid, productId: p.id, name: "Fortified" }).run();
+    const result = deleteProduct(db, hid, p.id);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toMatch(/variant/);
+  });
+
+  it("blocks deleting a product with eaten-log entries", () => {
+    const p = createProduct(db, hid, {
+      ingredientId, shopId, name: "Flour", packSize: 1000, priority: 1, url: null,
+    });
+    db.insert(schema.consumptions).values({ householdId: hid, date: "2026-01-01", productId: p.id, count: 1 }).run();
+    const result = deleteProduct(db, hid, p.id);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toMatch(/eaten-log/);
+  });
+
+  it("deletes a product referenced by meal events/rules/batch items (clears FKs, no crash)", () => {
+    const p = createProduct(db, hid, {
+      ingredientId, shopId, name: "Flour", packSize: 1000, priority: 1, url: null,
+    });
+    const slotId = db.insert(schema.mealSlots).values({ householdId: hid, name: "Snack" }).returning().all()[0].id;
+    const ev = db.insert(schema.mealEvents).values({ householdId: hid, date: "2026-01-01", slotId, productId: p.id, servings: 1 }).returning().all()[0];
+    const rule = db.insert(schema.mealRules).values({ householdId: hid, slotId, productId: p.id, startDate: "2026-01-01" }).returning().all()[0];
+    const batch = db.insert(schema.batches).values({ householdId: hid, slotId, label: "Batch", cookedDate: "2026-01-01", mealsTotal: 1, mealsRemaining: 1 }).returning().all()[0];
+    db.insert(schema.batchItems).values({ batchId: batch.id, productId: p.id }).run();
+
+    expect(deleteProduct(db, hid, p.id)).toEqual({ ok: true, deleted: true });
+    expect(db.select().from(schema.mealEvents).where(eq(schema.mealEvents.id, ev.id)).all()[0].productId).toBeNull();
+    expect(db.select().from(schema.mealRules).where(eq(schema.mealRules.id, rule.id)).all()[0].productId).toBeNull();
+    expect(db.select().from(schema.batchItems).where(eq(schema.batchItems.batchId, batch.id)).all()[0].productId).toBeNull();
+  });
 });

@@ -5,6 +5,7 @@ import { getRecipe } from "@/lib/recipes";
 import { consumptionForRecipe } from "@/lib/consumption";
 import { NUTRIENT_PATCH_KEYS } from "@/lib/products";
 import { listEaten } from "@/lib/eaten";
+import { isoAddDays } from "@/lib/dates";
 
 type Db = BetterSQLite3Database<typeof schema>;
 
@@ -26,6 +27,17 @@ export function zeroNutrients(): Nutrients {
 
 function addScaled(acc: Nutrients, n: Nutrients, factor: number) {
   for (const k of NUTRIENT_KEYS) acc[k] += (n[k] ?? 0) * factor;
+}
+
+/**
+ * The nutrient label frozen onto a consumption row at cook/eat time, if any.
+ * Present => history is immune to later label edits; null => pre-snapshot row,
+ * fall back to the live product/variant.
+ */
+function frozenNutrients(nutrientsJson: string | null): Nutrients | null {
+  if (!nutrientsJson) return null;
+  const raw = JSON.parse(nutrientsJson) as Record<string, number | null>;
+  return Object.fromEntries(NUTRIENT_KEYS.map((k) => [k, raw[k] ?? 0])) as Nutrients;
 }
 
 type ProductRow = typeof schema.products.$inferSelect;
@@ -129,7 +141,9 @@ export function dayNutrition(
       const recipe = getRecipe(db, householdId, ev.recipeId);
       if (!recipe) continue;
       name = recipe.name;
-      if (ev.status === "served") {
+      // Cooked or served: read what was actually depleted (stock movements are
+      // frozen at cook time), so later recipe edits can't retro-change history.
+      if (ev.status !== "planned") {
         const moves = db.select().from(schema.stockMovements)
           .where(and(
             eq(schema.stockMovements.householdId, householdId),
@@ -143,7 +157,8 @@ export function dayNutrition(
           // for a lot-less ingredient (e.g. egg whites, banana) carry no
           // product, so fall back to the ingredient's preferred nutrition —
           // otherwise those ingredients silently count as 0 (served < label).
-          const src = (variant ? variantNutrients(variant) : (p ? productNutrients(p) : null))
+          const src = frozenNutrients(m.nutrientsJson)
+            ?? (variant ? variantNutrients(variant) : (p ? productNutrients(p) : null))
             ?? preferredNutrients(db, householdId, m.ingredientId);
           if (!src) { missing.add(m.ingredientId); continue; }
           addScaled(nutrients, src, Math.abs(m.delta));
@@ -161,8 +176,9 @@ export function dayNutrition(
       if (ev.productId != null) {
         const p = productById.get(ev.productId);
         name = p?.name ?? "Item";
-        if (ev.status === "served") {
-          // Served: attribute to the actual product/variant recorded in movements.
+        if (ev.status !== "planned") {
+          // Cooked/served: attribute to the actual product/variant recorded in
+          // movements — frozen at cook time, immune to later edits.
           const moves = db.select().from(schema.stockMovements)
             .where(and(
               eq(schema.stockMovements.householdId, householdId),
@@ -172,7 +188,8 @@ export function dayNutrition(
           for (const m of moves) {
             const variant = m.variantId != null ? variantById.get(m.variantId) : undefined;
             const mp = m.productId != null ? productById.get(m.productId) : undefined;
-            const src = variant ? variantNutrients(variant) : (mp ? productNutrients(mp) : null);
+            const src = frozenNutrients(m.nutrientsJson)
+              ?? (variant ? variantNutrients(variant) : (mp ? productNutrients(mp) : null));
             if (!src) { if (mp) missing.add(mp.ingredientId); continue; }
             addScaled(nutrients, src, Math.abs(m.delta));
           }
@@ -206,7 +223,8 @@ export function dayNutrition(
   for (const c of listEaten(db, householdId, date)) {
     const p = productById.get(c.productId);
     const variant = c.variantId != null ? variantById.get(c.variantId) : undefined;
-    const n = variant ? variantNutrients(variant) : (p ? productNutrients(p) : null);
+    const n = frozenNutrients(c.nutrientsJson)
+      ?? (variant ? variantNutrients(variant) : (p ? productNutrients(p) : null));
     const nutrients = zeroNutrients();
     const miss = new Set<number>();
     if (n) addScaled(nutrients, n, c.count); // c.count is canonical units
@@ -257,8 +275,56 @@ export function dayNutrition(
   return { date, meals, total, planned, missing: [...missing] };
 }
 
+/**
+ * ONE serving's worth of what a batch ACTUALLY depleted, read from its frozen
+ * stock movements (whole pack ÷ mealsTotal). This is what keeps a later recipe
+ * edit from retro-changing a batch that's already cooked (and partly eaten).
+ * Null when the batch has no movements, so callers fall back to its items.
+ */
+function batchMovementLines(
+  db: Db, householdId: number, batchId: number,
+): {
+  ingredientId: number; qty: number; productId: number | null; variantId: number | null;
+  nutrientsJson: string | null;
+}[] | null {
+  const [batch] = db.select().from(schema.batches)
+    .where(and(eq(schema.batches.id, batchId), eq(schema.batches.householdId, householdId))).all();
+  if (!batch) return null;
+  const moves = db.select().from(schema.stockMovements).where(and(
+    eq(schema.stockMovements.householdId, householdId),
+    eq(schema.stockMovements.batchId, batchId),
+    eq(schema.stockMovements.reason, "cooked"),
+  )).all();
+  if (!moves.length) return null;
+  const per = Math.max(1, batch.mealsTotal);
+  return moves.map((m) => ({
+    ingredientId: m.ingredientId,
+    qty: Math.abs(m.delta) / per,
+    productId: m.productId,
+    variantId: m.variantId,
+    nutrientsJson: m.nutrientsJson,
+  }));
+}
+
 /** Nutrition of ONE serving of a batch = sum of its item lines. */
 export function batchServingNutrients(db: Db, householdId: number, batchId: number): Nutrients {
+  const frozen = batchMovementLines(db, householdId, batchId);
+  if (frozen) {
+    const out = zeroNutrients();
+    for (const line of frozen) {
+      const v = line.variantId != null
+        ? db.select().from(schema.productVariants).where(eq(schema.productVariants.id, line.variantId)).all()[0]
+        : undefined;
+      const p = line.productId != null
+        ? db.select().from(schema.products).where(eq(schema.products.id, line.productId)).all()[0]
+        : undefined;
+      const src = frozenNutrients(line.nutrientsJson)
+        ?? (v ? variantNutrients(v) : (p ? productNutrients(p) : null))
+        ?? preferredNutrients(db, householdId, line.ingredientId);
+      if (src) addScaled(out, src, line.qty);
+    }
+    return out;
+  }
   const items = db.select().from(schema.batchItems)
     .where(eq(schema.batchItems.batchId, batchId)).all();
   const out = zeroNutrients();
@@ -276,8 +342,85 @@ export function batchServingNutrients(db: Db, householdId: number, batchId: numb
       const v = it.variantId != null
         ? db.select().from(schema.productVariants).where(eq(schema.productVariants.id, it.variantId)).all()[0]
         : undefined;
-      const src = v ? variantNutrients(v) : (p ? productNutrients(p) : null);
+      // A variant with nothing filled in falls back to the product, rather
+      // than contributing zeros (mirrored in batchServingLines below).
+      const vn = v ? variantNutrients(v) : null;
+      const src = vn ?? (p ? productNutrients(p) : null);
       if (src) addScaled(out, src, it.amount ?? 0);
+    }
+  }
+  return out;
+}
+
+/**
+ * ONE serving of a batch, broken down per ingredient instead of summed.
+ * Same traversal and same nutrition sources as batchServingNutrients — keep
+ * the two in step, or the day's ingredient table stops reconciling with its
+ * totals (the invariant nutrition.test.ts asserts).
+ */
+export function batchServingLines(
+  db: Db, householdId: number, batchId: number,
+): { ingredientId: number; qty: number; src: NutrientValues; productName: string }[] {
+  const items = db.select().from(schema.batchItems)
+    .where(eq(schema.batchItems.batchId, batchId)).all();
+  const out: { ingredientId: number; qty: number; src: NutrientValues; productName: string }[] = [];
+  const pick = (row: Record<string, unknown>): NutrientValues =>
+    Object.fromEntries(
+      NUTRIENT_PATCH_KEYS.map((k) => [k, row[k]]).filter(([, v]) => v != null),
+    ) as NutrientValues;
+
+  const frozen = batchMovementLines(db, householdId, batchId);
+  if (frozen) {
+    for (const line of frozen) {
+      const v = line.variantId != null
+        ? db.select().from(schema.productVariants).where(eq(schema.productVariants.id, line.variantId)).all()[0]
+        : undefined;
+      const p = line.productId != null
+        ? db.select().from(schema.products).where(eq(schema.products.id, line.productId)).all()[0]
+        : undefined;
+      const useVariant = v && variantNutrients(v) != null;
+      const src = useVariant ? v : (p && hasNutrition(p) ? p : preferredProduct(db, householdId, line.ingredientId));
+      const values = line.nutrientsJson
+        ? (JSON.parse(line.nutrientsJson) as NutrientValues)
+        : (src ? pick(src as unknown as Record<string, unknown>) : null);
+      if (!values) continue;
+      out.push({
+        ingredientId: line.ingredientId,
+        qty: line.qty,
+        src: values,
+        productName: (useVariant ? v!.name : p?.name) ?? src?.name ?? "?",
+      });
+    }
+    return out;
+  }
+
+  for (const it of items) {
+    if (it.recipeId != null) {
+      const recipe = getRecipe(db, householdId, it.recipeId);
+      if (!recipe) continue;
+      for (const line of consumptionForRecipe(recipe, it.amount ?? 1)) {
+        const p = preferredProduct(db, householdId, line.ingredientId);
+        if (!p) continue;
+        out.push({ ingredientId: line.ingredientId, qty: line.amount, src: pick(p), productName: p.name });
+      }
+    } else if (it.productId != null) {
+      const p = db.select().from(schema.products)
+        .where(and(eq(schema.products.id, it.productId), eq(schema.products.householdId, householdId))).all()[0];
+      if (!p) continue;
+      const v = it.variantId != null
+        ? db.select().from(schema.productVariants).where(eq(schema.productVariants.id, it.variantId)).all()[0]
+        : undefined;
+      // mirror batchServingNutrients: a variant with nothing filled in falls
+      // back to the product, rather than contributing zeros.
+      const useVariant = v && variantNutrients(v) != null;
+      const src = useVariant ? v : p;
+      if (!useVariant && !hasNutrition(p)) continue;
+      out.push({
+        ingredientId: p.ingredientId,
+        qty: it.amount ?? 0,
+        src: pick(src as unknown as Record<string, unknown>),
+        productName: (useVariant ? v!.name : p.name),
+      });
     }
   }
   return out;
@@ -452,6 +595,12 @@ export function dayIngredientTable(
           // fall back to the ingredient's preferred product so they still show.
           const p = (m.productId != null ? productById.get(m.productId) : undefined)
             ?? preferredProduct(db, householdId, m.ingredientId) ?? undefined;
+          // frozen label wins — must mirror dayNutrition or the table stops
+          // reconciling with the day's totals after a label edit
+          if (m.nutrientsJson) {
+            accumulateSrc(m.ingredientId, Math.abs(m.delta), JSON.parse(m.nutrientsJson) as NutrientValues, p?.name ?? "?");
+            continue;
+          }
           if (!p || !hasNutrition(p)) continue; // no usable nutrition
           accumulate(m.ingredientId, Math.abs(m.delta), p);
         }
@@ -466,8 +615,9 @@ export function dayIngredientTable(
       // direct item: product/variant or ingredient (preferred product) × amount
       const amount = ev.amount ?? 0;
       if (ev.productId != null) {
-        if (ev.status === "served") {
-          // Served: attribute to the actual product/variant recorded in movements.
+        if (ev.status !== "planned") {
+          // Cooked/served: attribute to the actual product/variant recorded in
+          // movements — frozen at cook time, immune to later edits.
           const moves = db.select().from(schema.stockMovements)
             .where(and(
               eq(schema.stockMovements.householdId, householdId),
@@ -478,7 +628,8 @@ export function dayIngredientTable(
             const p = m.productId != null ? productById.get(m.productId) : undefined;
             if (!p) continue;
             const variant = m.variantId != null ? variantById.get(m.variantId) : undefined;
-            accumulateSrc(m.ingredientId, Math.abs(m.delta), variant ?? p, variant?.name ?? p.name);
+            const src = m.nutrientsJson ? (JSON.parse(m.nutrientsJson) as NutrientValues) : (variant ?? p);
+            accumulateSrc(m.ingredientId, Math.abs(m.delta), src, variant?.name ?? p.name);
           }
         } else {
           const p = productById.get(ev.productId);
@@ -507,11 +658,24 @@ export function dayIngredientTable(
       rows.set(rowKey, row);
     }
     row.qty += c.count;
+    const vals = c.nutrientsJson ? (JSON.parse(c.nutrientsJson) as Record<string, unknown>) : (src as Record<string, unknown>);
     for (const k of NUTRIENT_PATCH_KEYS) {
-      const val = (src as Record<string, unknown>)[k] as number | null | undefined;
+      const val = vals[k] as number | null | undefined;
       if (val == null) continue;
       row.values[k] = (row.values[k] ?? 0) + val * c.count;
     }
+  }
+
+  // Batch servings eaten this day. dayNutrition counts these as real meals, so
+  // omitting them here made the table silently undercount by a whole batch
+  // meal. Same negative id namespace dayNutrition uses, so the per-meal
+  // drill-down filter (`eventIds`) selects them the same way.
+  const batchEatenRows = db.select().from(schema.batchEaten)
+    .where(and(eq(schema.batchEaten.householdId, householdId), eq(schema.batchEaten.date, date))).all();
+  for (const be of batchEatenRows) {
+    if (eventIdSet && !eventIdSet.has(-1_000_000 - be.id)) continue;
+    for (const line of batchServingLines(db, householdId, be.batchId))
+      accumulateSrc(line.ingredientId, line.qty, line.src, line.productName);
   }
 
   return [...rows.values()];
@@ -612,18 +776,9 @@ export function scorecards(n: Nutrients): Scorecard[] {
 }
 
 /** ISO date + n days, computed in local time (no UTC drift). */
-function isoAddDays(iso: string, n: number): string {
-  const d = new Date(`${iso}T00:00:00`);
-  d.setDate(d.getDate() + n);
-  const z = (x: number) => String(x).padStart(2, "0");
-  return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
-}
-
-/** Monday (week start) of the week containing `iso`. */
-export function mondayOf(iso: string): string {
-  const dow = (new Date(`${iso}T00:00:00`).getDay() + 6) % 7; // Mon=0
-  return isoAddDays(iso, -dow);
-}
+// mondayOf lives in @/lib/dates (client-safe, no DB import) and is re-exported
+// here so client components can pull it without dragging better-sqlite3 in.
+export { mondayOf } from "@/lib/dates";
 
 export interface WeekNutrition {
   monday: string;
@@ -642,24 +797,27 @@ export function weekNutrition(db: Db, householdId: number, monday: string): Week
   const plannedSum = zeroNutrients();
   const missing = new Set<string>();
   let daysWithMeals = 0;
+  let daysServed = 0; // days with something actually eaten — the denominator `average` needs
   const lookups = dayLookups(db, householdId); // shared across the 7 days
   for (let i = 0; i < 7; i++) {
     const date = isoAddDays(monday, i);
     const day = dayNutrition(db, householdId, date, lookups);
     const hasMeals = day.meals.length > 0;
+    const hasServed = day.meals.some((m) => !m.estimate);
     if (hasMeals) {
       daysWithMeals++;
-      addScaled(sum, day.total, 1);
       addScaled(plannedSum, day.planned, 1);
+    }
+    if (hasServed) {
+      daysServed++;
+      addScaled(sum, day.total, 1);
       for (const m of day.missing) missing.add(m);
     }
     perDay.push({ date, total: day.total, planned: day.planned, hasMeals });
   }
   const average = zeroNutrients();
   const plannedAverage = zeroNutrients();
-  if (daysWithMeals > 0) for (const k of NUTRIENT_KEYS) {
-    average[k] = sum[k] / daysWithMeals;
-    plannedAverage[k] = plannedSum[k] / daysWithMeals;
-  }
+  if (daysServed > 0) for (const k of NUTRIENT_KEYS) average[k] = sum[k] / daysServed;
+  if (daysWithMeals > 0) for (const k of NUTRIENT_KEYS) plannedAverage[k] = plannedSum[k] / daysWithMeals;
   return { monday, perDay, average, plannedAverage, daysWithMeals, missing: [...missing] };
 }

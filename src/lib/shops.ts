@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
 
@@ -24,11 +24,15 @@ export function createShop(
   return row;
 }
 
+// Alphabetical: as the shop list grows, insertion order (the previous
+// behavior) makes both the manage page and every shop picker (AddExtra,
+// product editor) harder to scan than a stable, predictable A-Z order.
 export function listShops(db: Db, householdId: number) {
   return db
     .select()
     .from(schema.shops)
     .where(eq(schema.shops.householdId, householdId))
+    .orderBy(asc(schema.shops.name))
     .all();
 }
 
@@ -58,6 +62,32 @@ export function deleteShop(db: Db, householdId: number, id: number): DeleteResul
     return {
       ok: false,
       reason: `Can't delete: ${productCount} ${productCount === 1 ? "product" : "products"} use this shop.`,
+    };
+  }
+  // purchases.shopId and shoppingExtras.shopId are optional per-row overrides
+  // (independent of the product's default shop) and both FK-reference shops.id
+  // with foreign_keys=ON, so an unchecked delete throws a raw SqliteError
+  // instead of the friendly message above.
+  const purchaseCount = db
+    .select()
+    .from(schema.purchases)
+    .where(and(eq(schema.purchases.householdId, householdId), eq(schema.purchases.shopId, id)))
+    .all().length;
+  if (purchaseCount > 0) {
+    return {
+      ok: false,
+      reason: `Can't delete: ${purchaseCount} ${purchaseCount === 1 ? "purchase" : "purchases"} reference this shop.`,
+    };
+  }
+  const extraCount = db
+    .select()
+    .from(schema.shoppingExtras)
+    .where(and(eq(schema.shoppingExtras.householdId, householdId), eq(schema.shoppingExtras.shopId, id)))
+    .all().length;
+  if (extraCount > 0) {
+    return {
+      ok: false,
+      reason: `Can't delete: ${extraCount} shopping list ${extraCount === 1 ? "item" : "items"} reference this shop.`,
     };
   }
   const rows = db

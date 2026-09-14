@@ -28,4 +28,13 @@ describe("predictRunout (pure)", () => {
     const r = predictRunout({ stock: 500, dailyRate: 0, dailyStdDev: 0, historyDays: 0, bufferDays: 0 });
     expect(r.pointDays).toBe(Infinity);
   });
+
+  it("keeps low <= point <= high for a sub-1-unit/day rate (e.g. a 'count' item eaten every other day)", () => {
+    // Regression: a hardcoded floor of 1 unit/day on the low-rate clamp used to
+    // invert the range whenever dailyRate < 1 (highDays came out below pointDays).
+    const r = predictRunout({ stock: 10, dailyRate: 0.5, dailyStdDev: 0, historyDays: 0, bufferDays: 0 });
+    expect(r.pointDays).toBe(20);
+    expect(r.lowDays).toBeLessThanOrEqual(r.pointDays);
+    expect(r.highDays).toBeGreaterThanOrEqual(r.pointDays);
+  });
 });

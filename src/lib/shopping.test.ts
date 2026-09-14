@@ -4,8 +4,10 @@ import { makeTestDb, type TestDb } from "@/test/db";
 import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
 import { createProduct } from "@/lib/products";
-import { recordPurchase, listPendingPurchases, listPurchaseHistory, updatePurchase, deletePurchase, learnedShelfLife, addExtra, listExtras, deleteExtra, urgency } from "@/lib/shopping";
+import { recordPurchase, listPendingPurchases, listPurchaseHistory, updatePurchase, deletePurchase, learnedShelfLife, addExtra, listExtras, deleteExtra, urgency, shoppingList } from "@/lib/shopping";
 import { currentStock } from "@/lib/stock";
+import { addEvent } from "@/lib/plan";
+import { todayISO, toISODate } from "@/lib/dates";
 
 let db: TestDb;
 let hid: number;
@@ -38,6 +40,53 @@ describe("recordPurchase", () => {
   it("buying 2 adds 2x the pack size", () => {
     recordPurchase(db, hid, { productId, quantity: 2, cents: 1299 });
     expect(currentStock(db, hid, flourId)).toBe(22680);
+  });
+});
+
+describe("recordPurchase shop ownership", () => {
+  it("rejects a shopId belonging to another household", () => {
+    const otherHid = seedHousehold(db);
+    const otherShopId = db.insert(schema.shops)
+      .values({ householdId: otherHid, name: "Other Mart" }).returning().all()[0].id;
+    expect(() => recordPurchase(db, hid, { productId, quantity: 1, shopId: otherShopId }))
+      .toThrow(/shop not found/);
+    // the whole transaction should have rolled back: no purchase, no stock movement
+    expect(db.select().from(schema.purchases).where(eq(schema.purchases.householdId, hid)).all()).toHaveLength(0);
+    expect(currentStock(db, hid, flourId)).toBe(0);
+  });
+
+  it("allows a null/undefined shopId and a shopId in the caller's own household", () => {
+    expect(() => recordPurchase(db, hid, { productId, quantity: 1, shopId: null })).not.toThrow();
+    expect(() => recordPurchase(db, hid, { productId, quantity: 1, shopId })).not.toThrow();
+  });
+});
+
+describe("updatePurchase / addExtra shop ownership", () => {
+  it("updatePurchase rejects a shopId from another household", () => {
+    const otherHid = seedHousehold(db);
+    const otherShopId = db.insert(schema.shops)
+      .values({ householdId: otherHid, name: "Other Mart" }).returning().all()[0].id;
+    const pid = recordPurchase(db, hid, { productId, quantity: 1 }).id;
+    expect(() => updatePurchase(db, hid, pid, { shopId: otherShopId })).toThrow(/shop not found/);
+  });
+
+  it("addExtra rejects a shopId from another household", () => {
+    const otherHid = seedHousehold(db);
+    const otherShopId = db.insert(schema.shops)
+      .values({ householdId: otherHid, name: "Other Mart" }).returning().all()[0].id;
+    expect(() => addExtra(db, hid, { title: "Napkins", shopId: otherShopId })).toThrow(/shop not found/);
+  });
+
+  it("addExtra rejects a productId from another household", () => {
+    const otherHid = seedHousehold(db);
+    const otherIngredient = db.insert(schema.ingredients)
+      .values({ householdId: otherHid, name: "Sugar", canonicalUnit: "g" }).returning().all()[0].id;
+    const otherShop = db.insert(schema.shops)
+      .values({ householdId: otherHid, name: "Other Mart" }).returning().all()[0].id;
+    const otherProductId = createProduct(db, otherHid, {
+      ingredientId: otherIngredient, shopId: otherShop, name: "Sugar 1kg", packSize: 1000, priority: 1, url: null,
+    }).id;
+    expect(() => addExtra(db, hid, { productId: otherProductId })).toThrow(/product not found/);
   });
 });
 
@@ -123,6 +172,16 @@ describe("learnedShelfLife", () => {
     buy("2026-06-01T00:00:00Z", "2026-06-06");
     buy("2026-06-10T00:00:00Z", null); // no expiry → ignored
     expect(learnedShelfLife(db, hid).has(flourId)).toBe(false); // only 1 dated → untrusted
+  });
+
+  it("counts a whole day even when the purchase's timestamp carries a time-of-day", () => {
+    // Same calendar-day gaps as the median test above, but purchasedAt lands
+    // late in the UTC day instead of exactly at midnight. Diffing raw instants
+    // (rather than flooring to the purchase's UTC calendar day) used to shave
+    // most of a day off the gap here.
+    buy("2026-06-01T20:00:00Z", "2026-06-06"); // still a 5-day gap
+    buy("2026-06-10T20:00:00Z", "2026-06-17"); // still a 7-day gap
+    expect(learnedShelfLife(db, hid).get(flourId)).toBe(6); // median of [5,7]
   });
 });
 
@@ -217,5 +276,23 @@ describe("urgency", () => {
   it("keeps 'out today' and null when there is no run-out", () => {
     expect(urgency("2026-07-01", undefined, "2026-07-01")).toEqual({ label: "out today", tone: "run" });
     expect(urgency(undefined, "2026-07-03", "2026-07-01")).toBeNull();
+  });
+});
+
+describe("shoppingList", () => {
+  it("sorts each shop's lines most-urgent first", () => {
+    const oilId = db.insert(schema.ingredients)
+      .values({ householdId: hid, name: "Oil", canonicalUnit: "ml" }).returning().all()[0].id;
+    createProduct(db, hid, { ingredientId: oilId, shopId, name: "Olive Oil", packSize: 1000, priority: 1, url: null });
+    const slotId = db.insert(schema.mealSlots).values({ householdId: hid, name: "Dinner" }).returning().all()[0].id;
+    const today = todayISO();
+    const soon = toISODate(new Date(Date.now() + 10 * 86_400_000));
+    // Flour runs out in 10 days ("low"); Oil runs out today ("run"). Neither
+    // has any stock, so both need buying — Oil should sort first.
+    addEvent(db, hid, { date: soon, slotId, ingredientId: flourId, amount: 100, servings: 1 });
+    addEvent(db, hid, { date: today, slotId, ingredientId: oilId, amount: 50, servings: 1 });
+
+    const costco = shoppingList(db, hid, 14).get("Costco")!;
+    expect(costco.map((l) => l.ingredientName)).toEqual(["Oil", "Flour"]);
   });
 });

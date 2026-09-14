@@ -2,6 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
 import { allocateFEFO } from "@/lib/stock";
+import { nutrientSnapshot } from "@/lib/products";
 
 type Db = BetterSQLite3Database<typeof schema>;
 
@@ -21,13 +22,26 @@ export function logEaten(db: Db, householdId: number, input: EatInput) {
     if (!product) throw new Error("product not found in household");
     let perServing = 1; // canonical units in one packet/serving
     if (input.variantId != null) {
+      // Must belong to the product being logged — otherwise a mismatched
+      // variantId (e.g. from a different product) would apply the wrong
+      // packet size to this product's canonical amount.
       const [variant] = tx.select({ s: schema.productVariants.servingSize }).from(schema.productVariants)
-        .where(and(eq(schema.productVariants.id, input.variantId), eq(schema.productVariants.householdId, householdId))).all();
-      if (variant?.s && variant.s > 0) perServing = variant.s;
+        .where(and(
+          eq(schema.productVariants.id, input.variantId),
+          eq(schema.productVariants.householdId, householdId),
+          eq(schema.productVariants.productId, input.productId),
+        )).all();
+      if (!variant) throw new Error("variant does not belong to product");
+      if (variant.s && variant.s > 0) perServing = variant.s;
     }
     const canonical = servings * perServing;
     const [row] = tx.insert(schema.consumptions)
-      .values({ householdId, date: input.date, productId: input.productId, variantId: input.variantId ?? null, count: canonical })
+      .values({
+        householdId, date: input.date, productId: input.productId,
+        variantId: input.variantId ?? null, count: canonical,
+        // freeze the label as logged — later edits only affect future logs
+        nutrientsJson: nutrientSnapshot(tx, householdId, input.productId, input.variantId ?? null),
+      })
       .returning().all();
     // Draw from lots FEFO (soonest-expiry first) like cooking does, so the
     // depletion is attributed to real purchases — otherwise it lands in the

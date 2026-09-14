@@ -30,6 +30,16 @@ function trim(n: number): string {
   return Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100);
 }
 
+/**
+ * Whole packs needed to cover a required amount, rounded up (e.g. need 650g of
+ * a 500g pack → 2 packs). A missing/non-positive pack size can't be divided
+ * into, so it counts as a single pack rather than exploding into Infinity/NaN.
+ */
+export function packsNeeded(needed: number, packSize: number): number {
+  if (!(packSize > 0)) return 1;
+  return Math.max(1, Math.ceil(needed / packSize));
+}
+
 const G_PER_OZ = 28.3495;
 
 /**

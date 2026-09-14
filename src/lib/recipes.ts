@@ -97,9 +97,12 @@ export function deleteRecipe(db: Db, householdId: number, id: number): DeleteRes
   });
 }
 
+// Alphabetical, matching listShops — insertion order (the previous behavior)
+// makes the recipe list harder to scan as it grows.
 export function listRecipes(db: Db, householdId: number) {
   const recipes = db.select().from(schema.recipes)
-    .where(eq(schema.recipes.householdId, householdId)).all();
+    .where(eq(schema.recipes.householdId, householdId))
+    .orderBy(asc(schema.recipes.name)).all();
   return recipes.map((recipe) => {
     const ingredients = db.select().from(schema.recipeIngredients)
       .where(eq(schema.recipeIngredients.recipeId, recipe.id)).all();

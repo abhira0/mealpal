@@ -93,12 +93,12 @@ export function getBatch(db: Db, householdId: number, batchId: number) {
   return { ...batch, items };
 }
 
-/** Eat one serving on a date: count down (floor 0) and log a batchEaten row. */
+/** Eat one serving on a date: count down (floor 0) and log a batchEaten row. No-op if missing / not yours. */
 export function eatFromBatch(db: Db, householdId: number, batchId: number, date: string) {
   return db.transaction((tx) => {
     const [batch] = tx.select().from(schema.batches)
       .where(and(eq(schema.batches.id, batchId), eq(schema.batches.householdId, householdId))).all();
-    if (!batch) throw new Error("batch not found in household");
+    if (!batch) return;
     tx.insert(schema.batchEaten).values({ householdId, batchId, date }).run();
     tx.update(schema.batches).set({ mealsRemaining: Math.max(0, batch.mealsRemaining - 1) })
       .where(eq(schema.batches.id, batchId)).run();

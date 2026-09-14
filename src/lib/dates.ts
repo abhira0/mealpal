@@ -18,3 +18,16 @@ export function todayISO(): string {
 export function localNoon(date: string): Date {
   return new Date(`${date}T12:00:00`);
 }
+
+/** YYYY-MM-DD n days from iso (n may be negative). */
+export function isoAddDays(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + n);
+  return toISODate(d);
+}
+
+/** The Monday (as YYYY-MM-DD) of the week containing iso. */
+export function mondayOf(iso: string): string {
+  const dow = (new Date(`${iso}T00:00:00`).getDay() + 6) % 7; // Mon=0
+  return isoAddDays(iso, -dow);
+}

@@ -177,4 +177,15 @@ describe("eatFromBatch / uneatFromBatch", () => {
     expect(getBatch(db, hid, b.id)?.mealsRemaining).toBe(1);
     expect(db.select().from(schema.batchEaten).all()).toHaveLength(2);
   });
+
+  it("no-ops instead of throwing for a missing or foreign-household batch", () => {
+    const b = packBatch(db, hid, { slotId, label: "Lunch", cookedDate: "2026-08-09", mealsTotal: 2, items: [] });
+    // Neither call should throw: a route handler calls this unconditionally,
+    // so a throw here would surface to the client as an uncaught 500 instead
+    // of a clean no-op / 404.
+    expect(() => eatFromBatch(db, hid, 999999, "2026-08-09")).not.toThrow();
+    expect(() => eatFromBatch(db, hid + 999, b.id, "2026-08-09")).not.toThrow();
+    expect(getBatch(db, hid, b.id)?.mealsRemaining).toBe(2); // untouched
+    expect(db.select().from(schema.batchEaten).all()).toHaveLength(0);
+  });
 });
