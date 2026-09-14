@@ -10,7 +10,7 @@ run out → when is the next cook day?* and *did I actually eat my ~5–6 meals
 today?* The underlying goal is **discipline** (regaining weight/muscle lost over
 2 years), so the feature must be near-zero-friction or it won't get used.
 
-MyFitnessPal was considered and **dropped**: no usable public API, and MealPal
+MyFitnessPal was considered and **dropped**: no usable public API, and Platr
 already computes calories/protein vs goal, so syncing to a clone is overhead.
 
 ## The 3-phase lifecycle (the spine)

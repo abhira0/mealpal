@@ -5,7 +5,7 @@
 
 ## Problem
 
-MealPal is styled exclusively for phones: a 560px column centered on the
+Platr is styled exclusively for phones: a 560px column centered on the
 screen with a fixed bottom nav. On a desktop browser it works but looks like
 a phone simulator floating in whitespace.
 
@@ -29,7 +29,7 @@ list stacks are the whole surface.
 - The existing `BottomNav` component is restyled by CSS into a fixed left
   sidebar: enamel background, column of icon + label rows, active state in
   paprika. No new component.
-- Only markup change: a "MealPal" wordmark element in the nav, hidden on
+- Only markup change: a "Platr" wordmark element in the nav, hidden on
   mobile (`display:none` under 900px).
 
 ### 2. Lists flow into two columns

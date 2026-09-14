@@ -64,7 +64,7 @@ every inbound a lot id to attribute against, so FEFO walks one ordered list.
    movements of every `reason`, not just `purchase`.
 
 Migrations are hand-written SQL (`db:generate` is known-broken — memory
-`mealpal-drizzle-drift`). Apply via the sqlite3 CLI, then insert the
+`platr-drizzle-drift`). Apply via the sqlite3 CLI, then insert the
 `__drizzle_migrations` bookkeeping row.
 
 ## `src/lib/stock.ts`

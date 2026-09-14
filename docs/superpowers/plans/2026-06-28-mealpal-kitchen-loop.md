@@ -1,4 +1,4 @@
-# MealPal Kitchen Loop Implementation Plan (Phases 3–5: Recipes, Planning/Inventory, Shopping)
+# Platr Kitchen Loop Implementation Plan (Phases 3–5: Recipes, Planning/Inventory, Shopping)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -120,7 +120,7 @@ export const purchases = sqliteTable("purchases", {
 npm run db:generate && npm run db:migrate
 ```
 
-Expected: `drizzle/0002_*.sql` created and applied. Verify with `sqlite3 mealpal.db ".tables"` — includes `recipes`, `recipe_ingredients`, `recipe_steps`, `recipe_media`, `meal_slots`, `meal_events`, `stock_movements`, `purchases`.
+Expected: `drizzle/0002_*.sql` created and applied. Verify with `sqlite3 platr.db ".tables"` — includes `recipes`, `recipe_ingredients`, `recipe_steps`, `recipe_media`, `meal_slots`, `meal_events`, `stock_movements`, `purchases`.
 
 - [ ] **Step 3: Verify and commit**
 

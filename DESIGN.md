@@ -1,5 +1,5 @@
 ---
-name: MealPal
+name: Platr
 description: A household's food operation as one calm, dense productivity tool — the category standard at Linear's craft.
 colors:
   bg: "#EEF1F4"
@@ -32,8 +32,26 @@ colors:
   macro-fat: "#E0684A"
 typography:
   # Dense Operate tool: a fine discrete size scale (px) is intentional. Any literal
-  # font-size in the app should be one of these steps.
-  sizes: [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 22, 24, 26]
+  # font-size in the app should be one of these steps. Expressed as a `scale` map
+  # (not a list) so tooling that lacks YAML-list support reads the full ramp;
+  # 20/32 are the Cook Mode step-text clamp endpoints.
+  scale:
+    s9: "9px"
+    s10: "10px"
+    s11: "11px"
+    s12: "12px"
+    s13: "13px"
+    s14: "14px"
+    s15: "15px"
+    s16: "16px"
+    s17: "17px"
+    s18: "18px"
+    s19: "19px"
+    s20: "20px"
+    s22: "22px"
+    s24: "24px"
+    s26: "26px"
+    s32: "32px"
   display:
     fontFamily: "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif"
     fontSize: "26px"
@@ -132,13 +150,13 @@ components:
     padding: "4px 9px"
 ---
 
-# Design System: MealPal
+# Design System: Platr
 
 ## Overview
 
 **Creative North Star: "The Kitchen Operations Console"**
 
-MealPal is a household's food operation rendered as a single calm, dense productivity tool. It plays the category standard straight — a clean, familiar productivity-tool look executed impeccably, with no gimmick or novelty world — and holds itself to Linear's craft bar: crisp neutral surfaces, tight typography, one restrained accent, fast and information-dense. It is light-first by intent, built for the daytime kitchen scene and for a returning power user who already knows the app, not for onboarding strangers.
+Platr is a household's food operation rendered as a single calm, dense productivity tool. It plays the category standard straight — a clean, familiar productivity-tool look executed impeccably, with no gimmick or novelty world — and holds itself to Linear's craft bar: crisp neutral surfaces, tight typography, one restrained accent, fast and information-dense. It is light-first by intent, built for the daytime kitchen scene and for a returning power user who already knows the app, not for onboarding strangers.
 
 The world is cool and near-monochrome. A light cool-gray canvas carries white surfaces separated by hairline borders and barely-there 1px shadows; text is near-black; a single indigo accent appears sparingly to mark the one live action or the current selection. Typography is the system font stack (no webfont payload) with tight negative tracking on headings, and a monospace stack reserved for eyebrows, metadata, and every numeral — which is always set in tabular figures so quantities, prices, and macros align in columns. Corners are gently softened at 6–12px; nothing is pill-round except tags and toggles.
 
@@ -149,7 +167,7 @@ This build explicitly refuses the friendly rounded-card + food-photo + soft-gree
 - One indigo accent (#4F5BD5), used sparingly for the primary action and current selection.
 - System font stack; tight tracking on headings; monospace + tabular numerals for all figures.
 - 6–12px radii, 1px ambient shadows; information-dense, mobile-first, one-handed.
-- Responsive shell: bottom nav on mobile, fixed left sidebar at ≥900px.
+- Responsive shell: bottom nav on mobile, fixed left sidebar at ≥1024px.
 
 ## Colors
 
@@ -215,7 +233,7 @@ Mobile-first single column inside a `.app` shell capped at **600px** and centere
 
 Section structure is carried by the mono eyebrow/section-label pattern rather than boxes: a `.section-label` adds a top hairline (Line Soft) and an uppercase mono heading, except the first.
 
-**Responsive rule (≥900px):** the shell becomes a two-pane desktop layout. The bottom nav transforms into a fixed **220px left sidebar** (`order:-1`, full-height, right hairline border, vertical, with a visible brand wordmark that is hidden on mobile). Content uncaps to a **960px** centered column with 24px padding. Lists of `.row`, `.account-row`, or `button.card` reflow via `:has()` into an `auto-fill` grid of `minmax(300px, 1fr)` cards, while non-card children span the full row. Bottom sheets recenter into a 520px centered modal (grab handle hidden).
+**Responsive rule (≥1024px):** the shell becomes a two-pane desktop layout. The bottom nav transforms into a fixed **220px left sidebar** (`order:-1`, full-height, right hairline border, vertical, with a visible brand wordmark that is hidden on mobile). Content uncaps to a **960px** centered column with 24px padding. Lists of `.row`, `.account-row`, or `button.card` reflow via `:has()` into an `auto-fill` grid of `minmax(300px, 1fr)` cards, while non-card children span the full row. Bottom sheets recenter into a 520px centered modal (grab handle hidden).
 
 ## Elevation & Depth
 
@@ -265,7 +283,7 @@ A calm three-step radius scale: **6px (`r1`)** for small inset chrome (checkbox,
 
 ### Navigation
 - **Mobile:** Fixed bottom bar, white with a top hairline, icons+labels in 10px sans, Ink 3 at rest, Accent when `.on`. Respects `env(safe-area-inset-bottom)`.
-- **Desktop (≥900px):** Becomes a 220px fixed left sidebar with a visible brand wordmark, horizontal row items (14px), hover fill Surface 2, and the active item on Indigo Wash with Indigo Ink text.
+- **Desktop (≥1024px):** Becomes a 220px fixed left sidebar with a visible brand wordmark, horizontal row items (14px), hover fill Surface 2, and the active item on Indigo Wash with Indigo Ink text.
 
 ### View Tabs & Filters
 - **Tabs (underlined):** 13px 600 sans, Ink 2, transparent 2px bottom border; active is Ink with an Accent underline.
@@ -289,7 +307,7 @@ A calm three-step radius scale: **6px (`r1`)** for small inset chrome (checkbox,
 - **Do** ship status color as the weak-tint background + `-line` border + saturated-ink triad.
 - **Do** keep input text at 16px and controls at a 44px min touch target.
 - **Do** use the shared focus ring (`0 0 0 3px rgba(79,91,213,.28)`) on `:focus-visible`.
-- **Do** honor the responsive split: bottom nav below 900px, 220px left sidebar and 960px content at and above it.
+- **Do** honor the responsive split: bottom nav below 1024px, 220px left sidebar and 960px content at and above it.
 
 ### Don't:
 - **Don't** introduce a second accent hue or use macro chart colors (carbs/fat) anywhere outside the macro charts.

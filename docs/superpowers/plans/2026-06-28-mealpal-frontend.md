@@ -1,8 +1,8 @@
-# MealPal Frontend (PWA) Implementation Plan — "Enamel & Label Tape"
+# Platr Frontend (PWA) Implementation Plan — "Enamel & Label Tape"
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or executing-plans. Steps use checkbox (`- [ ]`) syntax.
 
-**Goal:** A distinctive, installable, mobile-first PWA frontend for MealPal — Today / Plan / Pantry / Shop — built against the existing REST API.
+**Goal:** A distinctive, installable, mobile-first PWA frontend for Platr — Today / Plan / Pantry / Shop — built against the existing REST API.
 
 **Architecture:** Next.js 16 App Router. Plain CSS with design tokens in `globals.css` (no Tailwind — matches the repo). Fonts via `next/font/google`. A root layout provides the app shell (bottom tab bar). Screens are client components that `fetch` the JSON API by URL (the API is owned by the engine track and couples only at runtime). A small set of reusable presentational components carries the identity — chiefly the `QuantityChip`.
 
@@ -49,7 +49,7 @@ Replace `src/app/globals.css` with tokens and base styles. Define `:root` with t
 
 - [ ] **Step 2: Wire fonts + metadata + shell in `layout.tsx`**
 
-Use `next/font/google` for `Bricolage_Grotesque`, `Hanken_Grotesk`, `Space_Mono`, exposing them as CSS variables on `<body>`. Add `export const metadata` with `title`, `description`, `manifest: "/manifest.webmanifest"`, `appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "MealPal" }`, and `themeColor` via `export const viewport = { themeColor: "#115E59" }`. Render `{children}` then `<BottomNav/>`.
+Use `next/font/google` for `Bricolage_Grotesque`, `Hanken_Grotesk`, `Space_Mono`, exposing them as CSS variables on `<body>`. Add `export const metadata` with `title`, `description`, `manifest: "/manifest.webmanifest"`, `appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Platr" }`, and `themeColor` via `export const viewport = { themeColor: "#115E59" }`. Render `{children}` then `<BottomNav/>`.
 
 - [ ] **Step 3: PWA manifest + icons**
 
@@ -57,8 +57,8 @@ Create `public/manifest.webmanifest`:
 
 ```json
 {
-  "name": "MealPal",
-  "short_name": "MealPal",
+  "name": "Platr",
+  "short_name": "Platr",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#EFEADD",

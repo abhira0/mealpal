@@ -5,7 +5,7 @@
 
 ## Goal
 
-MealPal was built mobile-first and stretched to desktop (content capped at ~960px, cards
+Platr was built mobile-first and stretched to desktop (content capped at ~960px, cards
 auto-gridded, bottom-nav flipped to a sidebar via CSS). The user wants **genuinely separate
 mobile and desktop experiences** — different components/views/layouts per device, not one
 layout forced onto the other. Desktop should use the wide viewport for **master-detail** and

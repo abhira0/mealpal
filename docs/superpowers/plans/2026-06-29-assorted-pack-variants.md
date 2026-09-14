@@ -34,7 +34,7 @@ These changes from the earlier (abandoned) approach must be undone first so the 
 
 - [ ] **Step 2: Drop the column from the dev DB**
 
-Run: `sqlite3 ./mealpal.db "ALTER TABLE products DROP COLUMN pack_parent_id;"`
+Run: `sqlite3 ./platr.db "ALTER TABLE products DROP COLUMN pack_parent_id;"`
 Expected: no output (success). If it errors that the column is missing, that's fine — continue.
 
 - [ ] **Step 3: Verify clean**
@@ -178,7 +178,7 @@ CREATE TABLE `consumptions` (
 
 - [ ] **Step 5: Apply + verify**
 
-Run: `npm run db:migrate && sqlite3 ./mealpal.db ".tables" | tr ' ' '\n' | grep -E "product_variants|consumptions"`
+Run: `npm run db:migrate && sqlite3 ./platr.db ".tables" | tr ' ' '\n' | grep -E "product_variants|consumptions"`
 Expected: both table names print.
 
 - [ ] **Step 6: Verify the in-memory test DB migrates** (this is what every test uses)

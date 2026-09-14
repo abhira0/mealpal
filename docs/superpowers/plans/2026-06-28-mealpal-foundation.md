@@ -1,4 +1,4 @@
-# MealPal Foundation Implementation Plan
+# Platr Foundation Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -32,14 +32,14 @@
 ## Task 1: Scaffold the Next.js project
 
 **Files:**
-- Create: entire project scaffold in `/Users/abhishekr/git_repos/mealpal`
+- Create: entire project scaffold in `/Users/abhishekr/git_repos/platr`
 
 - [ ] **Step 1: Scaffold into the current directory**
 
 Run (the `.` targets the current dir; it is empty except `docs/`):
 
 ```bash
-cd /Users/abhishekr/git_repos/mealpal
+cd /Users/abhishekr/git_repos/platr
 npx create-next-app@latest . --ts --app --src-dir --eslint --no-tailwind --import-alias "@/*" --use-npm --no-turbopack
 ```
 
@@ -82,7 +82,7 @@ npm install -D drizzle-kit @types/better-sqlite3 vitest
 Create `.env.local`:
 
 ```
-DATABASE_URL=./mealpal.db
+DATABASE_URL=./platr.db
 AUTH_SECRET=replace-with-a-long-random-string
 ```
 
@@ -139,7 +139,7 @@ import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
 
-const sqlite = new Database(process.env.DATABASE_URL ?? "./mealpal.db");
+const sqlite = new Database(process.env.DATABASE_URL ?? "./platr.db");
 sqlite.pragma("journal_mode = WAL");
 sqlite.pragma("foreign_keys = ON");
 
@@ -158,7 +158,7 @@ export default defineConfig({
   dialect: "sqlite",
   schema: "./src/db/schema.ts",
   out: "./drizzle",
-  dbCredentials: { url: process.env.DATABASE_URL ?? "./mealpal.db" },
+  dbCredentials: { url: process.env.DATABASE_URL ?? "./platr.db" },
 });
 ```
 
@@ -179,10 +179,10 @@ npm run db:generate
 npm run db:migrate
 ```
 
-Expected: a `drizzle/0000_*.sql` file is created and applied; `mealpal.db` now exists with `households` and `users` tables. Verify:
+Expected: a `drizzle/0000_*.sql` file is created and applied; `platr.db` now exists with `households` and `users` tables. Verify:
 
 ```bash
-sqlite3 mealpal.db ".tables"
+sqlite3 platr.db ".tables"
 ```
 
 Expected output includes `households` and `users`.
@@ -701,7 +701,7 @@ export default async function Home() {
   const session = await auth();
   return (
     <main style={{ maxWidth: 480, margin: "4rem auto", fontFamily: "system-ui" }}>
-      <h1>MealPal</h1>
+      <h1>Platr</h1>
       <p>Signed in as {session?.user?.email}</p>
       <p>Household ID: {session?.user?.householdId}</p>
       <form
