@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "mealpal",
+  "project_id": "42386b5e-69c6-41a3-8c79-5777c9ef1e9d"
+}
