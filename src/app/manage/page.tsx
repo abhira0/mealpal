@@ -6,8 +6,9 @@ import { SignOutButton } from "@/components/SignOutButton";
 import { PageHeader } from "@/components/PageHeader";
 import { ENTITIES, type EntitySlug } from "@/app/manage/entities";
 import { BookOpen, CalendarClock, Camera, ChevronRight, Egg, Store, Tag, Target, Utensils, type LucideIcon } from "lucide-react";
-import { calendarToken } from "@/lib/calendar";
-import { CopyField } from "@/components/CopyField";
+import { db } from "@/db";
+import { getCalendarToken, regenerateCalendarToken } from "@/lib/households";
+import { CalendarLinkField } from "@/components/CalendarLinkField";
 
 // Resolve the app's own origin so server-side fetches to /api hit this app.
 async function origin(): Promise<string> {
@@ -55,7 +56,9 @@ export default async function ManagePage() {
   const email = session.user?.email ?? "—";
   const householdName = session.user?.name ?? "Your kitchen";
   const hid = session.user.householdId;
-  const calendarUrl = `${base}/api/calendar/${hid}/${calendarToken(hid)}`;
+  // Defensive: households created before drizzle/0038 was backfilled, or in a
+  // test seed, may not have a stored token yet — lazily mint one rather than 404.
+  const calendarToken = getCalendarToken(db, hid) ?? regenerateCalendarToken(db, hid);
 
   return (
     <>
@@ -112,7 +115,7 @@ export default async function ManagePage() {
             <CalendarClock size={13} style={{ verticalAlign: "-2px", marginRight: 4 }} aria-hidden="true" />
             Subscribe by URL in TickTick, Google, or Apple Calendar to sync your meal plan.
           </p>
-          <CopyField value={calendarUrl} />
+          <CalendarLinkField hid={hid} initialToken={calendarToken} />
         </section>
 
         <section className="stack-sm">

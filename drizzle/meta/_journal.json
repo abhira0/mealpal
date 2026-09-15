@@ -267,6 +267,13 @@
       "when": 1786900000000,
       "tag": "0037_nutrient_snapshots",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "6",
+      "when": 1787000000000,
+      "tag": "0038_household_calendar_token",
+      "breakpoints": true
     }
   ]
 }

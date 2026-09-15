@@ -1,16 +1,22 @@
 import { describe, expect, it } from "vitest";
 import type { NextCook } from "@/lib/agenda";
-import { buildIcs, calendarToken, calendarTokenValid } from "@/lib/calendar";
+import { buildIcs, calendarTokenMatches, generateCalendarToken } from "@/lib/calendar";
 
-process.env.AUTH_SECRET ??= "test-secret";
+describe("calendar feed token", () => {
+  it("matches the stored token and rejects tampering / mismatch / missing", () => {
+    const t = generateCalendarToken();
+    expect(calendarTokenMatches(t, t)).toBe(true);
+    expect(calendarTokenMatches(t, t.slice(0, -1) + (t.at(-1) === "0" ? "1" : "0"))).toBe(false); // tampered
+    expect(calendarTokenMatches(t, "short")).toBe(false); // length mismatch, no throw
+    expect(calendarTokenMatches(null, t)).toBe(false); // no stored token yet
+    expect(calendarTokenMatches(t, "")).toBe(false);
+  });
 
-describe("calendar feed", () => {
-  it("token validates itself and rejects tampering", () => {
-    const t = calendarToken(7);
-    expect(calendarTokenValid(7, t)).toBe(true);
-    expect(calendarTokenValid(7, t.slice(0, -1) + "0")).toBe(false); // wrong token
-    expect(calendarTokenValid(8, t)).toBe(false); // right token, wrong household
-    expect(calendarTokenValid(7, "short")).toBe(false); // length mismatch, no throw
+  it("generates unique, unguessable-length tokens", () => {
+    const a = generateCalendarToken();
+    const b = generateCalendarToken();
+    expect(a).not.toBe(b);
+    expect(a.length).toBeGreaterThanOrEqual(32);
   });
 
   it("emits a timed VEVENT per cook-prep date, with escaped text", () => {

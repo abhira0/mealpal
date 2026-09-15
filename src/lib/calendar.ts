@@ -1,19 +1,24 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import type { NextCook } from "@/lib/agenda";
 
-// Per-household calendar token, derived from AUTH_SECRET — no DB column needed.
-// Unguessable and stable; rotating AUTH_SECRET revokes every feed at once.
-// ponytail: one shared secret → per-household tokens; store a real token column
-// if you ever need to revoke a single household's feed without rotating all.
-export function calendarToken(householdId: number): string {
-  const secret = process.env.AUTH_SECRET;
-  if (!secret) throw new Error("AUTH_SECRET is required for calendar feeds");
-  return createHmac("sha256", secret).update(`calendar:${householdId}`).digest("hex").slice(0, 24);
+// Per-household calendar token, stored on households.calendarToken (see
+// drizzle/0038_household_calendar_token.sql). Previously this was derived
+// on the fly from AUTH_SECRET, but that made a single household's feed
+// un-revocable without rotating AUTH_SECRET and invalidating every session
+// in the app. A stored, regeneratable token fixes that: a "Regenerate
+// calendar link" action just overwrites the column, and the old URL 404s.
+export function generateCalendarToken(): string {
+  return randomBytes(18).toString("hex"); // 36 hex chars, unguessable
 }
 
-export function calendarTokenValid(householdId: number, token: string): boolean {
-  const want = Buffer.from(calendarToken(householdId));
-  const got = Buffer.from(token);
+// Constant-time compare against the household's stored token. Mirrors the
+// timingSafeEqual + length-check pattern used elsewhere in this repo so a
+// length mismatch (e.g. no token yet) can't throw or short-circuit on a
+// cheap string compare first.
+export function calendarTokenMatches(stored: string | null | undefined, given: string): boolean {
+  if (!stored || !given) return false;
+  const want = Buffer.from(stored);
+  const got = Buffer.from(given);
   return want.length === got.length && timingSafeEqual(want, got);
 }
 

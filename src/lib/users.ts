@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
 import { hashPassword } from "@/lib/password";
+import { generateCalendarToken } from "@/lib/calendar";
 
 type Db = BetterSQLite3Database<typeof schema>;
 
@@ -25,7 +26,7 @@ export async function registerHousehold(db: Db, input: RegisterInput) {
   return db.transaction((tx) => {
     const [household] = tx
       .insert(schema.households)
-      .values({ name: input.householdName })
+      .values({ name: input.householdName, calendarToken: generateCalendarToken() })
       .returning()
       .all();
     // Generic "buy anywhere" shop for staples (onions, tomatoes) you don't

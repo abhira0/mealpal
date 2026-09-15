@@ -1,8 +1,9 @@
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, schema } from "@/db";
 import { nextCooks } from "@/lib/agenda";
 import { topUpRules } from "@/lib/rules";
-import { buildIcs, calendarTokenValid } from "@/lib/calendar";
+import { buildIcs, calendarTokenMatches } from "@/lib/calendar";
 import { todayISO } from "@/lib/dates";
 
 // Mirrors TodayAgenda's "🍳 Next cooking" filter — only these prep cards show.
@@ -21,7 +22,11 @@ export async function GET(
   const { hid: hidStr, token: tokenParam } = await params;
   const hid = Number(hidStr);
   const token = tokenParam.replace(/\.ics$/, ""); // TickTick appends nothing, but be forgiving
-  if (!Number.isInteger(hid) || !calendarTokenValid(hid, token)) {
+  const [household] = Number.isInteger(hid)
+    ? db.select({ calendarToken: schema.households.calendarToken })
+        .from(schema.households).where(eq(schema.households.id, hid)).all()
+    : [];
+  if (!household || !calendarTokenMatches(household.calendarToken, token)) {
     return new NextResponse("Not found", { status: 404 });
   }
   const today = todayISO();

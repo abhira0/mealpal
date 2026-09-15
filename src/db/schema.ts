@@ -3,6 +3,12 @@ import { sqliteTable, text, integer, real, blob } from "drizzle-orm/sqlite-core"
 export const households = sqliteTable("households", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
+  // Per-household ICS feed secret (see src/lib/calendar.ts). Stored (not
+  // derived from AUTH_SECRET) so a single household's feed can be revoked by
+  // regenerating this column, without rotating AUTH_SECRET and invalidating
+  // every session in the app. Nullable only for pre-migration rows that
+  // haven't been backfilled yet (see drizzle/0038_household_calendar_token.sql).
+  calendarToken: text("calendar_token"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
