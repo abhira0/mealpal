@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { StockAdjust } from "@/components/StockAdjust";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { EditableValue, mmdd } from "@/components/Bill";
 import { Dropdown } from "@/components/Dropdown";
 import { formatQty } from "@/lib/units";
@@ -47,6 +48,7 @@ export function PantryDetail({
   onAddOnHand,
   onApplyDelta,
 }: PantryDetailProps) {
+  const confirm = useConfirm();
   const unsortedEditProducts = products.filter((p) => p.ingredientId === ingredient.id);
   // Products ordered by their soonest lot expiry — the product holding the next batch first.
   const editProducts = [...unsortedEditProducts].sort((a, b) => {
@@ -141,10 +143,10 @@ export function PantryDetail({
                           type="button"
                           className="hrow-trash"
                           aria-label={`Remove lot of ${p.name}`}
-                          onClick={() => {
+                          onClick={async () => {
                             if (
                               lot.remaining > 0 &&
-                              !window.confirm(`Remove ${formatQty(lot.remaining, ingredient.canonicalUnit)} of ${p.name}?`)
+                              !(await confirm(`Remove ${formatQty(lot.remaining, ingredient.canonicalUnit)} of ${p.name}?`))
                             )
                               return;
                             onSaveLotDelta(ingredient.id, p.id, lot.purchaseId, -lot.remaining);

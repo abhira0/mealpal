@@ -606,3 +606,15 @@ button.row-link{background:none;border:none;width:100%;text-align:left;cursor:po
 @media (prefers-reduced-motion: reduce){
   ::view-transition-old(*),::view-transition-new(*),::view-transition-group(*){animation-duration:0s!important;animation-delay:0s!important}
 }
+
+/* ---------- toast (replaces window.alert) ---------- */
+.toast-stack{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 78px);z-index:70;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 16px;pointer-events:none}
+.toast{pointer-events:auto;display:flex;align-items:center;gap:10px;max-width:420px;width:100%;background:var(--ink);color:#fff;border-radius:var(--r2);padding:10px 12px;font-size:14px;font-weight:500;box-shadow:var(--shadow-pop)}
+.toast-error{background:var(--danger)}
+.toast span{flex:1}
+.toast-dismiss{background:none;border:none;color:inherit;opacity:.8;font-size:18px;line-height:1;cursor:pointer;padding:2px 4px}
+.toast-dismiss:hover{opacity:1}
+
+/* ---------- confirm sheet (replaces window.confirm) ---------- */
+.confirm-actions{display:flex;gap:8px}
+.confirm-actions .btn,.confirm-actions .btn-secondary{flex:1}

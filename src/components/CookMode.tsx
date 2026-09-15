@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { parseClip, fmtClip } from "@/lib/clip";
 import { useFocusTrap } from "@/lib/useFocusTrap";
+import { useConfirm } from "@/components/ConfirmProvider";
 import type { EditableRecipe } from "@/components/RecipeSheet";
 
 type Step = { text: string; startSeconds: number | null; endSeconds: number | null };
@@ -55,6 +56,7 @@ export function CookMode({
   // Public shared view: no editing, no clip API (both are auth-gated).
   readOnly?: boolean;
 }) {
+  const confirm = useConfirm();
   const [i, setI] = useState(0);
   // bump to remount the clip iframe → reloads at the step's start (YouTube's own
   // replay button ignores start/end and plays the whole video from 0)
@@ -170,9 +172,9 @@ export function CookMode({
     save(next);
   }
 
-  function deleteStep() {
+  async function deleteStep() {
     if (steps.length <= 1) return;
-    if (!window.confirm("Delete this step?")) return;
+    if (!(await confirm("Delete this step?"))) return;
     const next = steps.filter((_, n) => n !== i);
     setSteps(next);
     setI((n) => Math.min(n, next.length - 1));

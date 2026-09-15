@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { Dropdown } from "@/components/Dropdown";
+import { useToast } from "@/components/ToastProvider";
+import { useConfirm } from "@/components/ConfirmProvider";
 import type { InspectResult } from "@/lib/inspect";
 import type { AgendaMeal, AgendaState } from "@/views/agenda-data";
 import type { DeleteScope } from "@/lib/plan";
@@ -39,6 +41,8 @@ export function PlanInspector({
   hideHeader?: boolean; // embedded in a Sheet that already shows a title/close
 }) {
   const eventId = meal.eventId!; // caller guarantees an event-backed row
+  const toast = useToast();
+  const confirm = useConfirm();
   const [data, setData] = useState<InspectResult | null>(null);
   const [scope, setScope] = useState<DeleteScope>("one");
   const [tab, setTab] = useState<"details" | "nutrition">("details");
@@ -76,7 +80,7 @@ export function PlanInspector({
       const res = await fn();
       if (!res.ok) {
         const e = (await res.json().catch(() => null)) as { error?: string } | null;
-        alert(e?.error ?? "Action failed");
+        toast.error(e?.error ?? "Action failed");
         return;
       }
       if (closeAfter) { onClose(); return; }
@@ -100,12 +104,12 @@ export function PlanInspector({
       let res = await send(false);
       if (res.status === 409) {
         const e = (await res.json().catch(() => null)) as { error?: string } | null;
-        if (!confirm(`${e?.error ?? "Not enough stock"}.\n\nCook anyway (stock goes negative)?`)) return;
+        if (!(await confirm(`${e?.error ?? "Not enough stock"}. Cook anyway (stock goes negative)?`))) return;
         res = await send(true);
       }
       if (!res.ok) {
         const e = (await res.json().catch(() => null)) as { error?: string } | null;
-        alert(e?.error ?? "Could not cook.");
+        toast.error(e?.error ?? "Could not cook.");
         return;
       }
       await load();
@@ -120,8 +124,8 @@ export function PlanInspector({
   // toggles serve↔unserve by the fresh phase. The board reload it triggers
   // refreshes this inspector through the effect above.
   const toggleServe = () => agenda.toggleMeal(freshMeal, focusDate ?? data?.event.date ?? "");
-  const del = () => {
-    if (!confirm(recurring && scope !== "one" ? "Delete these occurrences?" : "Delete this meal?")) return;
+  const del = async () => {
+    if (!(await confirm(recurring && scope !== "one" ? "Delete these occurrences?" : "Delete this meal?"))) return;
     return act(() => fetch(`/api/events/${eventId}?scope=${recurring ? scope : "one"}`, { method: "DELETE" }), true);
   };
   // openEditMeal un-cooks first when needed (cooked meals are locked server-side).
