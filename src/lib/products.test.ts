@@ -11,6 +11,7 @@ import {
   deleteProduct,
   reorderProducts,
   nextPriorityForIngredient,
+  updateProduct,
 } from "@/lib/products";
 
 let db: TestDb;
@@ -112,6 +113,14 @@ describe("products & prices", () => {
     const a = createProduct(db, hid, { ingredientId, shopId, name: "A", packSize: 1, priority: 1, url: null });
     reorderProducts(db, hid, ingredientId, [99999, a.id]);
     expect(listProductsForIngredient(db, hid, ingredientId)[0].priority).toBe(1);
+  });
+
+  it("updateProduct with an empty patch returns the row unchanged instead of throwing", () => {
+    const p = createProduct(db, hid, {
+      ingredientId, shopId, name: "Flour", packSize: 1000, priority: 1, url: null,
+    });
+    expect(() => updateProduct(db, hid, p.id, {})).not.toThrow();
+    expect(updateProduct(db, hid, p.id, {})).toEqual(expect.objectContaining({ id: p.id, name: "Flour" }));
   });
 
   it("deletes an unreferenced product", () => {

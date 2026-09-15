@@ -251,6 +251,14 @@ export function updateProduct(
   id: number,
   patch: ProductPatch,
 ) {
+  // drizzle's .set({}) throws "No values to set" — an empty/unrecognized
+  // patch is a no-op, so just return the current row instead of crashing.
+  if (Object.keys(patch).length === 0) {
+    const [row] = db.select().from(schema.products)
+      .where(and(eq(schema.products.id, id), eq(schema.products.householdId, householdId)))
+      .all();
+    return row;
+  }
   const [row] = db
     .update(schema.products)
     .set(patch)
