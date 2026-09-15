@@ -4,6 +4,13 @@ import { schema } from "@/db";
 
 type Db = BetterSQLite3Database<typeof schema>;
 
+/** 24h HH:MM, zero-padded (e.g. "09:00", not "9:00"), so lexical sort == time order. */
+export const TIME_OF_DAY_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+export function isValidTimeOfDay(value: string): boolean {
+  return TIME_OF_DAY_RE.test(value);
+}
+
 export function createSlot(db: Db, householdId: number, name: string, timeOfDay = "12:00") {
   const [row] = db.insert(schema.mealSlots)
     .values({ householdId, name, timeOfDay }).returning().all();
