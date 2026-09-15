@@ -209,7 +209,8 @@ export function getShopping(db: Db, hid: number, horizonDays = 14) {
   const grouped = shoppingList(db, hid, horizonDays);
   let knownTotalCents = 0;
   let allPriced = true;
-  const byShop = [...grouped].map(([shop, lines]) => {
+  const byShop = [...grouped.values()].map((group) => {
+    const { shopName: shop, lines } = group;
     let shopCents = 0;
     let shopAllPriced = true;
     const outLines = lines.map((l) => {

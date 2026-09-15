@@ -12,7 +12,8 @@ export type RawLine = {
   urgency?: { label: string; tone: "run" | "low" } | null;
   extraId?: number;
 };
-export type ShoppingMap = Record<string, RawLine[]>;
+export type ShoppingGroup = { shopId: number | null; shopName: string; lines: RawLine[] };
+export type ShoppingMap = Record<string, ShoppingGroup>;
 
 /**
  * Total cost (cents) of a set of shopping lines: each line's product price
@@ -42,7 +43,7 @@ export function useShopData() {
   const [prices, setPrices] = useState<PriceMap>({});
   const [products, setProducts] = useState<Product[]>([]);
   const [units, setUnits] = useState<Record<number, string>>({});
-  const [shopMeta, setShopMeta] = useState<Record<string, Shop>>({});
+  const [shopMeta, setShopMeta] = useState<Record<number, Shop>>({});
   const [pendingCount, setPendingCount] = useState(0);
   // lineKey -> purchase id; lives here so checks survive the Bill tab round-trip.
   const [struck, setStruck] = useState<Map<string, number | null>>(new Map());
@@ -86,19 +87,19 @@ export function useShopData() {
     fetch("/api/shops")
       .then((r) => (r.ok ? r.json() : []))
       .then((shops: Shop[]) =>
-        setShopMeta(Object.fromEntries(shops.map((s) => [s.name, s]))),
+        setShopMeta(Object.fromEntries(shops.map((s) => [s.id, s]))),
       )
       .catch(() => {});
   }, []);
 
   const shops = useMemo(
-    () => (data ? Object.entries(data).filter(([, lines]) => lines.length) : []),
+    () => (data ? Object.entries(data).filter(([, group]) => group.lines.length) : []),
     [data],
   );
 
   const shopTotal = useCallback((lines: RawLine[]): number => sumLines(lines, prices), [prices]);
 
-  const tripTotal = shops.reduce((sum, [, lines]) => sum + shopTotal(lines), 0);
+  const tripTotal = shops.reduce((sum, [, group]) => sum + shopTotal(group.lines), 0);
 
   const toLines = useCallback(
     (lines: RawLine[]): ShopLine[] =>

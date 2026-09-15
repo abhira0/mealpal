@@ -318,7 +318,31 @@ describe("shoppingList", () => {
     addEvent(db, hid, { date: soon, slotId, ingredientId: flourId, amount: 100, servings: 1 });
     addEvent(db, hid, { date: today, slotId, ingredientId: oilId, amount: 50, servings: 1 });
 
-    const costco = shoppingList(db, hid, 14).get("Costco")!;
-    expect(costco.map((l) => l.ingredientName)).toEqual(["Oil", "Flour"]);
+    const costco = shoppingList(db, hid, 14).get(String(shopId))!;
+    expect(costco.lines.map((l) => l.ingredientName)).toEqual(["Oil", "Flour"]);
+  });
+
+  it("keeps two same-named shops as distinct groups (keyed by id, not name)", () => {
+    const otherCostcoId = db.insert(schema.shops)
+      .values({ householdId: hid, name: "Costco" }).returning().all()[0].id;
+    const sugarId = db.insert(schema.ingredients)
+      .values({ householdId: hid, name: "Sugar", canonicalUnit: "g" }).returning().all()[0].id;
+    createProduct(db, hid, {
+      ingredientId: sugarId, shopId: otherCostcoId, name: "Sugar 5lb",
+      packSize: 2270, priority: 1, url: null,
+    });
+    const slotId = db.insert(schema.mealSlots).values({ householdId: hid, name: "Dinner" }).returning().all()[0].id;
+    const today = todayISO();
+    addEvent(db, hid, { date: today, slotId, ingredientId: flourId, amount: 100, servings: 1 });
+    addEvent(db, hid, { date: today, slotId, ingredientId: sugarId, amount: 50, servings: 1 });
+
+    const list = shoppingList(db, hid, 14);
+    expect(list.size).toBe(2);
+    const first = list.get(String(shopId))!;
+    const second = list.get(String(otherCostcoId))!;
+    expect(first.shopName).toBe("Costco");
+    expect(second.shopName).toBe("Costco");
+    expect(first.lines.map((l) => l.ingredientName)).toEqual(["Flour"]);
+    expect(second.lines.map((l) => l.ingredientName)).toEqual(["Sugar"]);
   });
 });
