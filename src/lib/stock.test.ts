@@ -5,6 +5,7 @@ import { schema } from "@/db";
 import {
   recordMovement, currentStock, stockByIngredient, expiryByIngredient,
   lotsByProduct, allocateFEFO, adjustStock, stockByProduct, ownsStockRefs,
+  unattributedPool,
 } from "@/lib/stock";
 
 let db: TestDb;
@@ -182,5 +183,25 @@ describe("lotsByProduct / allocateFEFO / adjustStock (per-lot FEFO tracking)", (
     const lots = lotsByProduct(db, hid).get(productId)!;
     expect(lots).toHaveLength(1);
     expect(lots[0]).toMatchObject({ expiresAt: "2026-09-01", remaining: 500, manual: true, pricePaidCents: null });
+  });
+});
+
+describe("unattributedPool (floor-swallow guard for POST /api/stock)", () => {
+  // Mirrors the pre-check in src/app/api/stock/route.ts: a negative,
+  // unattributed adjustment is rejected (not silently written) whenever
+  // unattributedPool(...) + delta < 0, since netStock would otherwise floor
+  // the pool at 0 and read back unchanged.
+  it("flags a -5 adjustment on an ingredient with no lots and no existing unattributed stock", () => {
+    expect(unattributedPool(db, hid, flourId)).toBe(0);
+    const delta = -5;
+    expect(unattributedPool(db, hid, flourId) + delta < 0).toBe(true);
+  });
+
+  it("does not flag, and adjustStock still applies, a delta that keeps the pool >= 0", () => {
+    recordMovement(db, hid, { ingredientId: flourId, delta: 10, reason: "manual" });
+    const delta = -5;
+    expect(unattributedPool(db, hid, flourId) + delta < 0).toBe(false);
+    adjustStock(db, hid, flourId, delta);
+    expect(currentStock(db, hid, flourId)).toBe(5);
   });
 });

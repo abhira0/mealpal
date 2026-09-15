@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { stockByIngredient, stockByProduct, expiryByIngredient, expiryByProduct, adjustStock, lotsByProduct, recordMovement, ownsStockRefs } from "@/lib/stock";
+import { stockByIngredient, stockByProduct, expiryByIngredient, expiryByProduct, adjustStock, lotsByProduct, recordMovement, ownsStockRefs, unattributedPool } from "@/lib/stock";
 import { DATE_RE } from "@/lib/dates";
 
 export async function GET() {
@@ -35,6 +35,14 @@ export async function POST(req: Request) {
     // Per-lot correction / zero (trash button): targets the exact lot, no FEFO.
     recordMovement(db, hid, { ingredientId, productId, purchaseId, delta, reason: "manual" });
   } else if (delta !== 0) {
+    // Unattributed negative adjustments can be swallowed by netStock's floor at 0
+    // (see stock.ts) — pre-check so we never silently no-op a write.
+    if (productId == null && delta < 0 && unattributedPool(db, hid, ingredientId) + delta < 0) {
+      return NextResponse.json(
+        { error: "Would drop unattributed stock below zero — not applied" },
+        { status: 400 },
+      );
+    }
     // Add on-hand (new manual lot) when productId is set; legacy unattributed adjust otherwise.
     const rows = adjustStock(db, hid, ingredientId, delta, expiresAt, productId);
     // Return the new lot's id so the client can set its price (add has no price field).
