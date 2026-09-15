@@ -597,6 +597,9 @@ button.row-link{background:none;border:none;width:100%;text-align:left;cursor:po
 
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 
+/* ---------- offline banner ---------- */
+.offline-banner{position:sticky;top:0;z-index:70;background:var(--warn-weak);color:var(--warn);border-bottom:1px solid var(--warn-line);font-size:13px;font-weight:600;text-align:center;padding:8px 12px}
+
 /* ---------- route view transitions (App Router <ViewTransition>) ---------- */
 /* Restrained crossfade on client navigation; the bottom-nav/sidebar stays put
    (it lives outside the wrapped <ViewTransition>). ::view-transition-* are
