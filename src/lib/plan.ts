@@ -256,9 +256,16 @@ export function cookEvent(
     }
   }
 
-  recordCookedForEvent(db, householdId, effective, allocations);
-  db.update(schema.mealEvents).set({ status: "cooked", cookedAhead })
-    .where(eq(schema.mealEvents.id, ev.id)).run();
+  // Movement writes + status flip must land atomically: a failure partway
+  // through would leave some ingredients depleted, others not, with the event
+  // still 'planned' (uncookEvent only reverses status 'cooked'). better-sqlite3
+  // nests via savepoints, so this is safe even when `db` is already a `tx`
+  // (cookBatch/cookScope call cookEvent inside their own transaction).
+  db.transaction((tx) => {
+    recordCookedForEvent(tx, householdId, effective, allocations);
+    tx.update(schema.mealEvents).set({ status: "cooked", cookedAhead })
+      .where(eq(schema.mealEvents.id, ev.id)).run();
+  });
 }
 
 /** Thrown by cookBatch when an event lacks stock and the caller didn't force. */
