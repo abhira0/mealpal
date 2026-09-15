@@ -46,6 +46,20 @@ export async function POST(req: Request) {
     );
   }
 
-  await registerHousehold(db, { email, password, name, householdName });
+  // The pre-check above is just a fast path — it can't stop two concurrent
+  // requests from both passing it. users.email has a UNIQUE index, so the
+  // insert itself is the real guard; catch its constraint violation here
+  // instead of letting it 500.
+  try {
+    await registerHousehold(db, { email, password, name, householdName });
+  } catch (err) {
+    if (err instanceof Error && /UNIQUE constraint failed: users\.email/.test(err.message)) {
+      return NextResponse.json(
+        { error: "An account with that email already exists." },
+        { status: 409 },
+      );
+    }
+    throw err;
+  }
   return NextResponse.json({ ok: true }, { status: 201 });
 }
