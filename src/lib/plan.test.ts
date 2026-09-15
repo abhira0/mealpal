@@ -100,6 +100,44 @@ describe("meal plan", () => {
     expect(listEvents(db, hid, "2026-07-01", "2026-07-03").every((e) => e.status === "planned")).toBe(true);
   });
 
+  it("cookEvent rolls back all movements if a forced failure hits the third consumption line", () => {
+    // A recipe with 3 ingredients, none in stock, so cooking writes one
+    // unattributed "cooked" movement per line, in ingredient order.
+    const sugarId = db.insert(schema.ingredients)
+      .values({ householdId: hid, name: "Sugar", canonicalUnit: "g" }).returning().all()[0].id;
+    const eggId = db.insert(schema.ingredients)
+      .values({ householdId: hid, name: "Egg", canonicalUnit: "g" }).returning().all()[0].id;
+    const threeIngredientRecipe = createRecipe(db, hid, {
+      name: "Cake", baseServings: 2, notes: null,
+      ingredients: [
+        { ingredientId: flourId, amount: 200 },
+        { ingredientId: sugarId, amount: 100 },
+        { ingredientId: eggId, amount: 50 },
+      ], steps: [], media: [],
+    }).id;
+    const ev = addEvent(db, hid, { date: "2026-07-01", slotId, recipeId: threeIngredientRecipe, servings: 2 });
+
+    // Force the third movement insert to fail mid-transaction.
+    const sqlite = (db as unknown as { $client: import("better-sqlite3").Database }).$client;
+    sqlite.exec(`
+      CREATE TRIGGER block_third_movement
+      BEFORE INSERT ON stock_movements
+      WHEN (SELECT COUNT(*) FROM stock_movements) = 2
+      BEGIN
+        SELECT RAISE(ABORT, 'forced failure for test');
+      END;
+    `);
+
+    expect(() => cookEvent(db, hid, ev.id)).toThrow();
+
+    sqlite.exec(`DROP TRIGGER block_third_movement;`);
+
+    // The first two movements from this cook must have rolled back too, and
+    // the event must still be planned (not stuck between planned and cooked).
+    expect(db.select().from(schema.stockMovements).all()).toHaveLength(0);
+    expect(listEvents(db, hid, "2026-07-01", "2026-07-01")[0].status).toBe("planned");
+  });
+
   it("refuses to edit a cooked/served event (returns null)", () => {
     const ev = addEvent(db, hid, { date: "2026-07-01", slotId, recipeId, servings: 2 });
     cookEvent(db, hid, ev.id);
