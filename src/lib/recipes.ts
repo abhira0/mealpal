@@ -183,7 +183,7 @@ function recipeCostCents(
       ))
       .orderBy(asc(schema.products.priority)).limit(1).all();
     if (!product || product.packSize <= 0) return null;
-    const price = effectivePrice(db, product.id);
+    const price = effectivePrice(db, householdId, product.id);
     if (price == null) return null;
     total += (line.amount / product.packSize) * price;
   }
