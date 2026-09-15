@@ -4,14 +4,15 @@ import { db } from "@/db";
 import {
   dayNutrition, weekNutrition, mondayOf, getGoals, scorecards, macroSplit,
 } from "@/lib/nutrition";
+import { DATE_RE } from "@/lib/dates";
 
 // GET /api/nutrition/analysis?mode=day|week&date=YYYY-MM-DD
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const hid = session.user.householdId;
-  const date = req.nextUrl.searchParams.get("date");
-  if (!date) return NextResponse.json({ error: "date required" }, { status: 400 });
+  const date = req.nextUrl.searchParams.get("date") ?? "";
+  if (!DATE_RE.test(date)) return NextResponse.json({ error: "date=YYYY-MM-DD required" }, { status: 400 });
   const mode = req.nextUrl.searchParams.get("mode") === "week" ? "week" : "day";
 
   const goals = getGoals(db, hid);
