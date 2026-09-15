@@ -111,9 +111,15 @@ export function RecipeSheet({
       .catch(() => setIngredients([]));
   }, [open]);
 
-  // Prefill (edit) or reset (create) whenever the sheet opens.
-  useEffect(() => {
-    if (!open) return;
+  // Prefill (edit) or reset (create) whenever the sheet opens. Done during
+  // render (not an effect) by tracking the [open, recipe] pair the fields
+  // currently reflect, so this only re-runs when either actually changes.
+  const [prefilledFor, setPrefilledFor] = useState<{ open: boolean; recipe: EditableRecipe | undefined }>({
+    open: false,
+    recipe: undefined,
+  });
+  if (open && (open !== prefilledFor.open || recipe !== prefilledFor.recipe)) {
+    setPrefilledFor({ open, recipe });
     setError(null);
     setTab("details");
     if (recipe) {
@@ -144,7 +150,9 @@ export function RecipeSheet({
       setPhoto(null);
       setOtherMedia([]);
     }
-  }, [open, recipe]);
+  } else if (!open && prefilledFor.open) {
+    setPrefilledFor({ open, recipe });
+  }
 
   const ingredientOptions = ingredients.map((i) => ({ id: i.id, label: i.name }));
   const hasVideo = otherMedia.some((m) => m.kind === "youtube" || m.kind === "video");

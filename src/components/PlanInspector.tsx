@@ -57,8 +57,12 @@ export function PlanInspector({
   // serving via the shared agenda flow (which reloads agenda.days) keeps the
   // inspector in sync without bespoke plumbing.
   useEffect(() => {
-    void load();
-  }, [load, agenda.days]);
+    // Inlined (rather than calling load()) so this is a plain fetch/then
+    // chain instead of a call to a function that sets state.
+    fetch(`/api/events/${eventId}/inspect`, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((d) => setData(d as InspectResult | null));
+  }, [eventId, agenda.days]);
 
   // A meal snapshot with the freshest phase/variant, so delegating serve/unserve
   // to the agenda flow toggles the right direction even if the prop went stale.

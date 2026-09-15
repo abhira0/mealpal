@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { todayISO, toISODate, localNoon } from "@/lib/dates";
 
 export type Slot = { id: number; name: string; timeOfDay: string };
@@ -104,8 +104,13 @@ export function useAgenda(
 ) {
   // ponytail: server can't know the client's date/timezone, so all
   // time-derived text is client-only to avoid hydration drift.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  // useSyncExternalStore (server snapshot false, client snapshot true) flips this
+  // to true on the post-hydration client render without a setState-in-effect.
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const [todayIso, setTodayIso] = useState(todayISO);
   // A tab left open past midnight would otherwise keep yesterday's "today" —
   // recheck on tab-return (same trigger CookMode/PlanEditor use).

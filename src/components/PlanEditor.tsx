@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { Dropdown } from "@/components/Dropdown";
 import { Stepper } from "@/components/Stepper";
@@ -72,8 +72,13 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
   const [selected, setSelected] = useState<string>(todayIso);
   // ponytail: server can't know the client's date/timezone, so all time-derived
   // text (today, greeting, locale dates, the strip) is client-only to avoid hydration drift.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  // useSyncExternalStore (server snapshot false, client snapshot true) flips this
+  // to true on the post-hydration client render without a setState-in-effect.
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   // A tab left open past midnight would otherwise keep yesterday's "today" —
   // the Today button, isToday highlight, and header date all go stale. Cheap
