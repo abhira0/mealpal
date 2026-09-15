@@ -61,9 +61,23 @@ export function useShopData() {
       .catch(() => setError("Couldn't load the shopping list yet."));
   }, [horizon]);
 
+  // Reset stale data before a horizon-driven refetch — during render (not an
+  // effect) by tracking the horizon the current data/error belong to.
+  const [dataHorizon, setDataHorizon] = useState(horizon);
+  if (horizon !== dataHorizon) {
+    setDataHorizon(horizon);
+    setData(null);
+    setError(null);
+  }
+
   useEffect(() => {
-    loadShopping();
-  }, [loadShopping]);
+    // Inlined (rather than calling loadShopping()) so this is a plain
+    // fetch/then chain instead of a call to a function that sets state.
+    fetch(`/api/shopping?horizon=${horizon}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((j) => setData(j as ShoppingMap))
+      .catch(() => setError("Couldn't load the shopping list yet."));
+  }, [horizon]);
 
   useEffect(() => {
     fetch("/api/purchases")

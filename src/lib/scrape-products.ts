@@ -215,7 +215,7 @@ export async function connectAndExtract(
     );
   }
   let site: Site | undefined;
-  let target = pages.find((t) => (site = SITES.find((s) => s.match(t.url))) !== undefined);
+  const target = pages.find((t) => (site = SITES.find((s) => s.match(t.url))) !== undefined);
   if (!target || !site) {
     throw new Error(`No supported product tab found. Open a product page (${supported}) in the debug Chrome.`);
   }

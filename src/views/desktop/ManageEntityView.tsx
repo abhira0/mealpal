@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { DeskPage } from "@/components/DeskPage";
 import { EntityList } from "@/components/EntityList";
 import { IngredientDetail } from "@/components/IngredientDetail";
@@ -24,9 +24,13 @@ export function DesktopManageEntity({ slug }: { slug: EntitySlug }) {
   // The route only re-renders this component with a new `slug` prop — it
   // doesn't remount — so a selection from the previous entity type would
   // otherwise stick around and get fed into <Detail> as the wrong kind of id.
-  useEffect(() => {
+  // Reset during render (not an effect) by tracking the slug this render's
+  // selection belongs to.
+  const [selectedSlug, setSelectedSlug] = useState(slug);
+  if (slug !== selectedSlug) {
+    setSelectedSlug(slug);
     setSelectedId(null);
-  }, [slug]);
+  }
 
   return (
     <DeskPage title={ENTITIES[slug].label} testId="desktop-manage">

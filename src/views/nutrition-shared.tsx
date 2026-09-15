@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import type { IngredientNutritionRow, Nutrients, Goals, Scorecard } from "@/lib/nutrition";
 import { FACT_ROWS } from "@/components/NutritionFacts";
 import { EChart } from "@/components/EChart";
@@ -48,10 +48,19 @@ export const shortDate = (iso: string) =>
 // date input) then fills to today after mount. Shared by both nutrition views
 // so the mount effect lives in exactly one place.
 export function useTodayDate(): [string, (d: string) => void] {
+  // useSyncExternalStore (server snapshot false, client snapshot true) flips this
+  // to true on the post-hydration client render without a setState-in-effect.
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const [date, setDate] = useState("");
-  useEffect(() => {
+  // Fill in today's date once we're past hydration — setting state during
+  // render (not in an effect) so it happens synchronously with that flip.
+  if (mounted && date === "") {
     setDate(todayISO());
-  }, []);
+  }
   return [date, setDate];
 }
 
@@ -227,7 +236,13 @@ export function BreakdownBody({ data, mode, date }: { data: AnalysisData; mode: 
   const [view, setView] = useState<"meals" | "items" | "ingredients">("meals");
   const [basis, setBasis] = useState<"served" | "planned">("served");
   const [drill, setDrill] = useState<{ label: string; eventIds: number[] } | null>(null);
-  useEffect(() => { setDrill(null); }, [date]);
+  // Reset the drill-down when the day/week changes — done during render (not
+  // an effect) by tracking the date this render's drill state belongs to.
+  const [drillDate, setDrillDate] = useState(date);
+  if (date !== drillDate) {
+    setDrillDate(date);
+    setDrill(null);
+  }
   const dayMeals = mode === "day" && data.meals && data.meals.length > 0 ? data.meals : null;
   const mealN = basis === "served" ? data.nutrients : data.planned;
   return (

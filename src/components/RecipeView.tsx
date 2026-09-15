@@ -104,11 +104,23 @@ export function RecipeView({ id }: { id: string }) {
   }
 
   useEffect(() => {
-    loadRecipe();
+    // Inlined (rather than calling loadRecipe()) so the initial load is a
+    // plain fetch/then chain, matching the ingredients fetch just below.
+    fetch(`/api/recipes/${id}`).then((rRes) => {
+      if (rRes.status === 404 || !rRes.ok) {
+        setNotFound(true);
+        return;
+      }
+      rRes.json().then((r: Recipe) => {
+        setRecipe(r);
+        setServings(r.baseServings || 1);
+        setActiveMedia(0);
+        setShareToken(r.shareToken);
+      });
+    });
     fetch("/api/ingredients").then((iRes) => {
       if (iRes.ok) iRes.json().then(setIngredients);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const lookup = new Map(ingredients.map((i) => [i.id, i]));
