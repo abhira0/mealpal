@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { ENTITIES, type ColumnDef, type EntitySlug, type ListConfig } from "@/app/manage/entities";
 import { Favicon } from "@/components/Favicon";
+import { Dropdown } from "@/components/Dropdown";
 
 type Row = Record<string, unknown> & { id: number | string };
 type RefMaps = Record<string, Map<string, string>>;
@@ -42,6 +43,7 @@ export function EntityList(props: {
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [query, setQuery] = useState("");
+  const [sortKey, setSortKey] = useState<string>("");
 
   const refSlugs = useMemo(
     () =>
@@ -111,12 +113,28 @@ export function EntityList(props: {
     return raw == null || raw === "" ? "—" : String(raw);
   }
 
-  const q = query.trim().toLowerCase();
-  const shown = q
+  const q = config.searchable ? query.trim().toLowerCase() : "";
+  const filtered = q
     ? rows.filter((row) =>
         config.columns.some((col) => cellValue(row, col).toLowerCase().includes(q)),
       )
     : rows;
+
+  // Sort by the chosen column's rendered text: numeric-looking values compare
+  // numerically (price, stock, …), everything else alphabetically.
+  const sortCol = config.sortKeys?.length
+    ? config.columns.find((c) => c.key === sortKey)
+    : undefined;
+  const shown = sortCol
+    ? [...filtered].sort((a, b) => {
+        const av = cellValue(a, sortCol);
+        const bv = cellValue(b, sortCol);
+        const an = Number(av.replace(/[^0-9.-]/g, ""));
+        const bn = Number(bv.replace(/[^0-9.-]/g, ""));
+        if (av && bv && !Number.isNaN(an) && !Number.isNaN(bn)) return an - bn;
+        return av.localeCompare(bv);
+      })
+    : filtered;
 
   return (
     <>
@@ -128,7 +146,7 @@ export function EntityList(props: {
         {error && <p className="notice" role="alert">{error}</p>}
 
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {rows.length > 0 && (
+          {config.searchable && rows.length > 0 && (
             <div className="search" style={{ flex: 1, position: "relative" }}>
               <span className="search-icon" aria-hidden="true">⌕</span>
               <input
@@ -150,6 +168,17 @@ export function EntityList(props: {
                   ✕
                 </button>
               )}
+            </div>
+          )}
+          {config.sortKeys && config.sortKeys.length > 0 && rows.length > 0 && (
+            <div style={{ flex: "0 0 auto", width: 150 }}>
+              <Dropdown
+                label={`Sort ${config.label.toLowerCase()}`}
+                placeholder="Sort"
+                value={sortKey || null}
+                options={config.sortKeys.map((s) => ({ id: s.key, label: s.label }))}
+                onChange={(id) => setSortKey(String(id))}
+              />
             </div>
           )}
           {create.href ? (

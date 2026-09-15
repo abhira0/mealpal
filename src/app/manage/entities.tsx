@@ -54,6 +54,11 @@ export type ColumnDef = {
   renderCell?: (row: Record<string, unknown>) => ReactNode;
 };
 
+// One sort option offered in EntityList's sort dropdown. `key` names a column
+// (matched against ColumnDef.key) whose formatted/raw value is compared;
+// numeric-looking values sort numerically, everything else alphabetically.
+export type SortKey = { key: string; label: string };
+
 // What EntityList needs to render a list. EntityConfig extends this with the
 // extra bits the create/edit form needs. Recipes supplies a bare ListConfig
 // (it has a bespoke form) so it can reuse EntityList.
@@ -75,6 +80,10 @@ export type ListConfig = {
   titleTop?: boolean;
   canEdit: boolean;
   canDelete: boolean;
+  // Opt into the search box (filters on every rendered column's text).
+  searchable?: boolean;
+  // Opt into the sort dropdown. Omit for lists where insertion order is fine.
+  sortKeys?: SortKey[];
 };
 
 export type EntityConfig = ListConfig & {
@@ -117,6 +126,8 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
     columns: [
       { key: "name", label: "Name" },
     ],
+    searchable: true,
+    sortKeys: [{ key: "name", label: "Name" }],
     fields: [
       { name: "name", label: "Name", type: "text", required: true },
       { name: "website", label: "Website", type: "text", optional: true },
@@ -155,6 +166,11 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
       iconUrl: row.imageUrl as string | null,
     }),
     bigImage: true,
+    searchable: true,
+    sortKeys: [
+      { key: "name", label: "Name" },
+      { key: "stock", label: "In stock" },
+    ],
     fields: [
       { name: "name", label: "Name", type: "text", required: true },
       { name: "canonicalUnit", label: "Unit", type: "select", options: ["g", "ml", "oz", "count"], required: true },
@@ -210,6 +226,11 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
       iconUrl: row.imageUrl as string | null,
     }),
     titleTop: true,
+    searchable: true,
+    sortKeys: [
+      { key: "name", label: "Name" },
+      { key: "effectiveCents", label: "Price" },
+    ],
     fields: [
       { name: "ingredientId", label: "Ingredient", type: "select", optionsFrom: "ingredients", optionLabel: "name", required: true },
       { name: "shopId", label: "Shop", type: "select", optionsFrom: "shops", optionLabel: "name", required: true },
@@ -250,6 +271,11 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
     listPath: "/api/slots",
     itemPath: (id) => `/api/slots/${id}`,
     columns: [
+      { key: "name", label: "Name" },
+      { key: "timeOfDay", label: "Time" },
+    ],
+    searchable: true,
+    sortKeys: [
       { key: "name", label: "Name" },
       { key: "timeOfDay", label: "Time" },
     ],

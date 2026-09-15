@@ -48,6 +48,8 @@ export function useShopData() {
   const [struck, setStruck] = useState<Map<string, number | null>>(new Map());
   const [horizon, setHorizon] = useState(14);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<"shop" | "cost">("shop");
 
   const loadShopping = useCallback(() => {
     setData(null);
@@ -100,6 +102,31 @@ export function useShopData() {
 
   const tripTotal = shops.reduce((sum, [, lines]) => sum + shopTotal(lines), 0);
 
+  // Search filters each shop's lines down to matching ingredients/products
+  // (dropping shops left with none); sort reorders the remaining stops.
+  const shownShops = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const filtered: [string, RawLine[]][] = q
+      ? shops
+          .map(
+            ([name, lines]) =>
+              [
+                name,
+                lines.filter(
+                  (l) =>
+                    l.ingredientName.toLowerCase().includes(q) ||
+                    (l.product?.name.toLowerCase().includes(q) ?? false),
+                ),
+              ] as [string, RawLine[]],
+          )
+          .filter(([, lines]) => lines.length > 0)
+      : shops;
+    const sorted = [...filtered];
+    if (sort === "shop") sorted.sort(([a], [b]) => a.localeCompare(b));
+    else sorted.sort((a, b) => shopTotal(b[1]) - shopTotal(a[1]));
+    return sorted;
+  }, [shops, query, sort, shopTotal]);
+
   const toLines = useCallback(
     (lines: RawLine[]): ShopLine[] =>
       lines.map((l) => ({ ...l, unit: units[l.ingredientId] })),
@@ -143,5 +170,10 @@ export function useShopData() {
     toLines,
     handleStruck,
     stopCount: shops.length,
+    query,
+    setQuery,
+    sort,
+    setSort,
+    shownShops,
   };
 }
