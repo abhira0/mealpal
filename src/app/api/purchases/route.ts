@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { listPendingPurchases, listPurchaseHistory, recordPurchase } from "@/lib/shopping";
 import { dollarsToCents } from "@/lib/money";
 import { DATE_RE, localNoon, todayISO } from "@/lib/dates";
+import { parseLimit, parseOffset } from "@/lib/api-params";
 
 // Pending (not-yet-priced) purchases for the bill screen; ?all=1 for the full history tab.
 export async function GET(req: Request) {
@@ -12,8 +13,10 @@ export async function GET(req: Request) {
   const sp = new URL(req.url).searchParams;
   const hid = session.user.householdId;
   if (!sp.get("all")) return NextResponse.json(listPendingPurchases(db, hid));
-  const limit = Number(sp.get("limit")) || undefined;
-  const offset = Number(sp.get("offset")) || undefined;
+  const limit = parseLimit(sp.get("limit"));
+  const offset = parseOffset(sp.get("offset"));
+  if (offset === "invalid")
+    return NextResponse.json({ error: "offset must be non-negative" }, { status: 400 });
   return NextResponse.json(listPurchaseHistory(db, hid, { limit, offset }));
 }
 
