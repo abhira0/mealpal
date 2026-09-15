@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { deleteIngredient, ingredientDetail, updateIngredient } from "@/lib/ingredients";
+import { CANONICAL_UNITS, isCanonicalUnit } from "@/lib/units";
 
 export async function GET(
   _req: Request,
@@ -23,6 +24,12 @@ export async function PATCH(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const body = await req.json().catch(() => null);
+  if (body?.canonicalUnit !== undefined && !isCanonicalUnit(String(body.canonicalUnit).trim())) {
+    return NextResponse.json(
+      { error: `canonicalUnit must be one of ${CANONICAL_UNITS.join("/")}.` },
+      { status: 400 },
+    );
+  }
   const row = updateIngredient(db, session.user.householdId, Number(id), {
     ...(body?.name !== undefined ? { name: String(body.name).trim() } : {}),
     ...(body?.canonicalUnit !== undefined

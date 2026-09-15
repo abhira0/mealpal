@@ -1,6 +1,18 @@
 import { centsToDollars } from "@/lib/money";
 
 /**
+ * The only canonical units the app understands. Anything else breaks
+ * formatQty's kg/l rollup and convertCanonical's conversion table, so both
+ * POST and PATCH on /api/ingredients must reject values outside this set.
+ */
+export const CANONICAL_UNITS = ["g", "ml", "oz", "count"] as const;
+export type CanonicalUnit = (typeof CANONICAL_UNITS)[number];
+
+export function isCanonicalUnit(value: unknown): value is CanonicalUnit {
+  return CANONICAL_UNITS.includes(value as CanonicalUnit);
+}
+
+/**
  * Display formatter for a canonical amount. Rolls grams/millilitres up to
  * kg/l at 1000, trims trailing zeros, and keeps "count" unitless.
  */
