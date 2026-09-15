@@ -2,17 +2,19 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { toastStore, type ToastItem } from "@/lib/toast-store";
+import { toastStore, type ToastItem, type ToastAction } from "@/lib/toast-store";
+
+type ToastOptions = { action?: ToastAction; durationMs?: number };
 
 type ToastApi = {
-  success: (message: string) => void;
+  success: (message: string, opts?: ToastOptions) => void;
   error: (message: string) => void;
 };
 
 const ToastContext = createContext<ToastApi | null>(null);
 
 const api: ToastApi = {
-  success: (message) => toastStore.show("success", message),
+  success: (message, opts) => toastStore.show("success", message, opts),
   error: (message) => toastStore.show("error", message),
 };
 
@@ -49,6 +51,18 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 role={t.type === "error" ? "alert" : "status"}
               >
                 <span>{t.message}</span>
+                {t.action && (
+                  <button
+                    type="button"
+                    className="toast-action"
+                    onClick={() => {
+                      t.action!.onClick();
+                      toastStore.dismiss(t.id);
+                    }}
+                  >
+                    {t.action.label}
+                  </button>
+                )}
                 <button
                   type="button"
                   className="toast-dismiss"

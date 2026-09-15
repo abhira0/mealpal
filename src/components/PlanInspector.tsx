@@ -129,9 +129,17 @@ export function PlanInspector({
   // toggles serve↔unserve by the fresh phase. The board reload it triggers
   // refreshes this inspector through the effect above.
   const toggleServe = () => agenda.toggleMeal(freshMeal, focusDate ?? data?.event.date ?? "");
-  const del = async () => {
-    if (!(await confirm(recurring && scope !== "one" ? "Delete these occurrences?" : "Delete this meal?"))) return;
-    return act(() => fetch(`/api/events/${eventId}?scope=${recurring ? scope : "one"}`, { method: "DELETE" }), true);
+  // Optimistic delete: close the inspector immediately and schedule the actual
+  // DELETE ~6s out via the shared agenda undo queue (see useAgenda), which also
+  // hides the row from the board right away. Tapping the toast's Undo cancels
+  // the pending fetch — since nothing was ever sent, the row is exactly the
+  // same server row, not a recreated one.
+  const del = () => {
+    const s = recurring ? scope : "one";
+    const message = recurring && s !== "one" ? "Occurrences deleted." : "Meal deleted.";
+    onClose();
+    const cancel = agenda.scheduleEventDelete(eventId, s);
+    toast.success(message, { durationMs: 6000, action: { label: "Undo", onClick: cancel } });
   };
   // openEditMeal un-cooks first when needed (cooked meals are locked server-side).
   const edit = () => { onClose(); agenda.openEditMeal(meal); };

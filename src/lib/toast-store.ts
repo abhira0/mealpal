@@ -3,9 +3,13 @@
 // subscriber. Errors are sticky (no auto-dismiss timer); everything else
 // clears itself after AUTO_DISMISS_MS.
 export type ToastType = "success" | "error";
-export type ToastItem = { id: number; type: ToastType; message: string };
+// An optional inline action (currently just "Undo") shown on the toast itself.
+export type ToastAction = { label: string; onClick: () => void };
+export type ToastItem = { id: number; type: ToastType; message: string; action?: ToastAction };
 
 export const AUTO_DISMISS_MS = 4000;
+
+type ShowOptions = { action?: ToastAction; durationMs?: number };
 
 type Listener = (items: ToastItem[]) => void;
 
@@ -30,14 +34,14 @@ export function createToastStore() {
     emit();
   }
 
-  function show(type: ToastType, message: string) {
+  function show(type: ToastType, message: string, opts?: ShowOptions) {
     const id = nextId++;
-    items = [...items, { id, type, message }];
+    items = [...items, { id, type, message, action: opts?.action }];
     emit();
     if (type !== "error") {
       timers.set(
         id,
-        setTimeout(() => dismiss(id), AUTO_DISMISS_MS),
+        setTimeout(() => dismiss(id), opts?.durationMs ?? AUTO_DISMISS_MS),
       );
     }
     return id;
