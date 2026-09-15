@@ -99,6 +99,31 @@ export function addEvent(db: Db, householdId: number, input: EventInput) {
   return row;
 }
 
+/** Raised by addEvents to name which array item failed, so the route can report it. */
+export class EventItemError extends Error {
+  constructor(public index: number, message: string) {
+    super(message);
+  }
+}
+
+/**
+ * Add several events as one all-or-nothing unit (the "add meal" sheet posts a
+ * whole meal — a recipe plus its sides — in one go). If any item fails, the
+ * whole batch rolls back rather than leaving the earlier items planned; the
+ * thrown EventItemError names the offending index for the caller to report.
+ */
+export function addEvents(db: Db, householdId: number, inputs: EventInput[]) {
+  return db.transaction((tx) => {
+    return inputs.map((input, index) => {
+      try {
+        return addEvent(tx as unknown as Db, householdId, input);
+      } catch (e) {
+        throw new EventItemError(index, e instanceof Error ? e.message : String(e));
+      }
+    });
+  });
+}
+
 /** One event, or null. */
 export function getEvent(db: Db, householdId: number, eventId: number) {
   const [row] = db.select().from(schema.mealEvents)
