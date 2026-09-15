@@ -240,23 +240,28 @@ export function deleteEvent(db: Db, householdId: number, eventId: number, scope:
   const [ev] = db.select().from(schema.mealEvents)
     .where(and(eq(schema.mealEvents.id, eventId), eq(schema.mealEvents.householdId, householdId))).all();
   if (!ev) return;
-  // A cooked or served event owns stock movements; drop them first so removing
-  // it also backs out its stock/nutrition, then delete as usual.
-  if (ev.status === "cooked" || ev.status === "served") {
-    db.delete(schema.stockMovements)
-      .where(and(
-        eq(schema.stockMovements.householdId, householdId),
-        eq(schema.stockMovements.mealEventId, ev.id),
-      )).run();
-  }
-  if (!ev.ruleId || scope === "one") {
-    if (ev.ruleId) skipDay(db, ev.ruleId, ev.date, ev.slotId);
-    else db.delete(schema.mealEvents).where(eq(schema.mealEvents.id, ev.id)).run();
-  } else if (scope === "following") {
-    endSeriesFrom(db, householdId, ev.ruleId, ev.date);
-  } else {
-    deleteRule(db, householdId, ev.ruleId);
-  }
+  // endSeriesFrom/deleteRule only ever remove *planned* rows, so a cooked/served
+  // anchor always survives scope 'following'/'all' — only scope 'one' (or a
+  // one-off event with no rule) actually removes this row. Back out its stock
+  // movements iff it's actually going away, in the same transaction, so we
+  // never end up with a cooked event and no movements (or vice versa).
+  db.transaction(() => {
+    if (!ev.ruleId || scope === "one") {
+      if (ev.status === "cooked" || ev.status === "served") {
+        db.delete(schema.stockMovements)
+          .where(and(
+            eq(schema.stockMovements.householdId, householdId),
+            eq(schema.stockMovements.mealEventId, ev.id),
+          )).run();
+      }
+      if (ev.ruleId) skipDay(db, ev.ruleId, ev.date, ev.slotId);
+      else db.delete(schema.mealEvents).where(eq(schema.mealEvents.id, ev.id)).run();
+    } else if (scope === "following") {
+      endSeriesFrom(db, householdId, ev.ruleId, ev.date);
+    } else {
+      deleteRule(db, householdId, ev.ruleId);
+    }
+  });
 }
 
 /**

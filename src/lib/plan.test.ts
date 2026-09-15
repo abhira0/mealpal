@@ -206,6 +206,52 @@ describe("meal plan", () => {
     expect(currentStock(db, hid, flourId)).toBe(2000);
   });
 
+  // Regression for mealpal-aqc: endSeriesFrom/deleteRule only ever remove
+  // *planned* rows, so a cooked/served anchor always survives scope
+  // 'following'/'all' — it must keep both its status and its movements.
+  it("deleting a cooked recurring meal with scope 'following' keeps the anchor cooked with its stock intact", () => {
+    db.insert(schema.stockMovements)
+      .values({ householdId: hid, ingredientId: flourId, delta: 2000, reason: "manual" }).run();
+    createRule(db, hid, "2026-07-01", {
+      slotId, recipeId, servings: 2, intervalN: 1, unit: "day",
+      daysOfWeek: "1111111", startDate: "2026-07-01", untilDate: "2026-07-05",
+    });
+    const anchor = listEvents(db, hid, "2026-07-03", "2026-07-03")[0];
+    cookEvent(db, hid, anchor.id);
+    expect(currentStock(db, hid, flourId)).toBe(1500);
+
+    deleteEvent(db, hid, anchor.id, "following");
+
+    const stillThere = listEvents(db, hid, "2026-07-03", "2026-07-03")[0];
+    expect(stillThere).toBeDefined();
+    expect(stillThere.status).toBe("cooked");
+    expect(currentStock(db, hid, flourId)).toBe(1500); // movement kept, not reversed
+    // future planned occurrences of the series are gone
+    expect(listEvents(db, hid, "2026-07-04", "2026-07-05")).toHaveLength(0);
+  });
+
+  it("deleting a cooked recurring meal with scope 'all' keeps the anchor cooked with its stock intact", () => {
+    db.insert(schema.stockMovements)
+      .values({ householdId: hid, ingredientId: flourId, delta: 2000, reason: "manual" }).run();
+    createRule(db, hid, "2026-07-01", {
+      slotId, recipeId, servings: 2, intervalN: 1, unit: "day",
+      daysOfWeek: "1111111", startDate: "2026-07-01", untilDate: "2026-07-05",
+    });
+    const anchor = listEvents(db, hid, "2026-07-03", "2026-07-03")[0];
+    cookEvent(db, hid, anchor.id);
+    expect(currentStock(db, hid, flourId)).toBe(1500);
+
+    deleteEvent(db, hid, anchor.id, "all");
+
+    const stillThere = listEvents(db, hid, "2026-07-03", "2026-07-03")[0];
+    expect(stillThere).toBeDefined();
+    expect(stillThere.status).toBe("cooked");
+    expect(currentStock(db, hid, flourId)).toBe(1500); // movement kept, not reversed
+    // planned occurrences elsewhere in the series are gone
+    expect(listEvents(db, hid, "2026-07-01", "2026-07-02")).toHaveLength(0);
+    expect(listEvents(db, hid, "2026-07-04", "2026-07-05")).toHaveLength(0);
+  });
+
   it("serving a planned event depletes stock once and sets status served", () => {
     db.insert(schema.stockMovements)
       .values({ householdId: hid, ingredientId: flourId, delta: 2000, reason: "manual" }).run();
