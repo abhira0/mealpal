@@ -71,6 +71,25 @@ const netStock = sql<number>`
   + max(0, coalesce(sum(case when ${schema.stockMovements.purchaseId} is null then ${schema.stockMovements.delta} end), 0))
 `;
 
+/**
+ * Raw (unfloored) net of the unattributed no-lot pool for an ingredient — i.e.
+ * the second term of netStock before its `max(0, ...)` floor is applied. Used
+ * to pre-check whether a negative unattributed adjustment would be swallowed
+ * by that floor (silently no-op'd) before writing it; see adjustStock's
+ * no-product branch and POST /api/stock.
+ */
+export function unattributedPool(db: Db, householdId: number, ingredientId: number): number {
+  const [row] = db
+    .select({ total: sql<number>`coalesce(sum(${schema.stockMovements.delta}), 0)` })
+    .from(schema.stockMovements)
+    .where(and(
+      eq(schema.stockMovements.householdId, householdId),
+      eq(schema.stockMovements.ingredientId, ingredientId),
+      isNull(schema.stockMovements.purchaseId),
+    )).all();
+  return row?.total ?? 0;
+}
+
 export function currentStock(db: Db, householdId: number, ingredientId: number): number {
   const [row] = db
     .select({ total: netStock })
