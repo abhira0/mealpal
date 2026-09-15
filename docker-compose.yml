@@ -13,3 +13,11 @@ services:
       - ./backups:/backups     # scripts/backup.sh output; outside ./data on purpose,
                                 # so deleting the data volume doesn't delete backups
     restart: unless-stopped
+    healthcheck:
+      # no curl/wget in node:22-slim; node has global fetch, so use that instead
+      # of adding a package just for the healthcheck.
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
