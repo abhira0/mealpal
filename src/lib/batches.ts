@@ -136,10 +136,12 @@ export function eatFromBatch(db: Db, householdId: number, batchId: number, date:
   return db.transaction((tx) => {
     const [batch] = tx.select().from(schema.batches)
       .where(and(eq(schema.batches.id, batchId), eq(schema.batches.householdId, householdId))).all();
-    if (!batch) return;
+    if (!batch) return "not_found" as const;
+    if (batch.mealsRemaining <= 0) return "empty" as const;
     tx.insert(schema.batchEaten).values({ householdId, batchId, date }).run();
     tx.update(schema.batches).set({ mealsRemaining: Math.max(0, batch.mealsRemaining - 1) })
       .where(eq(schema.batches.id, batchId)).run();
+    return "ok" as const;
   });
 }
 

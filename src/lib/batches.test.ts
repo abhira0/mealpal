@@ -199,16 +199,25 @@ describe("unpackBatch", () => {
 describe("eatFromBatch / uneatFromBatch", () => {
   it("counts down on eat and back up on undo, flooring at 0", () => {
     const b = packBatch(db, hid, { slotId, label: "Lunch", cookedDate: "2026-08-09", mealsTotal: 2, items: [] });
-    eatFromBatch(db, hid, b.id, "2026-08-09");
+    expect(eatFromBatch(db, hid, b.id, "2026-08-09")).toBe("ok");
     expect(getBatch(db, hid, b.id)?.mealsRemaining).toBe(1);
-    eatFromBatch(db, hid, b.id, "2026-08-10");
-    eatFromBatch(db, hid, b.id, "2026-08-11"); // past 0
+    expect(eatFromBatch(db, hid, b.id, "2026-08-10")).toBe("ok");
     expect(getBatch(db, hid, b.id)?.mealsRemaining).toBe(0);
-    expect(db.select().from(schema.batchEaten).all()).toHaveLength(3);
-
-    uneatFromBatch(db, hid, b.id, "2026-08-11");
-    expect(getBatch(db, hid, b.id)?.mealsRemaining).toBe(1);
     expect(db.select().from(schema.batchEaten).all()).toHaveLength(2);
+
+    uneatFromBatch(db, hid, b.id, "2026-08-10");
+    expect(getBatch(db, hid, b.id)?.mealsRemaining).toBe(1);
+    expect(db.select().from(schema.batchEaten).all()).toHaveLength(1);
+  });
+
+  it("refuses to eat past 0 remaining, writing no batch_eaten row", () => {
+    const b = packBatch(db, hid, { slotId, label: "Lunch", cookedDate: "2026-08-09", mealsTotal: 1, items: [] });
+    expect(eatFromBatch(db, hid, b.id, "2026-08-09")).toBe("ok");
+    expect(getBatch(db, hid, b.id)?.mealsRemaining).toBe(0);
+
+    expect(eatFromBatch(db, hid, b.id, "2026-08-10")).toBe("empty");
+    expect(getBatch(db, hid, b.id)?.mealsRemaining).toBe(0);
+    expect(db.select().from(schema.batchEaten).all()).toHaveLength(1);
   });
 
   it("no-ops instead of throwing for a missing or foreign-household batch", () => {
@@ -216,8 +225,8 @@ describe("eatFromBatch / uneatFromBatch", () => {
     // Neither call should throw: a route handler calls this unconditionally,
     // so a throw here would surface to the client as an uncaught 500 instead
     // of a clean no-op / 404.
-    expect(() => eatFromBatch(db, hid, 999999, "2026-08-09")).not.toThrow();
-    expect(() => eatFromBatch(db, hid + 999, b.id, "2026-08-09")).not.toThrow();
+    expect(eatFromBatch(db, hid, 999999, "2026-08-09")).toBe("not_found");
+    expect(eatFromBatch(db, hid + 999, b.id, "2026-08-09")).toBe("not_found");
     expect(getBatch(db, hid, b.id)?.mealsRemaining).toBe(2); // untouched
     expect(db.select().from(schema.batchEaten).all()).toHaveLength(0);
   });
