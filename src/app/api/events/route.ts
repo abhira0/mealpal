@@ -6,7 +6,7 @@ import { schema } from "@/db";
 import { addEvent, listEvents } from "@/lib/plan";
 import { listVariants } from "@/lib/variants";
 import { topUpRules } from "@/lib/rules";
-import { todayISO } from "@/lib/dates";
+import { DATE_RE, todayISO } from "@/lib/dates";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -25,6 +25,8 @@ export async function POST(req: Request) {
   const b = await req.json().catch(() => null);
   if (!b?.date || !b?.slotId)
     return NextResponse.json({ error: "date and slotId required" }, { status: 400 });
+  if (typeof b.date !== "string" || !DATE_RE.test(b.date))
+    return NextResponse.json({ error: "date=YYYY-MM-DD required" }, { status: 400 });
 
   // Exactly one kind: recipe meal, direct ingredient, or direct product.
   const set = (v: unknown) => v != null && v !== "";
