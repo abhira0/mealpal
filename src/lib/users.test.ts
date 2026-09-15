@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import { makeTestDb, type TestDb } from "@/test/db";
 import { registerHousehold, findUserByEmail } from "@/lib/users";
+import { schema } from "@/db";
 
 let db: TestDb;
 beforeEach(() => {
@@ -21,6 +23,24 @@ describe("registerHousehold", () => {
     const found = await findUserByEmail(db, "a@b.com");
     expect(found?.householdId).toBe(user.householdId);
     expect(found?.passwordHash).not.toBe("hunter2"); // stored hashed
+  });
+
+  it("seeds default meal slots so the new household can plan immediately", async () => {
+    const user = await registerHousehold(db, {
+      email: "slots@b.com",
+      password: "hunter2",
+      name: "Abhishek",
+      householdName: "Home",
+    });
+
+    const slots = db.select().from(schema.mealSlots)
+      .where(eq(schema.mealSlots.householdId, user.householdId))
+      .all();
+    expect(slots.map((s) => [s.name, s.timeOfDay])).toEqual([
+      ["Breakfast", "08:00"],
+      ["Lunch", "12:00"],
+      ["Dinner", "18:00"],
+    ]);
   });
 
   it("rejects a duplicate email", async () => {
