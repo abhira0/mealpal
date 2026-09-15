@@ -1,35 +1,65 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Goals } from "@/lib/nutrition";
 import { CalorieMacroRing } from "@/components/CalorieMacroRing";
+
+type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 // Daily calorie/macro goals form for /manage/goals; auto-saves via /api/nutrition/goals.
 export function GoalsEditor() {
   const [form, setForm] = useState<Goals | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<SaveStatus>("idle");
+  // Snapshot (JSON) of the values as last loaded/saved. Comparing against it —
+  // rather than a plain "have we run once" flag — also survives dev/StrictMode's
+  // double-invoked effects, which would otherwise desync a simple boolean.
+  const loadedRef = useRef<string | null>(null);
 
   useEffect(() => {
     fetch("/api/nutrition/goals", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then(setForm)
+      .then((data: Goals | null) => {
+        setForm(data);
+        if (data) loadedRef.current = JSON.stringify(data);
+      })
       .catch(() => setForm(null));
   }, []);
 
-  // Debounced auto-save on any change.
-  // ponytail: also fires once after the initial load, re-PUTting what was just
-  // read — idempotent, cheaper than tracking a "dirty" flag.
+  // Debounced auto-save on any change. Skip when `form` matches the loaded/last
+  // saved snapshot, so mounting doesn't re-PUT the values it just read.
   useEffect(() => {
     if (!form) return;
+    if (JSON.stringify(form) === loadedRef.current) return;
+    setStatus("saving");
     const t = setTimeout(() => {
       fetch("/api/nutrition/goals", {
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form),
       })
-        .then((r) => setError(r.ok ? null : "Couldn't save — check your goal values."))
-        .catch(() => setError("Couldn't save — check your connection."));
+        .then((r) => {
+          if (r.ok) {
+            loadedRef.current = JSON.stringify(form);
+            setError(null);
+            setStatus("saved");
+          } else {
+            setError("Couldn't save — check your goal values.");
+            setStatus("error");
+          }
+        })
+        .catch(() => {
+          setError("Couldn't save — check your connection.");
+          setStatus("error");
+        });
     }, 500);
     return () => clearTimeout(t);
   }, [form]);
+
+  // Auto-clear the "Saved" pill after a few seconds.
+  useEffect(() => {
+    if (status !== "saved") return;
+    const t = setTimeout(() => setStatus("idle"), 3000);
+    return () => clearTimeout(t);
+  }, [status]);
 
   if (!form) return <p style={{ opacity: 0.6 }}>Loading…</p>;
 
@@ -56,6 +86,8 @@ export function GoalsEditor() {
 
   return (
     <>
+      {status === "saving" && <p className="mono" data-testid="save-status">Saving…</p>}
+      {status === "saved" && <p className="mono" data-testid="save-status">Saved</p>}
       {error && <p className="notice" role="alert">{error}</p>}
       {field("calorieGoal", "Calories")}
       {field("proteinG", "Protein (g)")}
