@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { todayISO, toISODate, localNoon } from "@/lib/dates";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 export type Slot = { id: number; name: string; timeOfDay: string };
 export type Recipe = { id: number; name: string; baseServings: number };
@@ -102,6 +103,7 @@ export function useAgenda(
   userName?: string | null,
   range?: { from?: string; to?: string },
 ) {
+  const confirm = useConfirm();
   // ponytail: server can't know the client's date/timezone, so all
   // time-derived text is client-only to avoid hydration drift.
   const [mounted, setMounted] = useState(false);
@@ -434,7 +436,8 @@ export function useAgenda(
   // Delete a whole batch (restores the stock it depleted). Confirm first —
   // this drops every remaining serving across all its days.
   async function removeBatch(batchId: number) {
-    if (!confirm("Delete this meal prep? Its remaining servings are removed and the stock it used is restored.")) return;
+    if (!(await confirm("Delete this meal prep? Its remaining servings are removed and the stock it used is restored.")))
+      return;
     await fetch(`/api/batches/${batchId}`, { method: "DELETE" });
     await Promise.all([loadAgenda(), loadAnalysis()]);
   }
