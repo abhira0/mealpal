@@ -21,9 +21,47 @@ export interface PackBatchInput {
   items: BatchItemInput[];
 }
 
+// slotId and every item's recipeId/productId/variantId/ingredientId come
+// straight off a request body. Mirrors assertOwnedRefs in src/lib/plan.ts:
+// verify each id belongs to this household *before* any insert, so a foreign
+// id throws instead of getting written onto batches/batch_items (productId
+// used to be checked only implicitly, by silently no-oping the depletion —
+// that left the foreign id written unchecked).
+function assertOwnedRefs(db: Db, householdId: number, input: PackBatchInput) {
+  const owns = (exists: boolean, what: string) => {
+    if (!exists) throw new Error(`${what} not found in household`);
+  };
+  const [slot] = db.select({ id: schema.mealSlots.id }).from(schema.mealSlots)
+    .where(and(eq(schema.mealSlots.id, input.slotId), eq(schema.mealSlots.householdId, householdId))).all();
+  owns(!!slot, "slot");
+  for (const item of input.items) {
+    if (item.recipeId != null) {
+      const [row] = db.select({ id: schema.recipes.id }).from(schema.recipes)
+        .where(and(eq(schema.recipes.id, item.recipeId), eq(schema.recipes.householdId, householdId))).all();
+      owns(!!row, "recipe");
+    }
+    if (item.productId != null) {
+      const [row] = db.select({ id: schema.products.id }).from(schema.products)
+        .where(and(eq(schema.products.id, item.productId), eq(schema.products.householdId, householdId))).all();
+      owns(!!row, "product");
+    }
+    if (item.variantId != null) {
+      const [row] = db.select({ id: schema.productVariants.id }).from(schema.productVariants)
+        .where(and(eq(schema.productVariants.id, item.variantId), eq(schema.productVariants.householdId, householdId))).all();
+      owns(!!row, "variant");
+    }
+    if (item.ingredientId != null) {
+      const [row] = db.select({ id: schema.ingredients.id }).from(schema.ingredients)
+        .where(and(eq(schema.ingredients.id, item.ingredientId), eq(schema.ingredients.householdId, householdId))).all();
+      owns(!!row, "ingredient");
+    }
+  }
+}
+
 /** Create a batch and deplete stock once for `mealsTotal` servings of its items. */
 export function packBatch(db: Db, householdId: number, input: PackBatchInput) {
   return db.transaction((tx) => {
+    assertOwnedRefs(tx as unknown as Db, householdId, input);
     const [batch] = tx.insert(schema.batches).values({
       householdId, slotId: input.slotId, label: input.label,
       cookedDate: input.cookedDate, mealsTotal: input.mealsTotal, mealsRemaining: input.mealsTotal,

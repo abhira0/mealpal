@@ -17,9 +17,13 @@ export async function POST(req: Request) {
   if (!b || typeof b.slotId !== "number" || !b.label?.trim() || typeof b.mealsTotal !== "number" || b.mealsTotal < 1) {
     return NextResponse.json({ error: "slotId, label, mealsTotal required" }, { status: 400 });
   }
-  const batch = packBatch(db, session.user.householdId, {
-    slotId: b.slotId, label: b.label.trim(), cookedDate: b.cookedDate ?? todayISO(),
-    mealsTotal: b.mealsTotal, items: Array.isArray(b.items) ? b.items : [],
-  });
-  return NextResponse.json(batch, { status: 201 });
+  try {
+    const batch = packBatch(db, session.user.householdId, {
+      slotId: b.slotId, label: b.label.trim(), cookedDate: b.cookedDate ?? todayISO(),
+      mealsTotal: b.mealsTotal, items: Array.isArray(b.items) ? b.items : [],
+    });
+    return NextResponse.json(batch, { status: 201 });
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "invalid batch" }, { status: 400 });
+  }
 }
