@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { stockByIngredient, stockByProduct, expiryByIngredient, expiryByProduct, adjustStock, lotsByProduct, recordMovement, ownsStockRefs, unattributedPool } from "@/lib/stock";
-import { DATE_RE } from "@/lib/dates";
+import { readJson } from "@/lib/validate";
 
 export async function GET() {
   const session = await auth();
@@ -20,14 +20,18 @@ export async function GET() {
 export async function POST(req: Request) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const b = await req.json().catch(() => null);
-  const ingredientId = Number(b?.ingredientId);
-  const delta = Number(b?.delta);
-  const productId = b?.productId != null ? Number(b.productId) : null;
-  const purchaseId = b?.purchaseId != null ? Number(b.purchaseId) : null;
-  const expiresAt = typeof b?.expiresAt === "string" && DATE_RE.test(b.expiresAt) ? b.expiresAt : null;
-  if (!ingredientId || !Number.isFinite(delta))
-    return NextResponse.json({ error: "ingredientId and numeric delta required" }, { status: 400 });
+  const parsed = await readJson(req, {
+    ingredientId: { type: "number", required: true, integer: true, min: 1 },
+    delta: { type: "number", required: true },
+    productId: { type: "number", integer: true, min: 1 },
+    purchaseId: { type: "number", integer: true, min: 1 },
+    expiresAt: { type: "date" },
+  });
+  if (parsed instanceof Response) return parsed;
+  const { ingredientId, delta } = parsed;
+  const productId = parsed.productId ?? null;
+  const purchaseId = parsed.purchaseId ?? null;
+  const expiresAt = parsed.expiresAt ?? null;
   const hid = session.user.householdId;
   if (!ownsStockRefs(db, hid, ingredientId, productId, purchaseId))
     return NextResponse.json({ error: "Not found" }, { status: 404 });
