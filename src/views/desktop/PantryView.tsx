@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { DeskPage } from "@/components/DeskPage";
 import { formatQty } from "@/lib/units";
 import { PantryDetail } from "@/views/PantryDetail";
@@ -25,6 +25,17 @@ export function DesktopPantry() {
   } = usePantryData();
   const [selected, setSelected] = useState<Ingredient | null>(null);
   const [showOut, setShowOut] = useState(false);
+  // "n" shortcut (src/components/DesktopShortcuts.tsx): opens "+ add on-hand"
+  // for the selected ingredient, same as clicking it. No-op with nothing
+  // selected — there's no ingredient-agnostic "new purchase" entry point.
+  const [newToken, setNewToken] = useState(0);
+  useEffect(() => {
+    function onNew() {
+      setNewToken((t) => t + 1);
+    }
+    window.addEventListener("platr:shortcut-new", onNew);
+    return () => window.removeEventListener("platr:shortcut-new", onNew);
+  }, []);
 
   // Shared row: name (+ optional expiry/batches line) left, status + qty chips right.
   const row = (
@@ -138,6 +149,7 @@ export function DesktopPantry() {
                 onPatchLot={patchLot}
                 onAddOnHand={addOnHand}
                 onApplyDelta={applyDelta}
+                newTrigger={newToken}
               />
             ) : (
               <div className="md-pane-empty">Select an ingredient.</div>

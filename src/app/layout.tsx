@@ -5,6 +5,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ToastProvider } from "@/components/ToastProvider";
 import { ConfirmProvider } from "@/components/ConfirmProvider";
+import { DesktopShortcuts } from "@/components/DesktopShortcuts";
 
 export const metadata: Metadata = {
   title: "Platr",
@@ -51,6 +52,7 @@ export default function RootLayout({
             </div>
             <BottomNav />
             <CommandPalette />
+            <DesktopShortcuts />
           </ConfirmProvider>
         </ToastProvider>
       </body>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { StockAdjust } from "@/components/StockAdjust";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -30,6 +30,10 @@ type PantryDetailProps = {
     cents: number | null,
   ) => Promise<void>;
   onApplyDelta: (ingId: number, productId: number | null, delta: number, exp: string | null) => void;
+  // Bumped by the desktop "n" shortcut (DesktopShortcuts.tsx) to open the
+  // add-on-hand form the same way clicking "+ add on-hand" does. Unused on
+  // mobile, where there's no keyboard shortcut layer.
+  newTrigger?: number;
 };
 
 /**
@@ -47,6 +51,7 @@ export function PantryDetail({
   onPatchLot,
   onAddOnHand,
   onApplyDelta,
+  newTrigger,
 }: PantryDetailProps) {
   const confirm = useConfirm();
   const unsortedEditProducts = products.filter((p) => p.ingredientId === ingredient.id);
@@ -168,6 +173,7 @@ export function PantryDetail({
           unit={ingredient.canonicalUnit}
           products={editProducts}
           onAdd={(productId, qty, exp, cents) => onAddOnHand(ingredient.id, productId, qty, exp, cents)}
+          newTrigger={newTrigger}
         />
       )}
 
@@ -195,13 +201,23 @@ export function PantryDetail({
 // that IS the product dropdown, and click-to-edit ×/exp/$. The lot is created the
 // moment a product AND a positive qty are both set; exp/$ set beforehand ride along.
 function AddOnHand({
-  unit, products, onAdd,
+  unit, products, onAdd, newTrigger,
 }: {
   unit: string;
   products: Product[];
   onAdd: (productId: number, qty: number, exp: string | null, cents: number | null) => Promise<void>;
+  newTrigger?: number;
 }) {
   const [open, setOpen] = useState(false);
+  // Opens the form the same way clicking "+ add on-hand" does, once per
+  // increment of newTrigger (the desktop "n" shortcut) — not on mount.
+  const prevTrigger = useRef(newTrigger);
+  useEffect(() => {
+    if (newTrigger !== undefined && newTrigger !== prevTrigger.current) {
+      prevTrigger.current = newTrigger;
+      setOpen(true);
+    }
+  }, [newTrigger]);
   const [draft, setDraft] = useState<{ productId: number | null; qty: number | null; exp: string | null; cents: number | null }>(
     { productId: null, qty: null, exp: null, cents: null },
   );
