@@ -269,8 +269,8 @@ describe("nextCooks", () => {
 
     const result = nextCooks(db, hid, "2026-08-09");
     expect(result).toEqual([
-      { slotId: lunchSlot, slotName: "Lunch", label: "Rice Bowl", cookDate: "2026-08-12", daysAway: 3 },
-      { slotId: dinnerSlot, slotName: "Dinner", label: "Chicken Curry", cookDate: "2026-08-15", daysAway: 6 },
+      { slotId: lunchSlot, slotName: "Lunch", label: "Rice Bowl", cookDate: "2026-08-12", daysAway: 3, prepStart: null, prepEnd: null },
+      { slotId: dinnerSlot, slotName: "Dinner", label: "Chicken Curry", cookDate: "2026-08-15", daysAway: 6, prepStart: null, prepEnd: null },
     ]);
   });
 
@@ -316,6 +316,7 @@ describe("nextCooks", () => {
     const result = nextCooks(db, hid, "2026-08-09");
     expect(result).toContainEqual({
       slotId: lunchSlot, slotName: "Lunch", label: "Overnight Oats", cookDate: "2026-08-09", daysAway: 0,
+      prepStart: null, prepEnd: null,
     });
   });
 

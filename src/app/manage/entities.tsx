@@ -252,15 +252,19 @@ export const ENTITIES: Record<EntitySlug, EntityConfig> = {
     columns: [
       { key: "name", label: "Name" },
       { key: "timeOfDay", label: "Time" },
+      { key: "prepStart", label: "Prep window", format: (row) => (row.prepStart && row.prepEnd ? `${row.prepStart}–${row.prepEnd}` : "—") },
     ],
     fields: [
       { name: "name", label: "Name", type: "text", required: true },
       { name: "timeOfDay", label: "Time of day", type: "time", required: true },
+      // Overrides the calendar feed's built-in Lunch/Dinner prep-time guess (src/lib/calendar.ts).
+      { name: "prepStart", label: "Prep start (calendar feed)", type: "time", optional: true },
+      { name: "prepEnd", label: "Prep end (calendar feed)", type: "time", optional: true },
     ],
     canEdit: true,
     canDelete: true,
-    toCreatePayload: (v) => ({ name: v.name, timeOfDay: v.timeOfDay || "12:00" }),
-    toUpdatePayload: (v) => ({ name: v.name, timeOfDay: v.timeOfDay || "12:00" }),
+    toCreatePayload: (v) => ({ name: v.name, timeOfDay: v.timeOfDay || "12:00", prepStart: optStr(v.prepStart), prepEnd: optStr(v.prepEnd) }),
+    toUpdatePayload: (v) => ({ name: v.name, timeOfDay: v.timeOfDay || "12:00", prepStart: optStr(v.prepStart) ?? null, prepEnd: optStr(v.prepEnd) ?? null }),
   },
 };
 

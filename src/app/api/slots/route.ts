@@ -15,6 +15,9 @@ export async function POST(req: Request) {
   const b = await req.json().catch(() => null);
   if (!b?.name?.trim()) return NextResponse.json({ error: "name required" }, { status: 400 });
   return NextResponse.json(
-    createSlot(db, session.user.householdId, String(b.name).trim(), b.timeOfDay || "12:00"),
+    createSlot(db, session.user.householdId, String(b.name).trim(), b.timeOfDay || "12:00", {
+      prepStart: b.prepStart ? String(b.prepStart) : null,
+      prepEnd: b.prepEnd ? String(b.prepEnd) : null,
+    }),
     { status: 201 });
 }

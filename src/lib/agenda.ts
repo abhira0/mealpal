@@ -40,6 +40,8 @@ export interface NextCook {
   label: string;
   cookDate: string;
   daysAway: number; // negative when cookDate is in the past (overdue prep)
+  prepStart: string | null; // slot's "HH:MM" prep window override for the calendar feed, or null
+  prepEnd: string | null;
 }
 
 export interface AgendaDay {
@@ -331,7 +333,10 @@ export function nextCooks(db: Db, householdId: number, today: string): NextCook[
   const result: NextCook[] = [];
   for (const [slotId, { cookDate, label }] of bySlot) {
     const slot = slotById.get(slotId);
-    result.push({ slotId, slotName: slot?.name ?? "—", label, cookDate, daysAway: daysFrom(cookDate) });
+    result.push({
+      slotId, slotName: slot?.name ?? "—", label, cookDate, daysAway: daysFrom(cookDate),
+      prepStart: slot?.prepStart ?? null, prepEnd: slot?.prepEnd ?? null,
+    });
   }
 
   // Recurring recipe meals (make-ahead items like Overnight Oats) also surface
@@ -361,6 +366,8 @@ export function nextCooks(db: Db, householdId: number, today: string): NextCook[
       label: getRecipe(db, householdId, recipeId)?.name ?? "Recipe",
       cookDate,
       daysAway: daysFrom(cookDate),
+      prepStart: slot?.prepStart ?? null,
+      prepEnd: slot?.prepEnd ?? null,
     });
   }
 

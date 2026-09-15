@@ -4,9 +4,16 @@ import { schema } from "@/db";
 
 type Db = BetterSQLite3Database<typeof schema>;
 
-export function createSlot(db: Db, householdId: number, name: string, timeOfDay = "12:00") {
+export function createSlot(
+  db: Db,
+  householdId: number,
+  name: string,
+  timeOfDay = "12:00",
+  prep?: { prepStart?: string | null; prepEnd?: string | null },
+) {
   const [row] = db.insert(schema.mealSlots)
-    .values({ householdId, name, timeOfDay }).returning().all();
+    .values({ householdId, name, timeOfDay, prepStart: prep?.prepStart ?? null, prepEnd: prep?.prepEnd ?? null })
+    .returning().all();
   return row;
 }
 
@@ -20,10 +27,15 @@ export function updateSlot(
   db: Db,
   householdId: number,
   id: number,
-  values: { name: string; timeOfDay?: string },
+  values: { name: string; timeOfDay?: string; prepStart?: string | null; prepEnd?: string | null },
 ) {
   const [row] = db.update(schema.mealSlots)
-    .set({ name: values.name, ...(values.timeOfDay !== undefined ? { timeOfDay: values.timeOfDay } : {}) })
+    .set({
+      name: values.name,
+      ...(values.timeOfDay !== undefined ? { timeOfDay: values.timeOfDay } : {}),
+      ...(values.prepStart !== undefined ? { prepStart: values.prepStart } : {}),
+      ...(values.prepEnd !== undefined ? { prepEnd: values.prepEnd } : {}),
+    })
     .where(and(eq(schema.mealSlots.id, id), eq(schema.mealSlots.householdId, householdId)))
     .returning().all();
   return row;

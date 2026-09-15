@@ -1,8 +1,9 @@
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, schema } from "@/db";
 import { nextCooks } from "@/lib/agenda";
 import { topUpRules } from "@/lib/rules";
-import { buildIcs, calendarTokenValid } from "@/lib/calendar";
+import { buildIcs, calendarTokenValid, DEFAULT_TIMEZONE } from "@/lib/calendar";
 import { todayISO } from "@/lib/dates";
 
 // Mirrors TodayAgenda's "🍳 Next cooking" filter — only these prep cards show.
@@ -26,7 +27,8 @@ export async function GET(
   }
   const today = todayISO();
   topUpRules(db, hid, today);
-  const ics = buildIcs(nextCooks(db, hid, today).filter(isVisibleCook));
+  const household = db.select().from(schema.households).where(eq(schema.households.id, hid)).get();
+  const ics = buildIcs(nextCooks(db, hid, today).filter(isVisibleCook), household?.timezone ?? DEFAULT_TIMEZONE);
   return new NextResponse(ics, {
     headers: {
       "Content-Type": "text/calendar; charset=utf-8",
