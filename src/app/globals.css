@@ -456,7 +456,9 @@ button.row-link{background:none;border:none;width:100%;text-align:left;cursor:po
 .cook-dots span{width:8px;height:8px;border-radius:50%;background:var(--surface-3)}
 .cook-dots span.on{background:var(--accent)}
 .cook-nav{display:flex;gap:12px}
-.cook-nav .btn{flex:1}
+.cook-nav .btn{flex:1;min-width:44px;min-height:44px}
+.cook-timer{align-self:center;min-width:44px;min-height:44px}
+.cook-timer.done{background:var(--ok);border-color:var(--ok)}
 .cook-top-actions{display:flex;align-items:center;gap:12px}
 .cook-edit-toggle{flex:none;width:auto;padding:6px 12px;font-size:13px}
 .cook-edit{display:flex;flex-direction:column;gap:12px;text-align:left;width:min(100%,980px);margin:0 auto}
