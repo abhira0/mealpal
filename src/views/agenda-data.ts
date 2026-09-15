@@ -743,16 +743,15 @@ export function useAgenda(
         return;
       }
 
-      // Creating: a meal is a collection of items. Post each one — a one-off to
-      // /api/events, or a per-item recurring rule to /api/rules when repeating.
-      // ponytail: sequential posts; a mid-list failure leaves earlier items
-      // added. Fine for a single-user household; make it a transactional bulk
-      // endpoint if partial adds ever bite.
+      // Creating: a meal is a collection of items — a one-off array to
+      // /api/events, or a per-item recurring rule array to /api/rules when
+      // repeating. Both endpoints accept an array body and insert it as one
+      // all-or-nothing transaction, so a mid-list failure never leaves earlier
+      // items planned and the client only posts once.
       const url = addRepeat ? "/api/rules" : "/api/events";
-      let ok = true;
-      for (const it of addItems) {
+      const bodies = addItems.map((it) => {
         const item = mealItemBody(it);
-        const body = addRepeat
+        return addRepeat
           ? {
               ...item, slotId: addSlotId, startDate: addDate,
               intervalN: addIntervalN, unit: addUnit,
@@ -760,12 +759,11 @@ export function useAgenda(
               untilDate: addUntil || null,
             }
           : { date: addDate, slotId: addSlotId, ...item };
-        const res = await fetch(url, {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-        });
-        if (!res.ok) { ok = false; break; }
-      }
-      if (ok) setAddOpen(false);
+      });
+      const res = await fetch(url, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(bodies),
+      });
+      if (res.ok) setAddOpen(false);
       await Promise.all([loadAgenda(), loadAnalysis()]);
     } finally {
       setAddSaving(false);

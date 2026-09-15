@@ -4,7 +4,7 @@ import { seedHousehold } from "@/test/fixtures";
 import { createRecipe } from "@/lib/recipes";
 import { createSlot } from "@/lib/slots";
 import { addEvent, listEvents, deleteEvent } from "@/lib/plan";
-import { matchingDates, createRule, topUpRules, listRules, updateRuleRecurrence } from "@/lib/rules";
+import { matchingDates, createRule, createRules, RuleItemError, topUpRules, listRules, updateRuleRecurrence } from "@/lib/rules";
 import { schema } from "@/db";
 import { eq } from "drizzle-orm";
 
@@ -245,5 +245,40 @@ describe("updateRuleRecurrence", () => {
     expect(rules.find((r) => r.id === a.id)!.intervalN).toBe(1);
     expect(rules.find((r) => r.id === b.id)!.intervalN).toBe(1);
     expect(listEvents(db, hid, "2026-06-02", "2026-06-02").length).toBe(2); // both items on an off-cadence day
+  });
+});
+
+describe("createRules (bulk add-meal, all-or-nothing)", () => {
+  it("creates every rule (and its materialized events) in one call", () => {
+    const today = "2026-06-01";
+    const rice = createRecipe(db, hid, {
+      name: "Rice", baseServings: 1, notes: null, ingredients: [], steps: [], media: [],
+    }).id;
+    const rules = createRules(db, hid, today, [
+      { slotId, recipeId, servings: 1, ...base, startDate: today },
+      { slotId, recipeId: rice, servings: 2, ...base, startDate: today },
+    ]);
+    expect(rules).toHaveLength(2);
+    expect(listRules(db, hid)).toHaveLength(2);
+    expect(listEvents(db, hid, today, today)).toHaveLength(2);
+  });
+
+  it("rolls back the whole batch when a later item is invalid, naming its index", () => {
+    const today = "2026-06-01";
+    const bogusSlotId = slotId + 999;
+    const attempt = () => createRules(db, hid, today, [
+      { slotId, recipeId, servings: 1, ...base, startDate: today },
+      { slotId: bogusSlotId, recipeId, servings: 1, ...base, startDate: today },
+    ]);
+    expect(attempt).toThrow(RuleItemError);
+    try {
+      attempt();
+    } catch (e) {
+      expect(e).toBeInstanceOf(RuleItemError);
+      expect((e as RuleItemError).index).toBe(1);
+    }
+    // Nothing from either failed attempt was left behind.
+    expect(listRules(db, hid)).toHaveLength(0);
+    expect(listEvents(db, hid, today, today)).toHaveLength(0);
   });
 });

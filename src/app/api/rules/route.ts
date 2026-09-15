@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { createRule, listRules } from "@/lib/rules";
+import { createRules, listRules, type RuleInput, RuleItemError } from "@/lib/rules";
 import { DATE_RE, todayISO } from "@/lib/dates";
 
 // List every recurring rule for the household (management/debugging view —
@@ -12,54 +12,83 @@ export async function GET() {
   return NextResponse.json(listRules(db, session.user.householdId));
 }
 
-export async function POST(req: Request) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const b = await req.json().catch(() => null);
+// Validate one rule item and resolve it to a RuleInput ready for createRule.
+// Shared by the single-object and array request bodies, mirroring /api/events.
+function resolveRuleInput(b: unknown): { input: RuleInput } | { error: string } {
+  const body = b as Record<string, unknown> | null;
   // exactly one item kind, mirroring /api/events
-  const item = [b?.recipeId, b?.productId, b?.ingredientId].filter((v) => v != null).length;
-  if (!b?.slotId || !b?.startDate || item !== 1)
-    return NextResponse.json({ error: "slotId, startDate, and exactly one of recipeId/productId/ingredientId required" }, { status: 400 });
+  const item = [body?.recipeId, body?.productId, body?.ingredientId].filter((v) => v != null).length;
+  if (!body?.slotId || !body?.startDate || item !== 1)
+    return { error: "slotId, startDate, and exactly one of recipeId/productId/ingredientId required" };
   // A direct-ingredient rule needs a positive amount per occurrence — mirrors
   // /api/events, which rejects the same case. Without this, createRule silently
   // stores amount 0 and every materialized occurrence logs zero consumption.
-  if (b.ingredientId != null && (!Number.isFinite(Number(b.amount)) || Number(b.amount) <= 0))
-    return NextResponse.json({ error: "amount must be a positive number" }, { status: 400 });
+  if (body.ingredientId != null && (!Number.isFinite(Number(body.amount)) || Number(body.amount) <= 0))
+    return { error: "amount must be a positive number" };
   // startDate/untilDate must be well-formed dates, or matchingDates() silently
   // compares NaN timestamps and the rule never materializes anything.
-  if (typeof b.startDate !== "string" || !DATE_RE.test(b.startDate))
-    return NextResponse.json({ error: "startDate must be a valid YYYY-MM-DD date" }, { status: 400 });
-  if (b.untilDate != null) {
-    if (typeof b.untilDate !== "string" || !DATE_RE.test(b.untilDate))
-      return NextResponse.json({ error: "untilDate must be a valid YYYY-MM-DD date" }, { status: 400 });
-    if (b.untilDate < b.startDate)
-      return NextResponse.json({ error: "untilDate must not be before startDate" }, { status: 400 });
+  if (typeof body.startDate !== "string" || !DATE_RE.test(body.startDate))
+    return { error: "startDate must be a valid YYYY-MM-DD date" };
+  if (body.untilDate != null) {
+    if (typeof body.untilDate !== "string" || !DATE_RE.test(body.untilDate))
+      return { error: "untilDate must be a valid YYYY-MM-DD date" };
+    if (body.untilDate < body.startDate)
+      return { error: "untilDate must not be before startDate" };
   }
-  const unit = b.unit === "day" ? "day" : "week";
-  const daysOfWeek = typeof b.daysOfWeek === "string" && /^[01]{7}$/.test(b.daysOfWeek)
-    ? b.daysOfWeek : "1111111";
+  const unit = body.unit === "day" ? "day" : "week";
+  const daysOfWeek = typeof body.daysOfWeek === "string" && /^[01]{7}$/.test(body.daysOfWeek)
+    ? body.daysOfWeek : "1111111";
   // mirror PATCH /api/rules/[id]: a weekly rule with no day selected never fires.
   if (unit === "week" && !daysOfWeek.includes("1"))
-    return NextResponse.json({ error: "pick at least one day of the week" }, { status: 400 });
-  try {
-    const rule = createRule(db, session.user.householdId, todayISO(), {
-      slotId: Number(b.slotId),
-      recipeId: b.recipeId != null ? Number(b.recipeId) : null,
-      productId: b.productId != null ? Number(b.productId) : null,
-      variantId: b.variantId != null ? Number(b.variantId) : null,
-      ingredientId: b.ingredientId != null ? Number(b.ingredientId) : null,
-      amount: b.amount != null ? Number(b.amount) : null,
-      servings: Number(b.servings) || 1,
-      intervalN: Math.max(1, Number(b.intervalN) || 1),
+    return { error: "pick at least one day of the week" };
+  return {
+    input: {
+      slotId: Number(body.slotId),
+      recipeId: body.recipeId != null ? Number(body.recipeId) : null,
+      productId: body.productId != null ? Number(body.productId) : null,
+      variantId: body.variantId != null ? Number(body.variantId) : null,
+      ingredientId: body.ingredientId != null ? Number(body.ingredientId) : null,
+      amount: body.amount != null ? Number(body.amount) : null,
+      servings: Number(body.servings) || 1,
+      intervalN: Math.max(1, Number(body.intervalN) || 1),
       unit,
       daysOfWeek,
-      startDate: String(b.startDate),
-      untilDate: b.untilDate ? String(b.untilDate) : null,
-    });
-    return NextResponse.json(rule, { status: 201 });
-  } catch (err) {
-    // Bad input (slot/recipe/product/variant/ingredient not found in this
-    // household) — not a server error.
-    return NextResponse.json({ error: (err as Error).message }, { status: 400 });
+      startDate: String(body.startDate),
+      untilDate: body.untilDate ? String(body.untilDate) : null,
+    },
+  };
+}
+
+// A repeating meal is a collection of per-item rules; the add-meal sheet posts
+// either a single item (back-compat) or the whole array in one request so the
+// batch is all-or-nothing — see createRules in @/lib/rules.
+export async function POST(req: Request) {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const raw = await req.json().catch(() => null);
+  if (raw == null) return NextResponse.json({ error: "invalid body" }, { status: 400 });
+  const isArray = Array.isArray(raw);
+  const items = isArray ? raw : [raw];
+  if (items.length === 0) return NextResponse.json({ error: "no items" }, { status: 400 });
+
+  const inputs: RuleInput[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const resolved = resolveRuleInput(items[i]);
+    if ("error" in resolved) {
+      return NextResponse.json(
+        isArray ? { error: resolved.error, index: i } : { error: resolved.error },
+        { status: 400 },
+      );
+    }
+    inputs.push(resolved.input);
+  }
+
+  try {
+    const rows = createRules(db, session.user.householdId, todayISO(), inputs);
+    return NextResponse.json(isArray ? rows : rows[0], { status: 201 });
+  } catch (e) {
+    if (e instanceof RuleItemError)
+      return NextResponse.json({ error: e.message, index: e.index }, { status: 400 });
+    throw e;
   }
 }

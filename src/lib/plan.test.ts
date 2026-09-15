@@ -4,7 +4,7 @@ import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
 import { createRecipe } from "@/lib/recipes";
 import { createSlot } from "@/lib/slots";
-import { addEvent, updateEvent, listEvents, cookEvent, uncookEvent, serveEvent, unserveEvent, deleteEvent, plannedConsumption, runOutDates, cookBatch, cookScope, ShortStock } from "@/lib/plan";
+import { addEvent, addEvents, EventItemError, updateEvent, listEvents, cookEvent, uncookEvent, serveEvent, unserveEvent, deleteEvent, plannedConsumption, runOutDates, cookBatch, cookScope, ShortStock } from "@/lib/plan";
 import { createRule } from "@/lib/rules";
 import { currentStock } from "@/lib/stock";
 import { createProduct } from "@/lib/products";
@@ -339,6 +339,40 @@ describe("meal plan", () => {
     uncookEvent(db, hid, ev.id);
     expect(listEvents(db, hid, "2026-07-01", "2026-07-01")[0].status).toBe("planned");
     expect(currentStock(db, hid, flourId)).toBe(2000);
+  });
+});
+
+describe("addEvents (bulk add-meal, all-or-nothing)", () => {
+  it("adds every item in one call", () => {
+    const rows = addEvents(db, hid, [
+      { date: "2026-07-01", slotId, recipeId, servings: 2 },
+      { date: "2026-07-01", slotId, recipeId, servings: 1 },
+    ]);
+    expect(rows).toHaveLength(2);
+    expect(listEvents(db, hid, "2026-07-01", "2026-07-01")).toHaveLength(2);
+  });
+
+  it("rolls back the whole batch when a later item is invalid, naming its index", () => {
+    const bogusRecipeId = recipeId + 999;
+    expect(() =>
+      addEvents(db, hid, [
+        { date: "2026-07-01", slotId, recipeId, servings: 2 },
+        { date: "2026-07-02", slotId, recipeId, servings: 1 },
+        { date: "2026-07-03", slotId, recipeId: bogusRecipeId, servings: 1 },
+      ]),
+    ).toThrow(EventItemError);
+    try {
+      addEvents(db, hid, [
+        { date: "2026-07-01", slotId, recipeId, servings: 2 },
+        { date: "2026-07-02", slotId, recipeId, servings: 1 },
+        { date: "2026-07-03", slotId, recipeId: bogusRecipeId, servings: 1 },
+      ]);
+    } catch (e) {
+      expect(e).toBeInstanceOf(EventItemError);
+      expect((e as EventItemError).index).toBe(2);
+    }
+    // Nothing from either failed attempt was left behind.
+    expect(listEvents(db, hid, "2026-07-01", "2026-07-03")).toHaveLength(0);
   });
 });
 

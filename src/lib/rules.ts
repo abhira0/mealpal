@@ -170,6 +170,31 @@ export function createRule(db: Db, householdId: number, today: string, input: Ru
   return rule;
 }
 
+/** Raised by createRules to name which array item failed, so the route can report it. */
+export class RuleItemError extends Error {
+  constructor(public index: number, message: string) {
+    super(message);
+  }
+}
+
+/**
+ * Create several recurring rules as one all-or-nothing unit (a multi-item
+ * repeating meal posts one rule per item). If any item fails, the whole batch
+ * rolls back rather than leaving earlier rules (and their materialized
+ * events) created; the thrown RuleItemError names the offending index.
+ */
+export function createRules(db: Db, householdId: number, today: string, inputs: RuleInput[]) {
+  return db.transaction((tx) => {
+    return inputs.map((input, index) => {
+      try {
+        return createRule(tx as unknown as Db, householdId, today, input);
+      } catch (e) {
+        throw new RuleItemError(index, e instanceof Error ? e.message : String(e));
+      }
+    });
+  });
+}
+
 /** All recurring rules for a household — for a management/listing UI. */
 export function listRules(db: Db, householdId: number) {
   return db.select().from(schema.mealRules)
