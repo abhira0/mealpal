@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Dropdown } from "@/components/Dropdown";
 import { Favicon, domainFrom } from "@/components/Favicon";
 import { NutritionPhoto } from "@/components/NutritionPhoto";
+import { ProductImage } from "@/components/ProductImage";
 import { NutritionFactsEditor, EDITOR_KEYS } from "@/components/NutritionFactsEditor";
 import { convertCanonical } from "@/lib/units";
 import { ENTITIES, type EntitySlug, type FieldDef } from "@/app/manage/entities";
@@ -428,8 +429,13 @@ export function EntityForm({
           )}
 
           {values.imageUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={values.imageUrl} alt="" loading="lazy" style={{ display: "block", maxHeight: 160, borderRadius: 8, margin: "0 auto" }} />
+            <ProductImage
+              src={values.imageUrl}
+              alt=""
+              width={160}
+              height={160}
+              style={{ display: "block", objectFit: "contain", borderRadius: 8, margin: "0 auto" }}
+            />
           )}
 
           {visibleFields.map((f) => (

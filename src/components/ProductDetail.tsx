@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/Skeleton";
 import { useCallback, useEffect, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { Favicon } from "@/components/Favicon";
+import { ProductImage } from "@/components/ProductImage";
 import { Sheet } from "@/components/Sheet";
 import { EntityForm } from "@/components/EntityForm";
 import { EditDeleteActions } from "@/components/EditDeleteActions";
@@ -146,8 +147,13 @@ export function ProductDetail({ id }: { id: string }) {
         <span className="section-label">Details</span>
         <section className="card stack-sm">
           {product.imageUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={product.imageUrl} alt={product.name} loading="lazy" style={{ display: "block", maxHeight: 160, borderRadius: 8, margin: "0 auto" }} />
+            <ProductImage
+              src={product.imageUrl}
+              alt={product.name}
+              width={160}
+              height={160}
+              style={{ display: "block", objectFit: "contain", borderRadius: 8, margin: "0 auto" }}
+            />
           )}
           {!product.available && <span className="chip run">unavailable</span>}
           <Field label="Ingredient">{ingredient?.name ?? "—"}</Field>

@@ -65,6 +65,8 @@ export function Favicon({
       alt=""
       width={size}
       height={size}
+      loading="lazy"
+      decoding="async"
       onError={() => setFailed(true)}
       style={{
         objectFit: "contain",

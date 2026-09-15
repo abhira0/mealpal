@@ -103,6 +103,7 @@ export function NutritionPhoto({
           src={`${current}?v=${v}`}
           alt="Nutrition facts label"
           loading="lazy"
+          decoding="async"
           role="button"
           tabIndex={0}
           aria-label="View nutrition facts label full screen"
@@ -114,7 +115,17 @@ export function NutritionPhoto({
               e.currentTarget.requestFullscreen?.();
             }
           }}
-          style={{ display: "block", maxHeight: 220, borderRadius: 8, border: "1px solid var(--line, #0001)", cursor: "zoom-in" }}
+          style={{
+            display: "block",
+            maxWidth: 165,
+            maxHeight: 220,
+            aspectRatio: "3 / 4",
+            objectFit: "contain",
+            background: "var(--surface-2)",
+            borderRadius: 8,
+            border: "1px solid var(--line, #0001)",
+            cursor: "zoom-in",
+          }}
         />
       ) : (
         <p style={{ margin: 0, opacity: 0.6 }}>No nutrition photo yet.</p>

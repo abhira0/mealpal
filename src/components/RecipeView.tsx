@@ -412,7 +412,7 @@ function Gallery({
             >
               {m.kind === "photo" ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={m.url} alt="" loading="lazy" />
+                <img src={m.url} alt="" width={60} height={44} loading="lazy" decoding="async" />
               ) : (
                 <span aria-hidden="true">▶</span>
               )}
@@ -443,7 +443,7 @@ function MediaBlock({
       return (
         <button type="button" className="media yt-facade" onClick={onLoad} aria-label={`Play video: ${title}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`https://img.youtube.com/vi/${yt}/hqdefault.jpg`} alt="" loading="lazy" />
+          <img src={`https://img.youtube.com/vi/${yt}/hqdefault.jpg`} alt="" loading="lazy" decoding="async" />
           <span className="yt-play" aria-hidden="true">▶</span>
         </button>
       );
@@ -475,7 +475,7 @@ function MediaBlock({
   return (
     <div className="media">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={media.url} alt={title} loading="lazy" />
+      <img src={media.url} alt={title} loading="lazy" decoding="async" />
     </div>
   );
 }
