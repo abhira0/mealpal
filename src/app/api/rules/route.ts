@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { createRule, listRules } from "@/lib/rules";
-import { todayISO } from "@/lib/dates";
+import { DATE_RE, todayISO } from "@/lib/dates";
 
 // List every recurring rule for the household (management/debugging view —
 // previously there was no way to see created rules other than via the agenda).
@@ -25,9 +25,22 @@ export async function POST(req: Request) {
   // stores amount 0 and every materialized occurrence logs zero consumption.
   if (b.ingredientId != null && (!Number.isFinite(Number(b.amount)) || Number(b.amount) <= 0))
     return NextResponse.json({ error: "amount must be a positive number" }, { status: 400 });
+  // startDate/untilDate must be well-formed dates, or matchingDates() silently
+  // compares NaN timestamps and the rule never materializes anything.
+  if (typeof b.startDate !== "string" || !DATE_RE.test(b.startDate))
+    return NextResponse.json({ error: "startDate must be a valid YYYY-MM-DD date" }, { status: 400 });
+  if (b.untilDate != null) {
+    if (typeof b.untilDate !== "string" || !DATE_RE.test(b.untilDate))
+      return NextResponse.json({ error: "untilDate must be a valid YYYY-MM-DD date" }, { status: 400 });
+    if (b.untilDate < b.startDate)
+      return NextResponse.json({ error: "untilDate must not be before startDate" }, { status: 400 });
+  }
   const unit = b.unit === "day" ? "day" : "week";
   const daysOfWeek = typeof b.daysOfWeek === "string" && /^[01]{7}$/.test(b.daysOfWeek)
     ? b.daysOfWeek : "1111111";
+  // mirror PATCH /api/rules/[id]: a weekly rule with no day selected never fires.
+  if (unit === "week" && !daysOfWeek.includes("1"))
+    return NextResponse.json({ error: "pick at least one day of the week" }, { status: 400 });
   const rule = createRule(db, session.user.householdId, todayISO(), {
     slotId: Number(b.slotId),
     recipeId: b.recipeId != null ? Number(b.recipeId) : null,
