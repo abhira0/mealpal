@@ -112,11 +112,12 @@ test.describe("core loop: plan -> cook -> stock -> shop -> eaten -> nutrition", 
     expect(lots[1].remaining).toBe(100); // untouched by the cook
 
     // --- SHOP: the shortfall from tomorrow's planned (uncooked) meal ----
+    // Shape (mealpal-ibb): grouped by shop id, each group carries its lines.
     const shopping = await (await page.request.get("/api/shopping?horizon=14")).json() as Record<
       string,
-      { ingredientId: number; ingredientName: string; needed: number; product: { id: number } | null }[]
+      { shopId: number | null; shopName: string; lines: { ingredientId: number; ingredientName: string; needed: number; product: { id: number } | null }[] }
     >;
-    const shopLine = Object.values(shopping).flat().find((l) => l.ingredientId === INGREDIENT_ID);
+    const shopLine = Object.values(shopping).flatMap((g) => g.lines).find((l) => l.ingredientId === INGREDIENT_ID);
     expect(shopLine).toBeTruthy();
     // stock(120) can't cover tomorrow's planned 2 servings (160g) -> short 40g.
     expect(shopLine!.needed).toBe(40);
