@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors, closestCenter,
   useDraggable, useDroppable, type DragEndEvent, type DragStartEvent,
@@ -182,6 +182,23 @@ export function DesktopPlan() {
   }
   // Open the unified create form in the panel (clears any selected meal).
   function openCreate(date: string) { setSel(null); agenda.openAdd({ date }); }
+
+  // "n" / "[" / "]" shortcuts (src/components/DesktopShortcuts.tsx): mirror
+  // the "+ Schedule" button and the "‹"/"›" week-nav buttons exactly.
+  useEffect(() => {
+    function onNew() { openCreate(start); }
+    function onPrev() { setStart((s) => addDays(s, -7)); }
+    function onNext() { setStart((s) => addDays(s, 7)); }
+    window.addEventListener("platr:shortcut-new", onNew);
+    window.addEventListener("platr:shortcut-prev", onPrev);
+    window.addEventListener("platr:shortcut-next", onNext);
+    return () => {
+      window.removeEventListener("platr:shortcut-new", onNew);
+      window.removeEventListener("platr:shortcut-prev", onPrev);
+      window.removeEventListener("platr:shortcut-next", onNext);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [start]);
 
   // Drag-and-drop reschedule: drag a planned bar onto another day/slot cell.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));

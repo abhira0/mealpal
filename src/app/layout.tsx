@@ -3,6 +3,7 @@ import { ViewTransition } from "react";
 import "./globals.css";
 import { BottomNav } from "@/components/BottomNav";
 import { CommandPalette } from "@/components/CommandPalette";
+import { DesktopShortcuts } from "@/components/DesktopShortcuts";
 
 export const metadata: Metadata = {
   title: "Platr",
@@ -47,6 +48,7 @@ export default function RootLayout({
         </div>
         <BottomNav />
         <CommandPalette />
+        <DesktopShortcuts />
       </body>
     </html>
   );

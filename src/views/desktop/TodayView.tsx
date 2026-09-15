@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { DeskPage } from "@/components/DeskPage";
 import { useAgenda } from "@/views/agenda-data";
@@ -10,6 +11,16 @@ import { CalorieMacroRing } from "@/components/CalorieMacroRing";
 export function DesktopToday({ userName }: { userName?: string | null }) {
   const agenda = useAgenda(userName);
   const { mounted, todayIso, nextCooks, analysis } = agenda;
+
+  // "n" shortcut (src/components/DesktopShortcuts.tsx): opens the same Add
+  // sheet as the agenda's own add affordances, defaulted to today.
+  useEffect(() => {
+    function onNew() {
+      agenda.openAdd();
+    }
+    window.addEventListener("platr:shortcut-new", onNew);
+    return () => window.removeEventListener("platr:shortcut-new", onNew);
+  }, [agenda]);
 
   const dateLabel = mounted
     ? new Date(todayIso + "T00:00:00").toLocaleDateString(undefined, {
