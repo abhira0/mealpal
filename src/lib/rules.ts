@@ -278,11 +278,13 @@ export function deleteRule(db: Db, householdId: number, ruleId: number, keepGene
         eq(schema.mealEvents.ruleId, ruleId),
         eq(schema.mealEvents.status, "planned"),
       )).run();
-  } else {
-    // detach: keep the rows but unlink them from the rule
-    db.update(schema.mealEvents).set({ ruleId: null })
-      .where(eq(schema.mealEvents.ruleId, ruleId)).run();
   }
+  // Cooked/served events are never deleted here (they own stock movements),
+  // so they'd otherwise still point at this rule and block the FK below —
+  // detach whatever's left (all of them when keepGenerated, just the
+  // cooked/served survivors otherwise) so they become plain one-off events.
+  db.update(schema.mealEvents).set({ ruleId: null })
+    .where(eq(schema.mealEvents.ruleId, ruleId)).run();
   db.delete(schema.mealRuleSkips).where(eq(schema.mealRuleSkips.ruleId, ruleId)).run();
   db.delete(schema.mealRules).where(eq(schema.mealRules.id, ruleId)).run();
 }
