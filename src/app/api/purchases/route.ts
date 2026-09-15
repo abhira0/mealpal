@@ -25,7 +25,9 @@ export async function POST(req: Request) {
   const b = await req.json().catch(() => null);
   const productId = Number(b?.productId);
   if (!productId) return NextResponse.json({ error: "productId required" }, { status: 400 });
-  const quantity = Number(b?.quantity) || 1;
+  const quantity = b?.quantity === undefined ? 1 : Number(b.quantity);
+  if (!Number.isInteger(quantity) || quantity < 1)
+    return NextResponse.json({ error: "quantity must be a positive integer" }, { status: 400 });
 
   let cents: number | null = null;
   if (b?.cents !== undefined && b.cents !== null && b.cents !== "") cents = Number(b.cents);
