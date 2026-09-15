@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db, schema } from "@/db";
 import { deleteEvent, getEvent, updateEvent, type DeleteScope, type EventInput } from "@/lib/plan";
+import { DATE_RE } from "@/lib/dates";
 
 // Same cross-household guard as POST /api/events — an edit can reassign the
 // event's slot/recipe, so a foreign id could otherwise be smuggled in here too.
@@ -33,6 +34,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const b = (await req.json().catch(() => null)) as Partial<EventInput> | null;
   if (!b || !b.date || typeof b.slotId !== "number") {
     return NextResponse.json({ error: "date, slotId required" }, { status: 400 });
+  }
+  if (typeof b.date !== "string" || !DATE_RE.test(b.date)) {
+    return NextResponse.json({ error: "date=YYYY-MM-DD required" }, { status: 400 });
   }
   if (!ownsSlot(session.user.householdId, b.slotId)) {
     return NextResponse.json({ error: "slot not found" }, { status: 404 });
