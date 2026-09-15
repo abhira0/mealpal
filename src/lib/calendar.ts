@@ -53,6 +53,29 @@ function prepHours(c: NextCook): [number, number] | null {
 
 const clock = (h: number) => `${String(Math.floor(h)).padStart(2, "0")}${String((h % 1) * 60).padStart(2, "0")}00`;
 
+// RFC 5545 §3.1 line folding: no content line may exceed 75 octets. Continuation
+// lines start with a single leading space, which itself counts toward the next
+// line's 75-octet cap — so continuation chunks carry at most 74 octets of
+// content. Folding is byte-based (UTF-8), so a multi-byte codepoint must never
+// be split across a fold boundary; back off to the nearest codepoint start.
+function foldLine(line: string): string {
+  const bytes = Buffer.from(line, "utf8");
+  if (bytes.length <= 75) return line;
+  const chunks: Buffer[] = [];
+  let offset = 0;
+  let limit = 75;
+  while (offset < bytes.length) {
+    let end = Math.min(offset + limit, bytes.length);
+    // A UTF-8 continuation byte matches 10xxxxxx; back off until we land on
+    // a codepoint boundary (a leading byte or end-of-buffer).
+    while (end > offset && (bytes[end] & 0xc0) === 0x80) end--;
+    chunks.push(bytes.subarray(offset, end));
+    offset = end;
+    limit = 74;
+  }
+  return chunks.map((chunk, i) => (i === 0 ? chunk.toString("utf8") : " " + chunk.toString("utf8"))).join("\r\n");
+}
+
 /**
  * The upcoming cook-prep dates (the homepage's "🍳 Next cooking" cards) as an
  * iCalendar feed. Prep with a known time (see prepHour) gets a 30-min timed
@@ -91,5 +114,5 @@ export function buildIcs(cooks: NextCook[], stamp = new Date()): string {
     );
   }
   lines.push("END:VCALENDAR");
-  return lines.join("\r\n") + "\r\n"; // RFC 5545 requires CRLF
+  return lines.map(foldLine).join("\r\n") + "\r\n"; // RFC 5545 requires CRLF
 }
