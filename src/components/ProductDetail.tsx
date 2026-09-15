@@ -1,6 +1,7 @@
 "use client";
 
 import { PageHeader } from "@/components/PageHeader";
+import { Skeleton } from "@/components/Skeleton";
 import { useCallback, useEffect, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { Favicon } from "@/components/Favicon";
@@ -109,7 +110,20 @@ export function ProductDetail({ id }: { id: string }) {
   if (!product) {
     return (
       <div className="content">
-        {error ? <p className="notice" role="alert">{error}</p> : <p className="loading">Loading…</p>}
+        {error ? (
+          <p className="notice" role="alert">{error}</p>
+        ) : (
+          <div className="stack-sm" aria-busy="true" aria-label="Loading product">
+            <Skeleton height={11} width={70} />
+            <section className="card stack-sm">
+              <Skeleton height={160} radius={8} />
+              <Skeleton height={14} width="45%" />
+              <Skeleton height={14} width="55%" />
+              <Skeleton height={14} width="35%" />
+              <Skeleton height={14} width="50%" />
+            </section>
+          </div>
+        )}
       </div>
     );
   }

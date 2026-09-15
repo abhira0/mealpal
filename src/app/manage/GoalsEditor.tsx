@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Goals } from "@/lib/nutrition";
 import { CalorieMacroRing } from "@/components/CalorieMacroRing";
+import { Skeleton, SkeletonRows } from "@/components/Skeleton";
 
 // Daily calorie/macro goals form for /manage/goals; auto-saves via /api/nutrition/goals.
 export function GoalsEditor() {
@@ -31,7 +32,14 @@ export function GoalsEditor() {
     return () => clearTimeout(t);
   }, [form]);
 
-  if (!form) return <p style={{ opacity: 0.6 }}>Loading…</p>;
+  if (!form) {
+    return (
+      <div className="stack-sm" aria-busy="true" aria-label="Loading goals">
+        <SkeletonRows count={4} height={56} gap={10} />
+        <Skeleton height={180} radius={999} style={{ width: 180, margin: "12px auto 0" }} />
+      </div>
+    );
+  }
 
   // Number inputs let a user type "-" or clear the box entirely; `min` only
   // affects the spinner/native validity, not what the keystroke produces. A

@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { Dropdown } from "@/components/Dropdown";
 import { useToast } from "@/components/ToastProvider";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { SkeletonRows } from "@/components/Skeleton";
 import type { InspectResult } from "@/lib/inspect";
 import type { AgendaMeal, AgendaState } from "@/views/agenda-data";
 import type { DeleteScope } from "@/lib/plan";
@@ -244,7 +245,9 @@ export function PlanInspector({
         <div className="insp-sec insp-full">
           <span className="field-label">Nutrition per day</span>
           {perDay == null ? (
-            <div className="insp-line">Loading…</div>
+            <div aria-busy="true" aria-label="Loading nutrition totals">
+              <SkeletonRows count={4} height={16} gap={6} />
+            </div>
           ) : perDay.length === 0 ? (
             <div className="insp-line">No days to total.</div>
           ) : (

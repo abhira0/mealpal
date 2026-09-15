@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
+import { Skeleton } from "@/components/Skeleton";
 import { Favicon } from "@/components/Favicon";
 import { Sheet } from "@/components/Sheet";
 import { EntityForm } from "@/components/EntityForm";
@@ -59,7 +60,17 @@ export function ShopDetail({ id }: { id: string }) {
   if (!shop) {
     return (
       <div className="content">
-        {error ? <p className="notice" role="alert">{error}</p> : <p className="loading">Loading…</p>}
+        {error ? (
+          <p className="notice" role="alert">{error}</p>
+        ) : (
+          <div className="stack-sm" aria-busy="true" aria-label="Loading shop">
+            <Skeleton height={11} width={70} />
+            <section className="card stack-sm">
+              <Skeleton height={14} width="50%" />
+              <Skeleton height={14} width="35%" />
+            </section>
+          </div>
+        )}
       </div>
     );
   }

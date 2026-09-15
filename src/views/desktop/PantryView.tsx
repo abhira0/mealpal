@@ -5,6 +5,7 @@ import { DeskPage } from "@/components/DeskPage";
 import { formatQty } from "@/lib/units";
 import { PantryDetail } from "@/views/PantryDetail";
 import { usePantryData, type Ingredient } from "@/views/pantry-data";
+import { SkeletonRows } from "@/components/Skeleton";
 
 export function DesktopPantry() {
   const {
@@ -77,7 +78,11 @@ export function DesktopPantry() {
         <div className="md-list stack-sm">
             {error && <p className="notice" role="alert">{error}</p>}
 
-            {ingredients === null && !error && <p className="loading">Loading…</p>}
+            {ingredients === null && !error && (
+              <div aria-busy="true" aria-label="Loading pantry">
+                <SkeletonRows count={5} height={62} />
+              </div>
+            )}
 
             {ingredients && ingredients.length === 0 && (
               <p className="empty">No ingredients yet.</p>

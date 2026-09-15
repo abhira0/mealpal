@@ -7,6 +7,7 @@ import { Bill } from "@/components/Bill";
 import { AddExtra } from "@/components/AddExtra";
 import { centsToDollars } from "@/lib/money";
 import { useShopData } from "@/views/shop-data";
+import { SkeletonRows } from "@/components/Skeleton";
 
 export function DesktopShop() {
   const s = useShopData();
@@ -53,7 +54,11 @@ export function DesktopShop() {
 
             {s.error && <p className="notice" role="alert">{s.error}</p>}
 
-            {s.data === null && !s.error && <p className="loading">Loading…</p>}
+            {s.data === null && !s.error && (
+              <div aria-busy="true" aria-label="Loading shopping list">
+                <SkeletonRows count={3} height={120} gap={16} />
+              </div>
+            )}
 
             {s.data && s.shops.length === 0 && (
               <p className="empty">Nothing to buy — plan some meals first.</p>

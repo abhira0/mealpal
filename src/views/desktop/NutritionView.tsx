@@ -11,6 +11,7 @@ import {
   isoAddDays,
   shortDate,
 } from "@/views/nutrition-shared";
+import { Skeleton } from "@/components/Skeleton";
 
 // Desktop dashboard: no tabs. A shared top bar (Day/Week + date control) drives
 // a single fetch; Overview and Breakdown sit side by side, both reading the same
@@ -49,7 +50,10 @@ export function DesktopNutrition() {
         </div>
 
         {loading || !data ? (
-          <p className="loading">Loading…</p>
+          <div className="dash-grid dash-nutrition" aria-busy="true" aria-label="Loading nutrition">
+            <Skeleton height={280} radius={16} />
+            <Skeleton height={280} radius={16} />
+          </div>
         ) : noMeals ? (
           <p className="empty">No meals planned this week.</p>
         ) : (

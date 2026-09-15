@@ -2,6 +2,7 @@
 
 import { PageHeader } from "@/components/PageHeader";
 import { useCallback, useEffect, useState } from "react";
+import { Skeleton } from "@/components/Skeleton";
 import { Sheet } from "@/components/Sheet";
 import { EntityForm } from "@/components/EntityForm";
 import { EditDeleteActions } from "@/components/EditDeleteActions";
@@ -31,7 +32,16 @@ export function SlotDetail({ id }: { id: string }) {
   if (!slot) {
     return (
       <div className="content">
-        {error ? <p className="notice" role="alert">{error}</p> : <p className="loading">Loading…</p>}
+        {error ? (
+          <p className="notice" role="alert">{error}</p>
+        ) : (
+          <div className="stack-sm" aria-busy="true" aria-label="Loading meal slot">
+            <Skeleton height={11} width={70} />
+            <section className="card stack-sm">
+              <Skeleton height={14} width="40%" />
+            </section>
+          </div>
+        )}
       </div>
     );
   }

@@ -5,6 +5,7 @@ import type { IngredientNutritionRow, Nutrients, Goals, Scorecard } from "@/lib/
 import { FACT_ROWS } from "@/components/NutritionFacts";
 import { EChart } from "@/components/EChart";
 import { CalorieMacroRing, MACRO_COLOR } from "@/components/CalorieMacroRing";
+import { SkeletonRows } from "@/components/Skeleton";
 
 // ---------- Types ----------
 
@@ -116,7 +117,16 @@ function IngredientsTable({ date, mode, eventIds }: { date: string; mode: "day" 
     </div>
   );
 
-  if (loaded?.key !== key) return <>{basisPill}<p className="loading">Loading…</p></>;
+  if (loaded?.key !== key) {
+    return (
+      <>
+        {basisPill}
+        <div aria-busy="true" aria-label="Loading ingredients">
+          <SkeletonRows count={5} height={18} gap={6} />
+        </div>
+      </>
+    );
+  }
   const rows = loaded.rows;
   if (rows.length === 0) return <>{basisPill}<p className="empty">No ingredients {basis === "served" ? "eaten" : "planned"} this {mode === "week" ? "week" : "day"}.</p></>;
 

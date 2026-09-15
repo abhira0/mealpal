@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { Ticket } from "@/components/ShopTicket";
+import { SkeletonRows } from "@/components/Skeleton";
 import { Dropdown } from "@/components/Dropdown";
 import { AddPurchase } from "@/components/AddPurchase";
 import { Favicon } from "@/components/Favicon";
@@ -158,7 +159,11 @@ export function Bill({ onCount, history = false }: { onCount?: (n: number) => vo
   return (
     <>
       {error && <p className="notice" role="alert">{error}</p>}
-      {rows === null && !error && <p className="loading">Loading…</p>}
+      {rows === null && !error && (
+        <div aria-busy="true" aria-label="Loading bill">
+          <SkeletonRows count={4} height={48} />
+        </div>
+      )}
 
       {history && rows !== null && <AddPurchase products={products} shops={shops} onAdded={loadFirst} />}
 
