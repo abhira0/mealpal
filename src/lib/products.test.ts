@@ -67,17 +67,28 @@ describe("products & prices", () => {
     });
     db.insert(schema.purchases).values({ householdId: hid, productId: p.id, quantity: 1, cents: 1299, purchasedAt: new Date("2026-01-01") }).run();
     db.insert(schema.purchases).values({ householdId: hid, productId: p.id, quantity: 1, cents: 1349, purchasedAt: new Date("2026-06-01") }).run();
-    expect(effectivePrice(db, p.id)).toBe(1349);
+    expect(effectivePrice(db, hid, p.id)).toBe(1349);
   });
 
   it("manual override beats latest purchase; null when neither", () => {
     const p = createProduct(db, hid, {
       ingredientId, shopId, name: "Flour", packSize: 1000, priority: 1, url: null,
     });
-    expect(effectivePrice(db, p.id)).toBeNull();
+    expect(effectivePrice(db, hid, p.id)).toBeNull();
     db.insert(schema.purchases).values({ householdId: hid, productId: p.id, quantity: 1, cents: 1349 }).run();
     db.update(schema.products).set({ priceCents: 999 }).where(eq(schema.products.id, p.id)).run();
-    expect(effectivePrice(db, p.id)).toBe(999);
+    expect(effectivePrice(db, hid, p.id)).toBe(999);
+  });
+
+  it("effective price is scoped to a household: a same-id product in another household returns null", () => {
+    const otherHid = seedHousehold(db);
+    const p = createProduct(db, hid, {
+      ingredientId, shopId, name: "Flour", packSize: 1000, priority: 1, url: null,
+    });
+    db.update(schema.products).set({ priceCents: 999 }).where(eq(schema.products.id, p.id)).run();
+    db.insert(schema.purchases).values({ householdId: hid, productId: p.id, quantity: 1, cents: 1349 }).run();
+    expect(effectivePrice(db, otherHid, p.id)).toBeNull();
+    expect(effectivePrice(db, hid, p.id)).toBe(999);
   });
 
   it("lists all household products with effective price and purchase history", () => {

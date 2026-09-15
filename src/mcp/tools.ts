@@ -219,7 +219,7 @@ export function getShopping(db: Db, hid: number, horizonDays = 14) {
       // buying at all) times the product's effective price. null when there's
       // no product on file or no price has ever been recorded for it.
       const packSize = l.product?.packSize ?? null;
-      const price = l.product ? effectivePrice(db, l.product.id) : null;
+      const price = l.product ? effectivePrice(db, hid, l.product.id) : null;
       const estCents = price != null && packSize && packSize > 0
         ? Math.round(Math.max(1, Math.ceil(l.needed / packSize)) * price)
         : null;

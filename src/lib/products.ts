@@ -343,17 +343,23 @@ export function deleteProduct(
  * Effective price in cents for a product: manual override (priceCents) if set,
  * else the most recent purchase's cents, else null. History lives in purchases.
  */
-export function effectivePrice(db: Db, productId: number): number | null {
+export function effectivePrice(db: Db, householdId: number, productId: number): number | null {
   const [product] = db
     .select({ priceCents: schema.products.priceCents })
     .from(schema.products)
-    .where(eq(schema.products.id, productId))
+    .where(and(eq(schema.products.id, productId), eq(schema.products.householdId, householdId)))
     .all();
   if (product?.priceCents != null) return product.priceCents;
   const [purchase] = db
     .select({ cents: schema.purchases.cents })
     .from(schema.purchases)
-    .where(and(eq(schema.purchases.productId, productId), isNotNull(schema.purchases.cents)))
+    .where(
+      and(
+        eq(schema.purchases.productId, productId),
+        eq(schema.purchases.householdId, householdId),
+        isNotNull(schema.purchases.cents),
+      ),
+    )
     .orderBy(desc(schema.purchases.purchasedAt))
     .limit(1)
     .all();
