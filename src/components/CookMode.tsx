@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { parseClip, fmtClip } from "@/lib/clip";
+import { parseStepDuration, resolveSwipe } from "@/lib/cook-mode-helpers";
 import { useFocusTrap } from "@/lib/useFocusTrap";
 import { useConfirm } from "@/components/ConfirmProvider";
 import type { EditableRecipe } from "@/components/RecipeSheet";
@@ -70,6 +71,12 @@ export function CookMode({
   const playerHostRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<YTPlayer | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
+  // Excludes the clip player from swipe detection (see onStepPointerDown) — a
+  // touch that starts on the video is the user scrubbing/using its own controls.
+  const clipRef = useRef<HTMLDivElement | null>(null);
+  const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const [timer, setTimer] = useState<{ remaining: number; running: boolean; done: boolean } | null>(null);
+  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useFocusTrap(overlayRef, true);
 
   useEffect(() => {
@@ -141,13 +148,98 @@ export function CookMode({
     };
   }, [editing, videoId, i, curStart, curEnd]);
 
+  // Clear any running kitchen timer on unmount (per-step reset happens
+  // explicitly wherever `i` changes — see resetTimer below — rather than in
+  // an effect, to avoid a setState-in-effect cascade).
+  useEffect(
+    () => () => {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    },
+    [],
+  );
+
   if (steps.length === 0) return null;
 
   const step = steps[i];
 
+  // Any running/finished kitchen timer belongs to the step that started it —
+  // clear it whenever the current step changes.
+  function resetTimer() {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    setTimer(null);
+  }
+
   function go(next: number) {
     if (editing) save(steps);
-    setI(Math.max(0, Math.min(next, steps.length - 1)));
+    const clamped = Math.max(0, Math.min(next, steps.length - 1));
+    if (clamped !== i) resetTimer();
+    setI(clamped);
+  }
+
+  // Swipe left/right over the step area to change steps. Scoped to this
+  // container (not the whole overlay) so it doesn't fight the clip player's
+  // own touch handling — a pointerdown starting inside the clip (scrubbing
+  // the video) is ignored entirely, and small/vertical drags fall through to
+  // normal scrolling.
+  function onStepPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
+    if (editing) return;
+    if (clipRef.current?.contains(e.target as Node)) return;
+    swipeStartRef.current = { x: e.clientX, y: e.clientY };
+  }
+
+  function onStepPointerUp(e: ReactPointerEvent<HTMLDivElement>) {
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+    if (!start) return;
+    const dir = resolveSwipe(e.clientX - start.x, e.clientY - start.y);
+    if (dir === 1) go(i + 1);
+    else if (dir === -1) go(i - 1);
+  }
+
+  function onStepPointerCancel() {
+    swipeStartRef.current = null;
+  }
+
+  // Synthesizes a short beep via Web Audio — no audio asset/dependency needed.
+  function playBeep() {
+    try {
+      const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = 880;
+      gain.gain.value = 0.2;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.5);
+      osc.onended = () => ctx.close();
+    } catch {
+      /* Web Audio unsupported/blocked — the "Timer done" state still shows visually. */
+    }
+  }
+
+  function startTimer(seconds: number) {
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    setTimer({ remaining: seconds, running: true, done: false });
+    timerIntervalRef.current = setInterval(() => {
+      setTimer((t) => {
+        if (!t) return t;
+        const remaining = t.remaining - 1;
+        if (remaining <= 0) {
+          if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+          timerIntervalRef.current = null;
+          playBeep();
+          return { remaining: 0, running: false, done: true };
+        }
+        return { ...t, remaining };
+      });
+    }, 1000);
   }
 
   function toggleEditing() {
@@ -215,6 +307,10 @@ export function CookMode({
   // overlay for the first few seconds of every clip, no matter the params).
   const clip = hasClip ? `/api/clip/${videoId}/${step.startSeconds}/${step.endSeconds}` : null;
 
+  // Rough duration parsed out of the step text (e.g. "simmer for 10 minutes"),
+  // offered as a one-tap kitchen timer. View mode only — editing shows a textarea.
+  const stepDuration = !editing ? parseStepDuration(step.text) : null;
+
   // Portal to body: on desktop this renders inside the sticky, scrolling
   // .md-pane, which would otherwise clip the fixed overlay to the pane.
   return createPortal(
@@ -243,7 +339,12 @@ export function CookMode({
         </div>
       </div>
 
-      <div className="cook-step">
+      <div
+        className="cook-step"
+        onPointerDown={onStepPointerDown}
+        onPointerUp={onStepPointerUp}
+        onPointerCancel={onStepPointerCancel}
+      >
         <span className="cook-num">Step {i + 1} of {steps.length}</span>
 
         {editing ? (
@@ -297,7 +398,7 @@ export function CookMode({
           <>
             {clip ? (
               <>
-                <div className="cook-clip">
+                <div className="cook-clip" ref={clipRef}>
                   <video key={`${i}-${replay}`} src={clip} autoPlay playsInline controls /></div>
                 <button type="button" className="btn cook-replay" onClick={() => setReplay((n) => n + 1)}>
                   ↻ Replay clip
@@ -305,6 +406,19 @@ export function CookMode({
               </>
             ) : null}
             <p className="cook-text">{step.text}</p>
+            {stepDuration != null ? (
+              timer?.done ? (
+                <span className="btn cook-timer done" role="status">⏰ Timer done</span>
+              ) : timer?.running ? (
+                <span className="btn cook-timer" role="timer" aria-live="polite">
+                  {fmtClip(timer.remaining)}
+                </span>
+              ) : (
+                <button type="button" className="btn cook-timer" onClick={() => startTimer(stepDuration)}>
+                  ⏱ Start timer ({fmtClip(stepDuration)})
+                </button>
+              )
+            ) : null}
           </>
         )}
       </div>
