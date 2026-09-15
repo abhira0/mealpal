@@ -33,6 +33,16 @@ export async function registerHousehold(db: Db, input: RegisterInput) {
     tx.insert(schema.shops)
       .values({ householdId: household.id, name: "Generic" })
       .run();
+    // Without default slots, every planning path (POST /api/events, meal
+    // rules, the plan grid) has nothing to attach to until the user
+    // manually visits Manage > Slots. Seed the usual three.
+    tx.insert(schema.mealSlots)
+      .values([
+        { householdId: household.id, name: "Breakfast", timeOfDay: "08:00" },
+        { householdId: household.id, name: "Lunch", timeOfDay: "12:00" },
+        { householdId: household.id, name: "Dinner", timeOfDay: "18:00" },
+      ])
+      .run();
     const [user] = tx
       .insert(schema.users)
       .values({
