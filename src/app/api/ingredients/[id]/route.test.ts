@@ -33,4 +33,11 @@ describe("PATCH /api/ingredients/[id]", () => {
     });
     expect(res.status).toBe(200);
   });
+
+  it("trims whitespace before checking canonicalUnit", async () => {
+    const res = await PATCH(req({ canonicalUnit: " g " }), {
+      params: Promise.resolve({ id: "1" }),
+    });
+    expect(res.status).toBe(200);
+  });
 });

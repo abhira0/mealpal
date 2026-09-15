@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db, schema } from "@/db";
 import { deleteEvent, getEvent, updateEvent, type DeleteScope, type EventInput } from "@/lib/plan";
-import { DATE_RE } from "@/lib/dates";
+import { validate } from "@/lib/validate";
 
 // Same cross-household guard as POST /api/events — an edit can reassign the
 // event's slot/recipe, so a foreign id could otherwise be smuggled in here too.
@@ -32,24 +32,23 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const b = (await req.json().catch(() => null)) as Partial<EventInput> | null;
-  if (!b || !b.date || typeof b.slotId !== "number") {
-    return NextResponse.json({ error: "date, slotId required" }, { status: 400 });
-  }
-  if (typeof b.date !== "string" || !DATE_RE.test(b.date)) {
-    return NextResponse.json({ error: "date=YYYY-MM-DD required" }, { status: 400 });
-  }
-  if (!ownsSlot(session.user.householdId, b.slotId)) {
+  const parsed = validate(b, {
+    date: { type: "date", required: true },
+    slotId: { type: "number", required: true, integer: true, min: 1 },
+  });
+  if (parsed instanceof Response) return parsed;
+  if (!ownsSlot(session.user.householdId, parsed.slotId)) {
     return NextResponse.json({ error: "slot not found" }, { status: 404 });
   }
-  if (b.recipeId != null && !ownsRecipe(session.user.householdId, b.recipeId)) {
+  if (b?.recipeId != null && !ownsRecipe(session.user.householdId, b.recipeId)) {
     return NextResponse.json({ error: "recipe not found" }, { status: 404 });
   }
   const rawScope = new URL(req.url).searchParams.get("scope");
   const scope: DeleteScope = rawScope === "following" || rawScope === "all" ? rawScope : "one";
   const row = updateEvent(db, session.user.householdId, Number(id), {
-    date: b.date, slotId: b.slotId, servings: b.servings ?? 1,
-    recipeId: b.recipeId ?? null, ingredientId: b.ingredientId ?? null,
-    productId: b.productId ?? null, variantId: b.variantId ?? null, amount: b.amount ?? null,
+    date: parsed.date, slotId: parsed.slotId, servings: b?.servings ?? 1,
+    recipeId: b?.recipeId ?? null, ingredientId: b?.ingredientId ?? null,
+    productId: b?.productId ?? null, variantId: b?.variantId ?? null, amount: b?.amount ?? null,
   }, scope);
   if (!row) return NextResponse.json({ error: "only planned meals can be edited" }, { status: 409 });
   return NextResponse.json(row);
