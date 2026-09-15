@@ -250,7 +250,7 @@ export function RecipeSheet({
               {photo ? (
                 <div className="media" style={{ marginBottom: 8 }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={photo} alt="" loading="lazy" />
+                  <img src={photo} alt="" loading="lazy" decoding="async" />
                 </div>
               ) : null}
               <div className="stack-sm" style={{ flexDirection: "row", gap: 8 }}>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { StockAdjust } from "@/components/StockAdjust";
+import { ProductImage } from "@/components/ProductImage";
 import { EditableValue, mmdd } from "@/components/Bill";
 import { Dropdown } from "@/components/Dropdown";
 import { formatQty } from "@/lib/units";
@@ -95,7 +96,9 @@ export function PantryDetail({
           const productLots = lots[String(p.id)] ?? [];
           return (
             <div key={p.id} className="pantry-prod">
-              {p.imageUrl && <img src={p.imageUrl} alt={p.name} loading="lazy" className="pantry-prod-img" />}
+              {p.imageUrl && (
+                <ProductImage src={p.imageUrl} alt={p.name} width={64} height={64} className="pantry-prod-img" />
+              )}
               <div className="pantry-prod-info">
                 <span className="body" style={{ color: "var(--sage)" }}>{p.name}</span>
                 <div className="pantry-lots">

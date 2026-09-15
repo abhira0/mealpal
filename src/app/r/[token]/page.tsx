@@ -54,7 +54,7 @@ export default async function PublicRecipePage({ params }: { params: Promise<{ t
           return <video key={i} className="media" src={m.url} controls />;
         }
         // eslint-disable-next-line @next/next/no-img-element
-        return <img key={i} className="media" src={m.url} alt={recipe.name} loading="lazy" />;
+        return <img key={i} className="media" src={m.url} alt={recipe.name} loading="lazy" decoding="async" />;
       })}
 
       <section>
