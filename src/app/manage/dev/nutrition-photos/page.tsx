@@ -3,6 +3,7 @@
 import { PageHeader } from "@/components/PageHeader";
 import { useEffect, useState } from "react";
 import { NutritionPhoto } from "@/components/NutritionPhoto";
+import { SkeletonRows } from "@/components/Skeleton";
 
 type Product = {
   id: number;
@@ -61,7 +62,9 @@ export default function NutritionPhotosPage() {
         />
 
         {!shown ? (
-          <p style={{ opacity: 0.6 }}>Loading…</p>
+          <div aria-busy="true" aria-label="Loading products">
+            <SkeletonRows count={4} height={140} gap={12} />
+          </div>
         ) : shown.length === 0 ? (
           <p style={{ opacity: 0.6 }}>No products yet.</p>
         ) : (

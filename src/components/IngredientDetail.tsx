@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { Skeleton, SkeletonRows } from "@/components/Skeleton";
 import {
   DndContext,
   PointerSensor,
@@ -159,7 +160,18 @@ export function IngredientDetail({ id }: { id: string }) {
   if (!detail) {
     return (
       <div className="content">
-        {error ? <p className="notice" role="alert">{error}</p> : <p className="loading">Loading…</p>}
+        {error ? (
+          <p className="notice" role="alert">{error}</p>
+        ) : (
+          <div className="stack-sm" aria-busy="true" aria-label="Loading ingredient">
+            <Skeleton height={11} width={70} />
+            <section className="card stack-sm">
+              <Skeleton height={14} width="40%" />
+            </section>
+            <Skeleton height={11} width={100} />
+            <SkeletonRows count={3} height={48} />
+          </div>
+        )}
       </div>
     );
   }

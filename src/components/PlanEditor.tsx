@@ -6,6 +6,7 @@ import { Dropdown } from "@/components/Dropdown";
 import { Stepper } from "@/components/Stepper";
 import { Sheet } from "@/components/Sheet";
 import { MealCard } from "@/components/MealCard";
+import { Skeleton } from "@/components/Skeleton";
 
 type Slot = { id: number; name: string; timeOfDay: string };
 type Recipe = { id: number; name: string; baseServings: number };
@@ -473,7 +474,15 @@ export function PlanEditor({ userName }: { userName?: string | null }) {
 
         <div style={{ marginTop: 22 }}>
           {loading ? (
-            <p className="loading">Loading…</p>
+            <div className="timeline" aria-busy="true" aria-label="Loading meal plan">
+              {Array.from({ length: 3 }, (_, i) => (
+                <div key={i} className="seg">
+                  <span className="node" aria-hidden="true" />
+                  <Skeleton height={10} width={80} style={{ marginBottom: 8 }} />
+                  <Skeleton height={72} />
+                </div>
+              ))}
+            </div>
           ) : slots.length === 0 ? (
             <p className="body">No meal slots yet. Add some in Manage.</p>
           ) : (

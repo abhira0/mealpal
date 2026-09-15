@@ -8,6 +8,7 @@ import { RecipeSheet } from "@/components/RecipeSheet";
 import { CookMode } from "@/components/CookMode";
 import { EditDeleteActions } from "@/components/EditDeleteActions";
 import { NutritionFacts, type FactValues, FACT_ROWS } from "@/components/NutritionFacts";
+import { Skeleton, SkeletonRows } from "@/components/Skeleton";
 
 type Media = { kind: string; url: string };
 type RecipeIngredient = { ingredientId: number; amount: number };
@@ -121,7 +122,13 @@ export function RecipeView({ id }: { id: string }) {
 
   if (!recipe) {
     return (
-      <Chrome title="Loading…" />
+      <>
+        <Chrome title={<Skeleton height={22} width={160} />} />
+        <div className="content stack" aria-busy="true" aria-label="Loading recipe">
+          <Skeleton radius={16} style={{ aspectRatio: "16/9", height: "auto" }} />
+          <SkeletonRows count={4} height={20} gap={10} />
+        </div>
+      </>
     );
   }
 

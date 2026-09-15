@@ -10,6 +10,7 @@ import {
   isoAddDays,
   shortDate,
 } from "@/views/nutrition-shared";
+import { Skeleton } from "@/components/Skeleton";
 
 export function MobileNutrition() {
   const [tab, setTab] = useState<"overview" | "breakdown">("overview");
@@ -53,7 +54,9 @@ export function MobileNutrition() {
         )}
 
         {loading || !data ? (
-          <p className="loading">Loading…</p>
+          <div aria-busy="true" aria-label="Loading nutrition">
+            <Skeleton height={280} radius={16} />
+          </div>
         ) : noMeals ? (
           <p className="empty">No meals planned this week.</p>
         ) : tab === "overview" ? (
