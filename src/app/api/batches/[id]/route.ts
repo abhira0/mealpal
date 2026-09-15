@@ -23,17 +23,21 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!b || typeof b.slotId !== "number" || !b.label?.trim() || typeof b.mealsTotal !== "number" || b.mealsTotal < 1) {
     return NextResponse.json({ error: "slotId, label, mealsTotal required" }, { status: 400 });
   }
-  const batch = db.transaction(() => {
-    const ok = unpackBatch(db, session.user.householdId, Number(id));
-    if (!ok) return null;
-    return packBatch(db, session.user.householdId, {
-      slotId: b.slotId!, label: b.label!.trim(),
-      cookedDate: b.cookedDate ?? todayISO(),
-      mealsTotal: b.mealsTotal!, items: Array.isArray(b.items) ? b.items : [],
+  try {
+    const batch = db.transaction(() => {
+      const ok = unpackBatch(db, session.user.householdId, Number(id));
+      if (!ok) return null;
+      return packBatch(db, session.user.householdId, {
+        slotId: b.slotId!, label: b.label!.trim(),
+        cookedDate: b.cookedDate ?? todayISO(),
+        mealsTotal: b.mealsTotal!, items: Array.isArray(b.items) ? b.items : [],
+      });
     });
-  });
-  if (!batch) return NextResponse.json({ error: "not found" }, { status: 404 });
-  return NextResponse.json(batch);
+    if (!batch) return NextResponse.json({ error: "not found" }, { status: 404 });
+    return NextResponse.json(batch);
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "invalid batch" }, { status: 400 });
+  }
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {

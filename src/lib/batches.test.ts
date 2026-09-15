@@ -89,6 +89,39 @@ describe("packBatch", () => {
   });
 });
 
+describe("packBatch ownership guard", () => {
+  it("rejects a slotId or item id from another household, writing nothing", () => {
+    const otherHid = seedHousehold(db);
+    const otherSlot = db.insert(schema.mealSlots).values({ householdId: otherHid, name: "Dinner", timeOfDay: "18:00" }).returning().all()[0].id;
+    const otherVeg = db.insert(schema.ingredients).values({ householdId: otherHid, name: "Other Veg", canonicalUnit: "g" }).returning().all()[0].id;
+    const otherShop = db.insert(schema.shops).values({ householdId: otherHid, name: "Other Shop" }).returning().all()[0].id;
+    const otherProd = createProduct(db, otherHid, { ingredientId: otherVeg, shopId: otherShop, name: "Foreign Veg", packSize: 100, priority: 1, url: null }).id;
+    const otherRecipe = createRecipe(db, otherHid, {
+      name: "Foreign Cake", baseServings: 1, notes: null, ingredients: [], steps: [], media: [],
+    }).id;
+
+    expect(() => packBatch(db, hid, {
+      slotId: otherSlot, label: "Bad", cookedDate: "2026-08-09", mealsTotal: 1, items: [],
+    })).toThrow(/slot not found/);
+
+    expect(() => packBatch(db, hid, {
+      slotId, label: "Bad", cookedDate: "2026-08-09", mealsTotal: 1, items: [{ productId: otherProd, amount: 1 }],
+    })).toThrow(/product not found/);
+
+    expect(() => packBatch(db, hid, {
+      slotId, label: "Bad", cookedDate: "2026-08-09", mealsTotal: 1, items: [{ recipeId: otherRecipe, amount: 1 }],
+    })).toThrow(/recipe not found/);
+
+    expect(() => packBatch(db, hid, {
+      slotId, label: "Bad", cookedDate: "2026-08-09", mealsTotal: 1, items: [{ ingredientId: otherVeg, amount: 1 }],
+    })).toThrow(/ingredient not found/);
+
+    // nothing was written by any of the rejected attempts
+    expect(db.select().from(schema.batches).all()).toHaveLength(0);
+    expect(db.select().from(schema.batchItems).all()).toHaveLength(0);
+  });
+});
+
 describe("listBatches / getBatch", () => {
   it("lists active batches (remaining > 0) and reads one with items", () => {
     const b = packBatch(db, hid, { slotId, label: "Dinner", cookedDate: "2026-08-09", mealsTotal: 3, items: [] });
