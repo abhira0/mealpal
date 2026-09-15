@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { getBatch, packBatch, unpackBatch, type PackBatchInput } from "@/lib/batches";
+import { getBatch, packBatch, unpackBatch } from "@/lib/batches";
 import { todayISO } from "@/lib/dates";
+import { validate } from "@/lib/validate";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -19,18 +20,24 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
-  const b = (await req.json().catch(() => null)) as Partial<PackBatchInput> | null;
-  if (!b || typeof b.slotId !== "number" || !b.label?.trim() || typeof b.mealsTotal !== "number" || b.mealsTotal < 1) {
-    return NextResponse.json({ error: "slotId, label, mealsTotal required" }, { status: 400 });
-  }
+  const b = await req.json().catch(() => null);
+  const parsed = validate(b, {
+    slotId: { type: "number", required: true, integer: true, min: 1 },
+    label: { type: "string", required: true, trim: true },
+    mealsTotal: { type: "number", required: true, min: 1 },
+    // previously unchecked — a malformed cookedDate would silently corrupt the
+    // batch's shelf-life/history ordering, same risk DATE_RE guards elsewhere.
+    cookedDate: { type: "date" },
+  });
+  if (parsed instanceof Response) return parsed;
   try {
     const batch = db.transaction(() => {
       const ok = unpackBatch(db, session.user.householdId, Number(id));
       if (!ok) return null;
       return packBatch(db, session.user.householdId, {
-        slotId: b.slotId!, label: b.label!.trim(),
-        cookedDate: b.cookedDate ?? todayISO(),
-        mealsTotal: b.mealsTotal!, items: Array.isArray(b.items) ? b.items : [],
+        slotId: parsed.slotId, label: parsed.label,
+        cookedDate: parsed.cookedDate ?? todayISO(),
+        mealsTotal: parsed.mealsTotal, items: Array.isArray(b?.items) ? b.items : [],
       });
     });
     if (!batch) return NextResponse.json({ error: "not found" }, { status: 404 });

@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { updatePurchase, deletePurchase } from "@/lib/shopping";
 import { dollarsToCents } from "@/lib/money";
 import { DATE_RE, localNoon, todayISO } from "@/lib/dates";
+import { validate } from "@/lib/validate";
 
 // Fill in / correct a purchase: price, expiry, quantity, purchase date. Household-scoped.
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -12,13 +13,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const b = await req.json().catch(() => null);
 
+  // productId/quantity/purchasedAt are plain "value or absent" fields, so they
+  // fit validate() directly. shopId/cents/dollars/expiresAt below all support
+  // an explicit null to clear an override — validate() treats null the same
+  // as absent, so those stay hand-rolled to keep the clear-to-null behavior.
+  const parsed = validate(b, {
+    productId: { type: "number", integer: true, min: 1 },
+    quantity: { type: "number", integer: true, min: 1 },
+    purchasedAt: { type: "date" },
+  });
+  if (parsed instanceof Response) return parsed;
+
   const patch: { cents?: number | null; expiresAt?: string | null; quantity?: number; productId?: number; shopId?: number | null; purchasedAt?: Date } = {};
 
-  if (b?.productId !== undefined) {
-    const p = Number(b.productId);
-    if (!Number.isInteger(p) || p < 1) return NextResponse.json({ error: "invalid productId" }, { status: 400 });
-    patch.productId = p;
-  }
+  if (parsed.productId !== undefined) patch.productId = parsed.productId;
 
   // null clears the override (fall back to the product's shop); a positive int overrides it.
   if (b?.shopId !== undefined) {
@@ -43,20 +51,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (b?.expiresAt !== undefined)
     patch.expiresAt = typeof b.expiresAt === "string" && DATE_RE.test(b.expiresAt) ? b.expiresAt : null;
 
-  if (b?.quantity !== undefined) {
-    const q = Number(b.quantity);
-    if (!Number.isInteger(q) || q < 1) return NextResponse.json({ error: "quantity must be a positive integer" }, { status: 400 });
-    patch.quantity = q;
-  }
+  if (parsed.quantity !== undefined) patch.quantity = parsed.quantity;
 
-  if (b?.purchasedAt !== undefined) {
+  if (parsed.purchasedAt !== undefined) {
     // date-only YYYY-MM-DD; reject anything malformed or in the future (a
     // typo'd year would skew learned shelf life and history ordering).
-    if (typeof b.purchasedAt !== "string" || !DATE_RE.test(b.purchasedAt))
-      return NextResponse.json({ error: "invalid purchasedAt" }, { status: 400 });
-    if (b.purchasedAt > todayISO())
+    if (parsed.purchasedAt > todayISO())
       return NextResponse.json({ error: "purchasedAt can't be in the future" }, { status: 400 });
-    patch.purchasedAt = localNoon(b.purchasedAt);
+    patch.purchasedAt = localNoon(parsed.purchasedAt);
   }
 
   // updatePurchase throws when a swapped productId doesn't resolve in this

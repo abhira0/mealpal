@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { deleteIngredient, ingredientDetail, updateIngredient } from "@/lib/ingredients";
-import { CANONICAL_UNITS, isCanonicalUnit } from "@/lib/units";
+import { CANONICAL_UNITS } from "@/lib/units";
+import { validate } from "@/lib/validate";
 
 export async function GET(
   _req: Request,
@@ -24,17 +25,16 @@ export async function PATCH(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const body = await req.json().catch(() => null);
-  if (body?.canonicalUnit !== undefined && !isCanonicalUnit(String(body.canonicalUnit).trim())) {
-    return NextResponse.json(
-      { error: `canonicalUnit must be one of ${CANONICAL_UNITS.join("/")}.` },
-      { status: 400 },
-    );
-  }
+  // Trim before validating so " g " still matches the enum, same as the old
+  // isCanonicalUnit(String(...).trim()) check.
+  if (body && typeof body.canonicalUnit === "string") body.canonicalUnit = body.canonicalUnit.trim();
+  const parsed = validate(body, {
+    canonicalUnit: { type: "enum", values: CANONICAL_UNITS },
+  });
+  if (parsed instanceof Response) return parsed;
   const row = updateIngredient(db, session.user.householdId, Number(id), {
     ...(body?.name !== undefined ? { name: String(body.name).trim() } : {}),
-    ...(body?.canonicalUnit !== undefined
-      ? { canonicalUnit: String(body.canonicalUnit).trim() }
-      : {}),
+    ...(parsed.canonicalUnit !== undefined ? { canonicalUnit: parsed.canonicalUnit } : {}),
   });
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(row);
