@@ -21,7 +21,16 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#EEF1F4",
+  // manifest.webmanifest's theme_color can't do media queries, so it stays
+  // light (#EEF1F4) as a static fallback for contexts that only read the
+  // manifest. Next's Viewport API supports a themeColor *array*, which it
+  // renders as two `<meta name="theme-color" media="...">` tags — the PWA
+  // status bar / task-switcher chrome follows the OS scheme via those,
+  // same as globals.css's `@media (prefers-color-scheme: dark)` block.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#EEF1F4" },
+    { media: "(prefers-color-scheme: dark)", color: "#15181B" },
+  ],
   width: "device-width",
   initialScale: 1,
 };

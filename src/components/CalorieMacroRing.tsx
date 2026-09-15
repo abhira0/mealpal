@@ -1,10 +1,12 @@
 "use client";
 
 import type { Nutrients } from "@/lib/nutrition";
-import { EChart } from "@/components/EChart";
+import { EChart, useThemeVars } from "@/components/EChart";
 
-// Chart-only macro hues (DESIGN.md): protein = accent teal, carbs, fat.
-export const MACRO_COLOR = { protein: "#1E7A8C", carbs: "#E0A63A", fat: "#E0684A" };
+// Chart-only macro hues (DESIGN.md): protein = accent teal, carbs, fat. These are
+// CSS custom properties (globals.css) so dark mode re-colors them with no
+// component change — DOM consumers (MacroBar) can use var() directly.
+export const MACRO_COLOR = { protein: "var(--accent)", carbs: "var(--macro-carbs)", fat: "var(--macro-fat)" };
 
 const pctOf = (value: number, goal: number | null) =>
   goal && goal > 0 ? Math.round((value / goal) * 100) : null;
@@ -17,6 +19,13 @@ export function CalorieMacroRing({ cal, macros, goal, n }: {
   goal: number;
   n: Pick<Nutrients, "carbsG" | "fatG" | "proteinG">;
 }) {
+  const theme = useThemeVars({
+    protein: ["--accent", "#1E7A8C"],
+    carbs: ["--macro-carbs", "#E0A63A"],
+    fat: ["--macro-fat", "#E0684A"],
+    ink: ["--ink", "#16191C"],
+    track: ["--surface-3", "#DADFE4"],
+  });
   if (macros.carbs + macros.fat + macros.protein === 0)
     return <p style={{ opacity: 0.6, textAlign: "center", margin: 0 }}>No calories logged.</p>;
   const r = (x: number) => Math.round(x);
@@ -31,7 +40,7 @@ export function CalorieMacroRing({ cal, macros, goal, n }: {
     animation: !reduceMotion,
     tooltip: { trigger: "item", formatter: tip },
     legend: {
-      bottom: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 11 },
+      bottom: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 11, color: theme.ink },
       data: ["Carbs", "Fat", "Protein"],
     },
     series: [
@@ -40,20 +49,20 @@ export function CalorieMacroRing({ cal, macros, goal, n }: {
         avoidLabelOverlap: false, label: { show: false }, labelLine: { show: false },
         emphasis: { scaleSize: 6, itemStyle: { shadowBlur: 6, shadowColor: "rgba(0,0,0,0.2)" } },
         data: [
-          { value: r(macros.carbs), name: "Carbs", grams: r(n.carbsG), itemStyle: { color: MACRO_COLOR.carbs } },
-          { value: r(macros.fat), name: "Fat", grams: r(n.fatG), itemStyle: { color: MACRO_COLOR.fat } },
-          { value: r(macros.protein), name: "Protein", grams: r(n.proteinG), itemStyle: { color: MACRO_COLOR.protein } },
+          { value: r(macros.carbs), name: "Carbs", grams: r(n.carbsG), itemStyle: { color: theme.carbs } },
+          { value: r(macros.fat), name: "Fat", grams: r(n.fatG), itemStyle: { color: theme.fat } },
+          { value: r(macros.protein), name: "Protein", grams: r(n.proteinG), itemStyle: { color: theme.protein } },
         ],
       },
       {
         type: "gauge", radius: "80%", center: ["50%", "46%"], startAngle: 90, endAngle: -270,
         min: 0, max: goal || 1, silent: false,
-        progress: { show: true, width: 8, roundCap: true, itemStyle: { color: MACRO_COLOR.protein } },
-        axisLine: { lineStyle: { width: 8, color: [[1, "#DADFE4"]] } },
+        progress: { show: true, width: 8, roundCap: true, itemStyle: { color: theme.protein } },
+        axisLine: { lineStyle: { width: 8, color: [[1, theme.track]] } },
         pointer: { show: false }, axisTick: { show: false }, splitLine: { show: false }, axisLabel: { show: false },
         anchor: { show: false },
         detail: {
-          offsetCenter: [0, "-4%"], fontSize: 24, fontWeight: 700, color: "#16191C",
+          offsetCenter: [0, "-4%"], fontSize: 24, fontWeight: 700, color: theme.ink,
           formatter: (v: number) => String(Math.round(v)),
         },
         title: { show: false },

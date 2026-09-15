@@ -7,10 +7,17 @@
   /* two-color theme: teal primary + coral secondary */
   --accent:#1E7A8C; --accent-press:#185F6E; --accent-ink:#175766; --accent-weak:#E1EDF0;
   --accent-2:#E8674F; --accent-2-ink:#BE4732; --accent-2-weak:#FCEAE6;
+  /* dedicated solid-fill token for the one white-on-red button (.btn.danger); kept
+     separate from --danger (used as *text*) because dark mode needs opposite
+     lightness for each role — see the dark block below. */
+  --danger-solid:#C41F1F; --danger-solid-press:#c02424;
   /* semantic, used sparingly — inks darkened to clear 4.5:1 on their weak tints */
   --danger:#C41F1F; --danger-weak:#FCECEC; --danger-line:#F3C9C9;
   --warn:#8A5200; --warn-weak:#FBF1DC; --warn-line:#EED9AE;
   --ok:#256B3E; --ok-weak:#E8F3EB; --ok-line:#CDE6D4;
+  /* macro chart hues — read back into JS via getComputedStyle for the (canvas,
+     can't use var()) EChart macro ring; DOM consumers (MacroBar) use var() directly */
+  --macro-carbs:#E0A63A; --macro-fat:#E0684A;
   /* radii + elevation */
   --r1:6px; --r2:8px; --r3:12px;
   --shadow-sm:0 1px 2px rgba(20,22,28,.05); --shadow-md:0 4px 14px rgba(20,22,28,.08);
@@ -198,8 +205,8 @@ button.insp-day:hover{border-color:var(--accent);color:var(--ink)}
 .btn-secondary.danger:hover{background:var(--danger-weak)}
 .btn.secondary{background:var(--surface);color:var(--ink);border-color:var(--line)}
 .btn.secondary:hover{background:var(--surface-2)}
-.btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
-.btn.danger:hover{background:#c02424;border-color:#c02424}
+.btn.danger{background:var(--danger-solid);border-color:var(--danger-solid);color:#fff}
+.btn.danger:hover{background:var(--danger-solid-press);border-color:var(--danger-solid-press)}
 .btn-link{font-family:var(--sans);font-weight:600;font-size:14px;color:var(--accent-ink);background:none;border:none;cursor:pointer;padding:8px 0;min-height:44px;display:inline-flex;align-items:center;gap:4px}
 .btn-link:hover{color:var(--accent-press)}
 .btn-add{font-family:var(--sans);font-weight:600;font-size:14px;color:var(--accent-ink);background:none;border:none;cursor:pointer;padding:8px 0;min-height:44px;text-align:left}
@@ -601,6 +608,49 @@ button.row-link{background:none;border:none;width:100%;text-align:left;cursor:po
 
 /* ---------- offline banner ---------- */
 .offline-banner{position:sticky;top:0;z-index:70;background:var(--warn-weak);color:var(--warn);border-bottom:1px solid var(--warn-line);font-size:13px;font-weight:600;text-align:center;padding:8px 12px}
+
+/* ---------- dark mode (system-driven only, no toggle) ----------
+   Re-declares the same custom properties with genuinely dark-appropriate values
+   (not a naive invert — see mealpal-iky). Every pair below was checked against
+   WCAG relative-luminance contrast: 4.5:1 for text, 3:1 for large text / UI
+   borders / non-text graphics (chart slices, status dots, focus rings).
+   Computed ratios (bg #15181B, surface #1E2226, surface-2 #262B30 unless noted):
+     --ink        on bg/surface        15.46 / 13.89
+     --ink-2      on bg/surface         9.87 / 8.87
+     --ink-3      on bg/surface/surf-2  6.65 / 5.97 / 5.33
+     --accent-ink on bg/accent-weak    10.57 / 9.31
+     --accent (button fill) + white text                4.98
+     --accent-2 (dot) on surface                          4.94
+     --line       on surface (UI border, needs 3:1)        3.01
+     --danger (text) on bg/surface      6.06 / 5.44
+     --danger-solid (button fill) + white text             5.92
+     --danger-line on danger-weak (chip border, needs 3:1)  3.11
+     --warn (text) on warn-weak                            8.60
+     --warn-line on warn-weak                               3.49
+     --ok (text) on ok-weak                                9.02
+     --ok-line on ok-weak                                   3.55
+     --macro-carbs on surface/surface-3                    8.89 / 6.99
+     --macro-fat   on surface/surface-3                    6.52 / 5.13
+   accent-press is a *hover-only* transient state; its white-on-fill ratio
+   (~3.3:1) is the one intentionally-accepted trade-off — see mealpal-iky notes. */
+@media (prefers-color-scheme: dark){
+  :root{
+    color-scheme:dark;
+    --bg:#15181B; --surface:#1E2226; --surface-2:#262B30; --surface-3:#2E343A;
+    --ink:#EDEFF1; --ink-2:#B9C2CA; --ink-3:#93A0A8;
+    --line:#666C72; --line-soft:#2A2F35;
+    --accent:#1E7A8C; --accent-press:#329BAF; --accent-ink:#6FD6E8; --accent-weak:#12262B;
+    --accent-2:#E8674F; --accent-2-ink:#FFA98F; --accent-2-weak:#2E1710;
+    --danger-solid:#B23A33; --danger-solid-press:#8f2e28;
+    --danger:#FF6259; --danger-weak:#3A1414; --danger-line:#AE4F47;
+    --warn:#F0C36B; --warn-weak:#332A10; --warn-line:#987A35;
+    --ok:#7FD9A0; --ok-weak:#0F2A1B; --ok-line:#4E8560;
+    --macro-carbs:#F0B84D; --macro-fat:#F08A6C;
+    --shadow-sm:0 1px 2px rgba(0,0,0,.4); --shadow-md:0 4px 14px rgba(0,0,0,.45);
+    --shadow-pop:0 16px 40px rgba(0,0,0,.55);
+    --focus:0 0 0 3px rgba(111,214,232,.40);
+  }
+}
 
 /* ---------- route view transitions (App Router <ViewTransition>) ---------- */
 /* Restrained crossfade on client navigation; the bottom-nav/sidebar stays put

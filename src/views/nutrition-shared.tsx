@@ -3,7 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { IngredientNutritionRow, Nutrients, Goals, Scorecard } from "@/lib/nutrition";
 import { FACT_ROWS } from "@/components/NutritionFacts";
-import { EChart } from "@/components/EChart";
+import { EChart, useThemeVars } from "@/components/EChart";
 import { CalorieMacroRing, MACRO_COLOR } from "@/components/CalorieMacroRing";
 import { SkeletonRows } from "@/components/Skeleton";
 
@@ -445,6 +445,15 @@ function GroupedNutrientTable({ n, goals, meals, basis, groupBy, onGroupClick }:
 
 export function WeekTrend({ perDay }: { perDay: NonNullable<AnalysisData["perDay"]> }) {
   const days = perDay.map((d) => shortDate(d.date));
+  // EChart draws to <canvas>, so it can't resolve MACRO_COLOR's var(...) strings —
+  // read the resolved custom-property values instead (follows dark mode automatically).
+  const theme = useThemeVars({
+    carbs: ["--macro-carbs", "#E0A63A"],
+    protein: ["--accent", "#1E7A8C"],
+    fat: ["--macro-fat", "#E0684A"],
+    ink: ["--ink", "#16191C"],
+    ink3: ["--ink-3", "#656E78"],
+  });
   // % of each day's calories from a macro (100%-stacked, like MyFitnessPal's week view).
   const pct = (d: { total: Nutrients }, key: keyof Nutrients, factor: number) => {
     const cal = 4 * d.total.carbsG + 9 * d.total.fatG + 4 * d.total.proteinG;
@@ -456,14 +465,14 @@ export function WeekTrend({ perDay }: { perDay: NonNullable<AnalysisData["perDay
   });
   const option = {
     grid: { left: 32, right: 8, top: 28, bottom: 20 },
-    legend: { top: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 10 } },
+    legend: { top: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 10, color: theme.ink } },
     tooltip: { trigger: "axis", valueFormatter: (v: number) => `${v}%` },
-    xAxis: { type: "category", data: days, axisLabel: { fontSize: 9 } },
-    yAxis: { type: "value", max: 100, axisLabel: { fontSize: 9, formatter: "{value}%" } },
+    xAxis: { type: "category", data: days, axisLabel: { fontSize: 9, color: theme.ink3 } },
+    yAxis: { type: "value", max: 100, axisLabel: { fontSize: 9, formatter: "{value}%", color: theme.ink3 } },
     series: [
-      series("carbsG", 4, "Carbs", MACRO_COLOR.carbs),
-      series("proteinG", 4, "Protein", MACRO_COLOR.protein),
-      series("fatG", 9, "Fat", MACRO_COLOR.fat),
+      series("carbsG", 4, "Carbs", theme.carbs),
+      series("proteinG", 4, "Protein", theme.protein),
+      series("fatG", 9, "Fat", theme.fat),
     ],
   };
   return (
