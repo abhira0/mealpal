@@ -37,6 +37,11 @@ describe("consumption", () => {
     expect(consumptionForRecipe(recipe, 4)).toEqual([{ ingredientId: flourId, amount: 1000 }]);
   });
 
+  it("does not round small amounts up when scaling down (mealpal-7l9)", () => {
+    const recipe = { baseServings: 2, ingredients: [{ ingredientId: flourId, amount: 1 }] };
+    expect(consumptionForRecipe(recipe, 1)).toEqual([{ ingredientId: flourId, amount: 0.5 }]);
+  });
+
   it("recording a cooked meal subtracts scaled amounts from stock", () => {
     const r = createRecipe(db, hid, {
       name: "Bread", baseServings: 2, notes: null,

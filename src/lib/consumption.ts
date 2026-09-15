@@ -183,7 +183,7 @@ export function consumptionForRecipe(
   const factor = servings / recipe.baseServings;
   return recipe.ingredients.map((i) => ({
     ingredientId: i.ingredientId,
-    amount: Math.round(i.amount * factor),
+    amount: i.amount * factor,
   }));
 }
 
