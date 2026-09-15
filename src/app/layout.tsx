@@ -6,6 +6,8 @@ import { CommandPalette } from "@/components/CommandPalette";
 import { ToastProvider } from "@/components/ToastProvider";
 import { ConfirmProvider } from "@/components/ConfirmProvider";
 import { DesktopShortcuts } from "@/components/DesktopShortcuts";
+import { OfflineBanner } from "@/components/OfflineBanner";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 
 export const metadata: Metadata = {
   title: "Platr",
@@ -45,6 +47,7 @@ export default function RootLayout({
           "Next cooking" and agenda rows as clean white cards; primary action a single indigo button.
         FORM: Category-standard productivity UI (canon, user-chosen craft bar: Linear).
         FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md. */}
+        <OfflineBanner />
         <ToastProvider>
           <ConfirmProvider>
             <div className="app">
@@ -55,6 +58,7 @@ export default function RootLayout({
             <DesktopShortcuts />
           </ConfirmProvider>
         </ToastProvider>
+        <ServiceWorkerRegister />
       </body>
     </html>
   );
