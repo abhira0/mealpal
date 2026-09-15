@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { deleteSlot, updateSlot } from "@/lib/slots";
+import { deleteSlot, isValidTimeOfDay, updateSlot } from "@/lib/slots";
 
 export async function PATCH(
   req: Request,
@@ -13,9 +13,13 @@ export async function PATCH(
   const body = await req.json().catch(() => null);
   const name = body?.name?.trim();
   if (!name) return NextResponse.json({ error: "name is required." }, { status: 400 });
+  const timeOfDay = body?.timeOfDay !== undefined ? String(body.timeOfDay) : undefined;
+  if (timeOfDay && !isValidTimeOfDay(timeOfDay)) {
+    return NextResponse.json({ error: "timeOfDay must be in HH:MM (24h) format" }, { status: 400 });
+  }
   const row = updateSlot(db, session.user.householdId, Number(id), {
     name,
-    ...(body?.timeOfDay !== undefined ? { timeOfDay: String(body.timeOfDay) || "12:00" } : {}),
+    ...(timeOfDay !== undefined ? { timeOfDay: timeOfDay || "12:00" } : {}),
   });
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(row);
