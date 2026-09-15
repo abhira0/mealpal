@@ -1,4 +1,4 @@
-import { and, eq, gte } from "drizzle-orm";
+import { and, eq, gte, inArray } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
 import { assertOwnedRefs } from "@/lib/ownership";
@@ -74,11 +74,21 @@ export function horizonEnd(today: string): string {
  * Insert meal_events for every matching day in [from, to] that has no existing
  * event in that (date, slot) and no tombstone. Manual or pre-existing rows win.
  * Idempotent. Advances generatedThrough to `to`.
+ *
+ * `precomputed`, when given, lets a caller that's materializing several rules
+ * at once (e.g. topUpRules) hoist the skip/taken lookups to a single
+ * household-wide query instead of one pair per rule.
  */
-export function materialize(db: Db, rule: typeof schema.mealRules.$inferSelect, from: string, to: string) {
+export function materialize(
+  db: Db,
+  rule: typeof schema.mealRules.$inferSelect,
+  from: string,
+  to: string,
+  precomputed?: { skips: Set<string>; taken: Set<string> },
+) {
   const dates = matchingDates(rule, from, to);
   if (dates.length) {
-    const skips = new Set(
+    const skips = precomputed?.skips ?? new Set(
       db.select().from(schema.mealRuleSkips)
         .where(eq(schema.mealRuleSkips.ruleId, rule.id)).all()
         .filter((s) => s.slotId === rule.slotId)
@@ -87,7 +97,7 @@ export function materialize(db: Db, rule: typeof schema.mealRules.$inferSelect, 
     // A day is taken only by this rule's own rows (idempotency) or a manual
     // row of the same recipe; other meals in the slot coexist. Direct-item rules
     // (no recipe) dedup on their own ruleId only.
-    const taken = new Set(
+    const taken = precomputed?.taken ?? new Set(
       db.select().from(schema.mealEvents)
         .where(and(
           eq(schema.mealEvents.householdId, rule.householdId),
@@ -166,17 +176,58 @@ export function listRules(db: Db, householdId: number) {
     .where(eq(schema.mealRules.householdId, householdId)).all();
 }
 
-/** Extend every household rule up to the current horizon. Idempotent; cheap when nothing new. */
+/**
+ * Extend every household rule up to the current horizon. Idempotent.
+ *
+ * Called on every agenda/events GET, so it must be cheap in the common case
+ * where nothing is behind: a single lightweight watermark query, no writes,
+ * and no per-rule skip/taken lookups.
+ */
 export function topUpRules(db: Db, householdId: number, today: string) {
-  const rules = db.select().from(schema.mealRules)
-    .where(eq(schema.mealRules.householdId, householdId)).all();
   const end = horizonEnd(today);
+
+  // Cheap guard: if every rule is already materialized through the horizon,
+  // there's nothing to do — bail before touching mealRuleSkips/mealEvents.
+  const watermarks = db.select({
+    id: schema.mealRules.id,
+    generatedThrough: schema.mealRules.generatedThrough,
+  }).from(schema.mealRules)
+    .where(eq(schema.mealRules.householdId, householdId)).all();
+  const dueIds = watermarks
+    .filter((r) => !r.generatedThrough || r.generatedThrough < end)
+    .map((r) => r.id);
+  if (dueIds.length === 0) return;
+
+  const rules = db.select().from(schema.mealRules)
+    .where(and(eq(schema.mealRules.householdId, householdId), inArray(schema.mealRules.id, dueIds))).all();
+
+  // Hoist the per-rule skip/taken lookups: one query each for the whole
+  // household instead of one pair per rule.
+  const skipsByRule = new Map<number, { slotId: number; date: string }[]>();
+  for (const s of db.select().from(schema.mealRuleSkips).where(inArray(schema.mealRuleSkips.ruleId, dueIds)).all()) {
+    if (!skipsByRule.has(s.ruleId)) skipsByRule.set(s.ruleId, []);
+    skipsByRule.get(s.ruleId)!.push({ slotId: s.slotId, date: s.date });
+  }
+  const eventsByHousehold = db.select().from(schema.mealEvents)
+    .where(eq(schema.mealEvents.householdId, householdId)).all();
+
   for (const rule of rules) {
     const from = rule.generatedThrough
       ? fmt(new Date(parse(rule.generatedThrough).getTime() + DAY))
       : rule.startDate;
     if (from > end) continue;
-    materialize(db, rule, from, end);
+    const skips = new Set(
+      (skipsByRule.get(rule.id) ?? [])
+        .filter((s) => s.slotId === rule.slotId)
+        .map((s) => s.date),
+    );
+    const taken = new Set(
+      eventsByHousehold
+        .filter((e) => e.slotId === rule.slotId)
+        .filter((e) => e.ruleId === rule.id || (rule.recipeId != null && e.recipeId === rule.recipeId))
+        .map((e) => e.date),
+    );
+    materialize(db, rule, from, end, { skips, taken });
   }
 }
 

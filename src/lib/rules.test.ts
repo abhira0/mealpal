@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { makeTestDb, type TestDb } from "@/test/db";
 import { seedHousehold } from "@/test/fixtures";
 import { createRecipe } from "@/lib/recipes";
@@ -86,6 +86,19 @@ describe("rule materialization", () => {
     topUpRules(db, hid, "2026-06-01");
     expect(week()).toHaveLength(3);
     expect(week().every((e) => e.ruleId != null)).toBe(true);
+  });
+
+  it("skips entirely (no writes) when already materialized through the horizon", () => {
+    createRule(db, hid, "2026-06-01", { slotId, recipeId, servings: 1, ...base, daysOfWeek: "0101010" });
+    // createRule already materializes through horizonEnd("2026-06-01"); a
+    // same-day top-up should be a no-op — no inserts, no update writes.
+    const insertSpy = vi.spyOn(db, "insert");
+    const updateSpy = vi.spyOn(db, "update");
+    topUpRules(db, hid, "2026-06-01");
+    expect(insertSpy).not.toHaveBeenCalled();
+    expect(updateSpy).not.toHaveBeenCalled();
+    insertSpy.mockRestore();
+    updateSpy.mockRestore();
   });
 
   it("does not overwrite a manual meal already on that day/slot", () => {
