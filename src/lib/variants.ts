@@ -32,6 +32,14 @@ export function listVariants(db: Db, householdId: number, productId: number) {
 }
 
 export function updateVariant(db: Db, householdId: number, id: number, patch: VariantPatch) {
+  // drizzle's .set({}) throws "No values to set" — an empty/unrecognized
+  // patch is a no-op, so just return the current row instead of crashing.
+  if (Object.keys(patch).length === 0) {
+    const [row] = db.select().from(schema.productVariants)
+      .where(and(eq(schema.productVariants.id, id), eq(schema.productVariants.householdId, householdId)))
+      .all();
+    return row;
+  }
   const [row] = db.update(schema.productVariants)
     .set(patch)
     .where(and(eq(schema.productVariants.id, id), eq(schema.productVariants.householdId, householdId)))

@@ -28,6 +28,12 @@ describe("variants CRUD", () => {
     expect(listVariants(db, hid, productId)).toHaveLength(1);
   });
 
+  it("updateVariant with an empty patch returns the row unchanged instead of throwing", () => {
+    const a = createVariant(db, hid, productId, { name: "Mega Omega", calories: 180 })!;
+    expect(() => updateVariant(db, hid, a.id, {})).not.toThrow();
+    expect(updateVariant(db, hid, a.id, {})).toEqual(expect.objectContaining({ id: a.id, name: "Mega Omega" }));
+  });
+
   it("won't create a variant on a product from another household", () => {
     const other = seedHousehold(db, "Other");
     expect(createVariant(db, other, productId, { name: "Sneaky" })).toBeUndefined();
