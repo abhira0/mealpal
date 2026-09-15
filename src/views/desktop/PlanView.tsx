@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors, closestCenter,
   useDraggable, useDroppable, type DragEndEvent, type DragStartEvent,
@@ -13,6 +13,7 @@ import { AgendaSheets } from "@/views/AgendaSheets";
 import { DOW } from "@/views/agenda-parts";
 import { Trash2 } from "lucide-react";
 import { todayISO } from "@/lib/dates";
+import { consumePendingCmdkAction } from "@/lib/cmdk-bus";
 
 const fmt = (iso: string) =>
   new Date(iso + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
@@ -113,6 +114,13 @@ export function DesktopPlan() {
   const agenda = useAgenda(null, { from: start, to: end });
   const today = todayISO();
   const week = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(start, i)), [start]);
+
+  // Command palette "Go to date…" (mealpal-d3f).
+  useEffect(() => {
+    return consumePendingCmdkAction((action) => {
+      if (action.type === "go-to-date") setStart(action.date);
+    });
+  }, []);
 
   // Slots ordered by time of day; only those with meals this week are shown.
   const slots = useMemo(

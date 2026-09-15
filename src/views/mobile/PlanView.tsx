@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { addDays, useAgenda, type AgendaMeal } from "@/views/agenda-data";
 import { AgendaSheets } from "@/views/AgendaSheets";
 import { MealRow, DOW } from "@/views/agenda-parts";
 import { Sheet } from "@/components/Sheet";
 import { PlanInspector } from "@/components/PlanInspector";
 import { todayISO } from "@/lib/dates";
+import { consumePendingCmdkAction } from "@/lib/cmdk-bus";
 
 const dowOf = (iso: string) => new Date(iso + "T00:00:00").getDay();
 const dnumOf = (iso: string) => new Date(iso + "T00:00:00").getDate();
@@ -33,6 +34,16 @@ export function MobilePlan() {
     setStart(ns);
     setSelected(ns);
   };
+
+  // Command palette "Go to date…" (mealpal-d3f).
+  useEffect(() => {
+    return consumePendingCmdkAction((action) => {
+      if (action.type === "go-to-date") {
+        setStart(action.date);
+        setSelected(action.date);
+      }
+    });
+  }, []);
 
   const day = byDate.get(selected);
   const meals = day?.meals ?? [];

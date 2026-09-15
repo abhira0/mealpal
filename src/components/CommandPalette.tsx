@@ -4,58 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { useFocusTrap } from "@/lib/useFocusTrap";
+import { fireCmdkAction } from "@/lib/cmdk-bus";
+import { ENTITY_GROUPS, NAV, buildActions, getEntities, rank, recordVisit, type Item } from "@/components/command-palette-logic";
 
-type Item = { key: string; label: string; sub?: string; href: string; group: string };
-
-const NAV: Item[] = [
-  { key: "nav-today", label: "Today", href: "/", group: "Go to" },
-  { key: "nav-plan", label: "Plan", href: "/plan", group: "Go to" },
-  { key: "nav-nutrition", label: "Nutrition", href: "/nutrition", group: "Go to" },
-  { key: "nav-pantry", label: "Pantry", href: "/pantry", group: "Go to" },
-  { key: "nav-shop", label: "Shop", href: "/shop", group: "Go to" },
-  { key: "nav-recipes", label: "Recipes", href: "/recipes", group: "Go to" },
-  { key: "nav-manage", label: "Manage", href: "/manage", group: "Go to" },
-];
-
-async function getJSON(url: string): Promise<unknown[]> {
-  try {
-    const r = await fetch(url, { cache: "no-store" });
-    if (!r.ok) return [];
-    const j = await r.json();
-    return Array.isArray(j) ? j : [];
-  } catch {
-    return [];
-  }
-}
-
-// Load searchable entities once per open-session. Kept minimal: name + id.
-async function loadEntities(): Promise<Item[]> {
-  const [recipes, ingredients, products, shops] = await Promise.all([
-    getJSON("/api/recipes"),
-    getJSON("/api/ingredients"),
-    getJSON("/api/products"),
-    getJSON("/api/shops"),
-  ]);
-  const R = (rows: unknown[]) => rows as { id: number | string; name?: string }[];
-  return [
-    ...R(recipes).map((r) => ({ key: `r-${r.id}`, label: r.name ?? String(r.id), href: `/recipes/${r.id}`, group: "Recipes" })),
-    ...R(ingredients).map((r) => ({ key: `i-${r.id}`, label: r.name ?? String(r.id), href: `/manage/ingredients/${r.id}`, group: "Ingredients" })),
-    ...R(products).map((r) => ({ key: `p-${r.id}`, label: r.name ?? String(r.id), href: `/manage/products/${r.id}`, group: "Products" })),
-    ...R(shops).map((r) => ({ key: `s-${r.id}`, label: r.name ?? String(r.id), href: `/manage/shops/${r.id}`, group: "Shops" })),
-  ];
-}
-
-// Substring match, ranked: earlier match position wins, then shorter label.
-function rank(items: Item[], q: string): Item[] {
-  if (!q) return NAV;
-  const needle = q.toLowerCase();
-  return items
-    .map((it) => ({ it, pos: it.label.toLowerCase().indexOf(needle) }))
-    .filter((x) => x.pos >= 0)
-    .sort((a, b) => a.pos - b.pos || a.it.label.length - b.it.label.length)
-    .slice(0, 40)
-    .map((x) => x.it);
-}
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function CommandPalette() {
   const pathname = usePathname();
@@ -64,20 +16,38 @@ export function CommandPalette() {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [entities, setEntities] = useState<Item[]>([]);
+  const [dateMode, setDateMode] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   useFocusTrap(dialogRef, open);
 
-  const all = useMemo(() => [...NAV, ...entities], [entities]);
-  const results = useMemo(() => rank(all, query.trim()), [all, query]);
-
   const close = useCallback(() => {
     setOpen(false);
     setQuery("");
+    setDateMode(false);
     triggerRef.current?.focus();
   }, []);
+
+  // The verb set (mealpal-d3f): each opens an existing sheet on the page that
+  // owns it, via cmdk-bus, instead of the palette navigating-only. `go()`
+  // below handles closing the palette (or not, for "Go to date…") — these
+  // handlers just do the navigation/event side of it.
+  const actions = useMemo(
+    () =>
+      buildActions({
+        addMeal: () => { router.push("/"); fireCmdkAction({ type: "add-meal" }); },
+        logEaten: () => { router.push("/"); fireCmdkAction({ type: "log-eaten" }); },
+        newPurchase: () => { router.push("/shop"); fireCmdkAction({ type: "new-purchase" }); },
+        goToDate: () => { setQuery(""); setActive(0); setDateMode(true); },
+      }),
+    [router],
+  );
+
+  const defaults = useMemo(() => [...actions, ...NAV], [actions]);
+  const all = useMemo(() => [...actions, ...NAV, ...entities], [actions, entities]);
+  const results = useMemo(() => (dateMode ? [] : rank(all, query, defaults)), [all, query, defaults, dateMode]);
 
   // Global ⌘K / Ctrl-K toggle.
   useEffect(() => {
@@ -108,7 +78,7 @@ export function CommandPalette() {
   useEffect(() => {
     if (!open) return;
     inputRef.current?.focus();
-    if (entities.length === 0) loadEntities().then(setEntities);
+    if (entities.length === 0) getEntities().then(setEntities);
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
@@ -127,11 +97,30 @@ export function CommandPalette() {
 
   const go = (it: Item | undefined) => {
     if (!it) return;
+    if (it.run) {
+      if (!it.keepOpen) close();
+      it.run();
+      return;
+    }
+    if (ENTITY_GROUPS.has(it.group)) recordVisit(it.key);
     close();
     router.push(it.href);
   };
 
+  const submitDate = () => {
+    const v = query.trim();
+    if (!DATE_RE.test(v)) return;
+    close();
+    router.push("/plan");
+    fireCmdkAction({ type: "go-to-date", date: v });
+  };
+
   const onKeyDown = (e: React.KeyboardEvent) => {
+    if (dateMode) {
+      if (e.key === "Enter") { e.preventDefault(); submitDate(); }
+      else if (e.key === "Escape") { e.preventDefault(); setDateMode(false); setQuery(""); }
+      return;
+    }
     if (e.key === "ArrowDown") { e.preventDefault(); setActive((i) => Math.min(i + 1, results.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setActive((i) => Math.max(i - 1, 0)); }
     else if (e.key === "Enter") { e.preventDefault(); go(results[active]); }
@@ -151,10 +140,10 @@ export function CommandPalette() {
         <input
           ref={inputRef}
           className="cmdk-input"
-          type="text"
+          type={dateMode ? "date" : "text"}
           value={query}
-          placeholder="Jump to a page, recipe, ingredient…"
-          aria-label="Search"
+          placeholder={dateMode ? "Pick a date…" : "Jump to a page, recipe, ingredient…"}
+          aria-label={dateMode ? "Date" : "Search"}
           role="combobox"
           aria-expanded="true"
           aria-controls="cmdk-list"
@@ -164,7 +153,8 @@ export function CommandPalette() {
           onKeyDown={onKeyDown}
         />
         <ul className="cmdk-list" id="cmdk-list" role="listbox" ref={listRef}>
-          {results.length === 0 && <li className="cmdk-empty">No matches.</li>}
+          {dateMode && <li className="cmdk-empty">Pick a date, then press ↵. Esc to go back.</li>}
+          {!dateMode && results.length === 0 && <li className="cmdk-empty">No matches.</li>}
           {results.map((it, i) => {
             const showGroup = i === 0 || results[i - 1].group !== it.group;
             return (

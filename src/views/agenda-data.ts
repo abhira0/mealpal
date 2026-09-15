@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { todayISO, toISODate, localNoon } from "@/lib/dates";
+import { consumePendingCmdkAction } from "@/lib/cmdk-bus";
 
 export type Slot = { id: number; name: string; timeOfDay: string };
 export type Recipe = { id: number; name: string; baseServings: number };
@@ -531,6 +532,17 @@ export function useAgenda(
     setAddItems([defaultMealItem(opts?.type && opts.type !== "batch" ? opts.type : "recipe", { recipes, products, ingredients })]);
     setAddOpen(true);
   }
+
+  // Command palette "Add meal" / "Log eaten" actions (mealpal-d3f): the
+  // palette navigates here and fires one of these instead of building its own
+  // add flow — this just calls the same opener a real "+" button would.
+  useEffect(() => {
+    return consumePendingCmdkAction((action) => {
+      if (action.type === "add-meal") openAdd();
+      else if (action.type === "log-eaten") openAdd({ date: todayIso });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayIso]);
 
   // Open the Add sheet pre-filled to edit a still-planned meal. Fetches the
   // full event row (the agenda row lacks servings/amount/variant).
