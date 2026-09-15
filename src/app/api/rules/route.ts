@@ -41,19 +41,25 @@ export async function POST(req: Request) {
   // mirror PATCH /api/rules/[id]: a weekly rule with no day selected never fires.
   if (unit === "week" && !daysOfWeek.includes("1"))
     return NextResponse.json({ error: "pick at least one day of the week" }, { status: 400 });
-  const rule = createRule(db, session.user.householdId, todayISO(), {
-    slotId: Number(b.slotId),
-    recipeId: b.recipeId != null ? Number(b.recipeId) : null,
-    productId: b.productId != null ? Number(b.productId) : null,
-    variantId: b.variantId != null ? Number(b.variantId) : null,
-    ingredientId: b.ingredientId != null ? Number(b.ingredientId) : null,
-    amount: b.amount != null ? Number(b.amount) : null,
-    servings: Number(b.servings) || 1,
-    intervalN: Math.max(1, Number(b.intervalN) || 1),
-    unit,
-    daysOfWeek,
-    startDate: String(b.startDate),
-    untilDate: b.untilDate ? String(b.untilDate) : null,
-  });
-  return NextResponse.json(rule, { status: 201 });
+  try {
+    const rule = createRule(db, session.user.householdId, todayISO(), {
+      slotId: Number(b.slotId),
+      recipeId: b.recipeId != null ? Number(b.recipeId) : null,
+      productId: b.productId != null ? Number(b.productId) : null,
+      variantId: b.variantId != null ? Number(b.variantId) : null,
+      ingredientId: b.ingredientId != null ? Number(b.ingredientId) : null,
+      amount: b.amount != null ? Number(b.amount) : null,
+      servings: Number(b.servings) || 1,
+      intervalN: Math.max(1, Number(b.intervalN) || 1),
+      unit,
+      daysOfWeek,
+      startDate: String(b.startDate),
+      untilDate: b.untilDate ? String(b.untilDate) : null,
+    });
+    return NextResponse.json(rule, { status: 201 });
+  } catch (err) {
+    // Bad input (slot/recipe/product/variant/ingredient not found in this
+    // household) — not a server error.
+    return NextResponse.json({ error: (err as Error).message }, { status: 400 });
+  }
 }

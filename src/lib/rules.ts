@@ -1,6 +1,7 @@
 import { and, eq, gte } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
+import { assertOwnedRefs } from "@/lib/ownership";
 
 type Db = BetterSQLite3Database<typeof schema>;
 
@@ -136,6 +137,7 @@ function resolveAmount(db: Db, householdId: number, input: RuleInput): { amount:
 }
 
 export function createRule(db: Db, householdId: number, today: string, input: RuleInput) {
+  assertOwnedRefs(db, householdId, input);
   const resolved = resolveAmount(db, householdId, input);
   const [rule] = db.insert(schema.mealRules).values({
     householdId,

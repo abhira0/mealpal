@@ -139,6 +139,52 @@ describe("rule materialization", () => {
   });
 });
 
+describe("createRule cross-household guard", () => {
+  it("rejects a slotId from another household", () => {
+    const otherHid = seedHousehold(db);
+    const otherSlot = createSlot(db, otherHid, "Dinner", "18:00").id;
+    expect(() => createRule(db, hid, "2026-06-01", { slotId: otherSlot, recipeId, servings: 1, ...base }))
+      .toThrow(/slot/i);
+  });
+
+  it("rejects a recipeId from another household", () => {
+    const otherHid = seedHousehold(db);
+    const otherRecipe = createRecipe(db, otherHid, {
+      name: "Soup", baseServings: 1, notes: null, ingredients: [], steps: [], media: [],
+    }).id;
+    expect(() => createRule(db, hid, "2026-06-01", { slotId, recipeId: otherRecipe, servings: 1, ...base }))
+      .toThrow(/recipe/i);
+  });
+
+  it("rejects a productId from another household", () => {
+    const otherHid = seedHousehold(db);
+    const ingId = db.insert(schema.ingredients).values({ householdId: otherHid, name: "Flour", canonicalUnit: "g" }).returning().all()[0].id;
+    const shopId = db.insert(schema.shops).values({ householdId: otherHid, name: "Mart" }).returning().all()[0].id;
+    const productId = db.insert(schema.products)
+      .values({ householdId: otherHid, ingredientId: ingId, shopId, name: "Brand A", packSize: 1000, priority: 1, servingSize: 50 })
+      .returning().all()[0].id;
+    expect(() => createRule(db, hid, "2026-06-01", { slotId, productId, servings: 1, ...base }))
+      .toThrow(/product/i);
+  });
+
+  it("rejects an ingredientId from another household", () => {
+    const otherHid = seedHousehold(db);
+    const ingId = db.insert(schema.ingredients).values({ householdId: otherHid, name: "Salt", canonicalUnit: "g" }).returning().all()[0].id;
+    expect(() => createRule(db, hid, "2026-06-01", { slotId, ingredientId: ingId, amount: 5, servings: 1, ...base }))
+      .toThrow(/ingredient/i);
+  });
+
+  it("does not insert a rule or materialize events when a ref is foreign", () => {
+    const otherHid = seedHousehold(db);
+    const otherRecipe = createRecipe(db, otherHid, {
+      name: "Soup", baseServings: 1, notes: null, ingredients: [], steps: [], media: [],
+    }).id;
+    expect(() => createRule(db, hid, "2026-06-01", { slotId, recipeId: otherRecipe, servings: 1, ...base })).toThrow();
+    expect(listRules(db, hid)).toHaveLength(0);
+    expect(listEvents(db, hid, "2026-06-01", "2026-06-07")).toHaveLength(0);
+  });
+});
+
 describe("listRules", () => {
   it("returns only this household's rules", () => {
     createRule(db, hid, "2026-06-01", { slotId, recipeId, servings: 1, ...base });

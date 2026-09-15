@@ -3,6 +3,7 @@ import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
 import { type CookAllocations, consumptionLinesForEvent, recordCookedForEvent, unstockedIngredients } from "@/lib/consumption";
 import { skipDay, endSeriesFrom, deleteRule } from "@/lib/rules";
+import { assertOwnedRefs } from "@/lib/ownership";
 
 type Db = BetterSQLite3Database<typeof schema>;
 
@@ -45,46 +46,6 @@ function resolveQuantity(db: Db, householdId: number, input: EventInput): { serv
     amount = input.amount ?? 0;
   }
   return { servings, amount };
-}
-
-// Every id on EventInput is a foreign key coming straight off a request body
-// (slotId, recipeId, ingredientId, productId, variantId). resolveQuantity
-// only *reads* productId/variantId scoped to the household — a missing row
-// there quietly falls back to perServing=1 rather than rejecting, so an id
-// belonging to another household would otherwise sail through and get
-// written onto this household's mealEvents row. Route-level checks cover
-// some of these per-endpoint, but not all (e.g. ingredientId is unchecked in
-// both POST and PATCH /api/events); guard here so the guarantee holds
-// regardless of the caller.
-function assertOwnedRefs(db: Db, householdId: number, input: EventInput) {
-  const owns = (exists: boolean, what: string) => {
-    if (!exists) throw new Error(`${what} not found in household`);
-  };
-  if (input.slotId != null) {
-    const [row] = db.select({ id: schema.mealSlots.id }).from(schema.mealSlots)
-      .where(and(eq(schema.mealSlots.id, input.slotId), eq(schema.mealSlots.householdId, householdId))).all();
-    owns(!!row, "slot");
-  }
-  if (input.recipeId != null) {
-    const [row] = db.select({ id: schema.recipes.id }).from(schema.recipes)
-      .where(and(eq(schema.recipes.id, input.recipeId), eq(schema.recipes.householdId, householdId))).all();
-    owns(!!row, "recipe");
-  }
-  if (input.ingredientId != null) {
-    const [row] = db.select({ id: schema.ingredients.id }).from(schema.ingredients)
-      .where(and(eq(schema.ingredients.id, input.ingredientId), eq(schema.ingredients.householdId, householdId))).all();
-    owns(!!row, "ingredient");
-  }
-  if (input.productId != null) {
-    const [row] = db.select({ id: schema.products.id }).from(schema.products)
-      .where(and(eq(schema.products.id, input.productId), eq(schema.products.householdId, householdId))).all();
-    owns(!!row, "product");
-  }
-  if (input.variantId != null) {
-    const [row] = db.select({ id: schema.productVariants.id }).from(schema.productVariants)
-      .where(and(eq(schema.productVariants.id, input.variantId), eq(schema.productVariants.householdId, householdId))).all();
-    owns(!!row, "variant");
-  }
 }
 
 export function addEvent(db: Db, householdId: number, input: EventInput) {
