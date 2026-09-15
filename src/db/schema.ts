@@ -3,6 +3,10 @@ import { sqliteTable, text, integer, real, blob } from "drizzle-orm/sqlite-core"
 export const households = sqliteTable("households", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
+  // IANA zone name. Default preserves the one household this app originally
+  // served (see mealpal-a9e); every calendar-feed prep time is wall-clock in
+  // this zone.
+  timezone: text("timezone").notNull().default("America/Phoenix"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -183,6 +187,11 @@ export const mealSlots = sqliteTable("meal_slots", {
   name: text("name").notNull(),
   // "HH:MM" 24h. Slots auto-order by this; text sort matches chronological order.
   timeOfDay: text("time_of_day").notNull().default("12:00"),
+  // Optional "HH:MM" wall-clock prep window (household's timezone), used by the
+  // calendar feed for a timed VEVENT instead of an all-day one. Null means the
+  // feed falls back to its built-in Lunch/Dinner/"overnight oats" heuristic.
+  prepStart: text("prep_start"),
+  prepEnd: text("prep_end"),
 });
 
 export const mealEvents = sqliteTable("meal_events", {

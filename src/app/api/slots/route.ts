@@ -19,6 +19,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "timeOfDay must be in HH:MM (24h) format" }, { status: 400 });
   }
   return NextResponse.json(
-    createSlot(db, session.user.householdId, String(b.name).trim(), timeOfDay || "12:00"),
+    createSlot(db, session.user.householdId, String(b.name).trim(), timeOfDay || "12:00", {
+      prepStart: b.prepStart ? String(b.prepStart) : null,
+      prepEnd: b.prepEnd ? String(b.prepEnd) : null,
+    }),
     { status: 201 });
 }

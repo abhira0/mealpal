@@ -20,6 +20,8 @@ export async function PATCH(
   const row = updateSlot(db, session.user.householdId, Number(id), {
     name,
     ...(timeOfDay !== undefined ? { timeOfDay: timeOfDay || "12:00" } : {}),
+    ...(body?.prepStart !== undefined ? { prepStart: body.prepStart ? String(body.prepStart) : null } : {}),
+    ...(body?.prepEnd !== undefined ? { prepEnd: body.prepEnd ? String(body.prepEnd) : null } : {}),
   });
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(row);
