@@ -614,6 +614,8 @@ button.row-link{background:none;border:none;width:100%;text-align:left;cursor:po
 .toast span{flex:1}
 .toast-dismiss{background:none;border:none;color:inherit;opacity:.8;font-size:18px;line-height:1;cursor:pointer;padding:2px 4px}
 .toast-dismiss:hover{opacity:1}
+.toast-action{background:none;border:none;color:inherit;font-size:14px;font-weight:700;text-decoration:underline;cursor:pointer;padding:2px 4px;white-space:nowrap}
+.toast-action:hover{opacity:.85}
 
 /* ---------- confirm sheet (replaces window.confirm) ---------- */
 .confirm-actions{display:flex;gap:8px}

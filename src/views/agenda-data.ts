@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { todayISO, toISODate, localNoon } from "@/lib/dates";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useToast } from "@/components/ToastProvider";
+import { scheduleUndo } from "@/lib/undo-delete";
 
 export type Slot = { id: number; name: string; timeOfDay: string };
 export type Recipe = { id: number; name: string; baseServings: number };
@@ -104,6 +106,7 @@ export function useAgenda(
   range?: { from?: string; to?: string },
 ) {
   const confirm = useConfirm();
+  const toast = useToast();
   // ponytail: server can't know the client's date/timezone, so all
   // time-derived text is client-only to avoid hydration drift.
   const [mounted, setMounted] = useState(false);
@@ -196,6 +199,46 @@ export function useAgenda(
     { meal: AgendaMeal; date: string; choices: CookChoice[]; picked: Record<number, CookPick> } | null
   >(null);
 
+  // Events optimistically hidden from the board while their delete is pending
+  // undo (see scheduleEventDelete below) — filtered out of the exported `days`
+  // just below.
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<number>>(new Set());
+  const visibleDays = useMemo(
+    () =>
+      pendingDeleteIds.size === 0
+        ? days
+        : days.map((d) => ({ ...d, meals: d.meals.filter((m) => m.eventId == null || !pendingDeleteIds.has(m.eventId)) })),
+    [days, pendingDeleteIds],
+  );
+
+  // Optimistic delete with a ~6s undo window, instead of a confirm() dialog:
+  // the row is hidden from the board immediately, but the DELETE is only sent
+  // once the window elapses. Undo just cancels the pending fetch — since the
+  // server row was never touched, restoring it means nothing more than
+  // un-hiding it, no re-creation, so it keeps its exact event/rule ids.
+  function scheduleEventDelete(eventId: number, scope: "one" | "following" | "all", delayMs = 6000) {
+    setPendingDeleteIds((prev) => new Set(prev).add(eventId));
+    const cancel = scheduleUndo(() => {
+      void (async () => {
+        await fetch(`/api/events/${eventId}?scope=${scope}`, { method: "DELETE" });
+        setPendingDeleteIds((prev) => {
+          const next = new Set(prev);
+          next.delete(eventId);
+          return next;
+        });
+        await Promise.all([loadAgenda(), loadAnalysis()]);
+      })();
+    }, delayMs);
+    return () => {
+      if (!cancel()) return; // already committed — nothing left to undo
+      setPendingDeleteIds((prev) => {
+        const next = new Set(prev);
+        next.delete(eventId);
+        return next;
+      });
+    };
+  }
+
   async function toggleMeal(meal: AgendaMeal, date: string) {
     // Synthetic batch rows (eventId null) share a batchId across every day
     // they're projected onto, so the optimistic update below must also scope
@@ -286,6 +329,17 @@ export function useAgenda(
       setActing(null);
     }
     if (!ok) setActionError(served ? "Couldn't undo that meal — please try again." : "Couldn't update that meal — please try again.");
+    // Surface an explicit undo affordance for marking eaten (the row's own
+    // checkbox already toggles back, but a toast makes the "you can undo this"
+    // path discoverable without a blocking confirm up front). The re-toggle
+    // targets the post-serve phase so it correctly flips back to un-served.
+    if (ok && !served) {
+      const eatenMeal: AgendaMeal = { ...meal, status: "served", phase: "served" };
+      toast.success(`${meal.name} marked eaten.`, {
+        durationMs: 6000,
+        action: { label: "Undo", onClick: () => void toggleMeal(eatenMeal, date) },
+      });
+    }
   }
 
   // Serve an event with a chosen product/variant pick (from the cook sheet).
@@ -778,7 +832,7 @@ export function useAgenda(
     todayIso,
     todayRef,
     // data
-    days,
+    days: visibleDays,
     nextCooks,
     slots,
     recipes,
@@ -799,6 +853,7 @@ export function useAgenda(
     rescheduleEvent,
     requestRemove,
     removeBatch,
+    scheduleEventDelete,
     // cook-choice sheet
     cookChoice,
     setCookChoice,
