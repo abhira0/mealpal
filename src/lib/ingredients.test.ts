@@ -37,6 +37,18 @@ describe("ingredients", () => {
     expect(updated?.name).toBe("Whole Milk");
   });
 
+  it("reports stock for every ingredient in one batched query, defaulting to 0 with no movements", () => {
+    const withStock = createIngredient(db, hid, { name: "Rice", canonicalUnit: "g" });
+    const noMovements = createIngredient(db, hid, { name: "Pepper", canonicalUnit: "g" });
+    db.insert(schema.stockMovements).values({ householdId: hid, ingredientId: withStock.id, delta: 500, reason: "manual" }).run();
+
+    const list = listIngredients(db, hid);
+    const rice = list.find((i) => i.id === withStock.id);
+    const pepper = list.find((i) => i.id === noMovements.id);
+    expect(rice?.stock).toBe(500);
+    expect(pepper?.stock).toBe(0);
+  });
+
   it("does not update an ingredient from another household", () => {
     const other = seedHousehold(db, "Other");
     const ing = createIngredient(db, other, {

@@ -2,7 +2,7 @@ import { and, asc, desc, eq, isNotNull } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { schema } from "@/db";
 import type { DeleteResult } from "@/lib/shops";
-import { currentStock } from "@/lib/stock";
+import { currentStock, stockByIngredient } from "@/lib/stock";
 
 type Db = BetterSQLite3Database<typeof schema>;
 
@@ -45,10 +45,12 @@ export function listIngredients(db: Db, householdId: number) {
     }
   }
 
+  const stock = stockByIngredient(db, householdId);
+
   return ingredients.map((ing) => ({
     ...ing,
     imageUrl: imageByIngredient.get(ing.id) ?? null,
-    stock: currentStock(db, householdId, ing.id), // ponytail: one query per ingredient, household scale
+    stock: stock.get(ing.id) ?? 0,
   }));
 }
 
