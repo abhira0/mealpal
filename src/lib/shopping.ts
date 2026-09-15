@@ -248,6 +248,7 @@ export function listExtras(db: Db, householdId: number) {
     productId: schema.products.id,
     productName: schema.products.name,
     // product's shop wins; otherwise the explicitly chosen shop
+    shopId: schema.shops.id,
     shopName: schema.shops.name,
   })
     .from(schema.shoppingExtras)
@@ -273,16 +274,27 @@ export interface ShoppingLine {
   product: { id: number; name: string; packSize: number } | null; // top-priority available product
 }
 
+// Sentinel key for products/extras with no shop on file — distinct from any
+// real shop id, so it never collides with a shop keyed by id.
+const UNASSIGNED_SHOP_KEY = "unassigned";
+
+export interface ShoppingGroup {
+  shopId: number | null; // null = unassigned
+  shopName: string;
+  lines: ShoppingLine[];
+}
+
 /**
  * For each ingredient short of `targetByIngredient`, pick the top-priority AVAILABLE
- * product and group the resulting lines by shop. Returns a shop -> lines map.
+ * product and group the resulting lines by shop. Returns a shop-id -> group map
+ * (keyed by id, not name, since two shops can share a display name).
  */
 export function buyRecommendation(
   db: Db, householdId: number,
   stockByIngredientMap: Map<number, number>,
   targetByIngredient: Map<number, number>,
-): Map<string, ShoppingLine[]> {
-  const result = new Map<string, ShoppingLine[]>();
+): Map<string, ShoppingGroup> {
+  const result = new Map<string, ShoppingGroup>();
   const ingredientRows = db.select().from(schema.ingredients)
     .where(eq(schema.ingredients.householdId, householdId)).all();
   const nameById = new Map(ingredientRows.map((i) => [i.id, i.name]));
@@ -301,13 +313,15 @@ export function buyRecommendation(
     const shop = product
       ? db.select().from(schema.shops).where(eq(schema.shops.id, product.shopId)).all()[0]
       : null;
-    const shopKey = shop?.name ?? "Unassigned";
+    const shopKey = shop ? String(shop.id) : UNASSIGNED_SHOP_KEY;
     const line: ShoppingLine = {
       ingredientId, ingredientName: nameById.get(ingredientId) ?? "?",
       needed, product: product ? { id: product.id, name: product.name, packSize: product.packSize } : null,
     };
-    if (!result.has(shopKey)) result.set(shopKey, []);
-    result.get(shopKey)!.push(line);
+    if (!result.has(shopKey)) {
+      result.set(shopKey, { shopId: shop?.id ?? null, shopName: shop?.name ?? "Unassigned", lines: [] });
+    }
+    result.get(shopKey)!.lines.push(line);
   }
   return result;
 }
@@ -338,16 +352,18 @@ export function shoppingList(db: Db, householdId: number, horizon = 14) {
     usable.set(id, Math.min(stock.get(id) ?? 0, useBeforeExpiry.get(id) ?? 0));
   const grouped = buyRecommendation(db, householdId, usable, target);
   const runOut = runOutDates(db, householdId, from, to, stock, expiry);
-  for (const lines of grouped.values())
-    for (const line of lines)
+  for (const group of grouped.values())
+    for (const line of group.lines)
       (line as typeof line & { urgency?: unknown }).urgency =
         urgency(runOut.get(line.ingredientId), expiry.get(line.ingredientId), from);
 
   // Fold in manually-added lines. extraId marks them so the UI deletes (not "buys") them.
   for (const e of listExtras(db, householdId)) {
-    const shopKey = e.shopName ?? "Unassigned";
-    if (!grouped.has(shopKey)) grouped.set(shopKey, []);
-    grouped.get(shopKey)!.push({
+    const shopKey = e.shopId != null ? String(e.shopId) : UNASSIGNED_SHOP_KEY;
+    if (!grouped.has(shopKey)) {
+      grouped.set(shopKey, { shopId: e.shopId ?? null, shopName: e.shopName ?? "Unassigned", lines: [] });
+    }
+    grouped.get(shopKey)!.lines.push({
       ingredientId: 0,
       ingredientName: e.title ?? e.productName ?? "Item",
       needed: e.quantity,
@@ -360,8 +376,8 @@ export function shoppingList(db: Db, householdId: number, horizon = 14) {
   // Most time-sensitive first within each shop, so the items you can't put
   // off surface at the top of the list instead of wherever the map iterated.
   const rank = { run: 0, low: 1 } as Record<string, number>;
-  for (const lines of grouped.values())
-    lines.sort((a, b) =>
+  for (const group of grouped.values())
+    group.lines.sort((a, b) =>
       (rank[(a as { urgency?: { tone?: string } | null }).urgency?.tone ?? ""] ?? 2) -
       (rank[(b as { urgency?: { tone?: string } | null }).urgency?.tone ?? ""] ?? 2));
 

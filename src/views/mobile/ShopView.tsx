@@ -63,16 +63,16 @@ export function MobileShop() {
               onAdded={s.loadShopping}
             />
 
-            {s.shops.map(([shopName, lines]) => {
-              const meta = s.shopMeta[shopName];
+            {s.shops.map(([key, group]) => {
+              const meta = group.shopId != null ? s.shopMeta[group.shopId] : undefined;
               return (
                 <ShopTicket
-                  key={shopName}
-                  shopName={shopName}
+                  key={key}
+                  shopName={group.shopName}
                   website={meta?.website}
                   iconUrl={meta?.iconUrl}
-                  total={s.shopTotal(lines)}
-                  lines={s.toLines(lines)}
+                  total={s.shopTotal(group.lines)}
+                  lines={s.toLines(group.lines)}
                   prices={s.prices}
                   struck={s.struck}
                   onStruck={s.handleStruck}
