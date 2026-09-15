@@ -63,4 +63,33 @@ describe("variants CRUD", () => {
     expect(db.select().from(schema.mealEvents).all()[0].variantId).toBeNull();
     expect(db.select().from(schema.mealRules).all()[0].variantId).toBeNull();
   });
+
+  it("rolls back all variantId nulling if the final delete fails mid-sequence", () => {
+    const v = createVariant(db, hid, productId, { name: "Mega Omega" })!;
+    const ing = db.select().from(schema.products).where(eq(schema.products.id, productId)).all()[0].ingredientId;
+    db.insert(schema.stockMovements).values({
+      householdId: hid, ingredientId: ing, productId, variantId: v.id, delta: -1, reason: "eaten",
+    }).run();
+
+    // Force the last statement (the variant delete) to fail after the earlier
+    // updates in the sequence have run, simulating a mid-transaction failure.
+    const sqlite = (db as unknown as { $client: import("better-sqlite3").Database }).$client;
+    sqlite.exec(`
+      CREATE TRIGGER block_variant_delete
+      BEFORE DELETE ON product_variants
+      WHEN old.id = ${v.id}
+      BEGIN
+        SELECT RAISE(ABORT, 'forced failure for test');
+      END;
+    `);
+
+    expect(() => deleteVariant(db, hid, v.id)).toThrow();
+
+    sqlite.exec(`DROP TRIGGER block_variant_delete;`);
+
+    // Because the whole sequence ran in one transaction, the failed delete
+    // must have rolled back the earlier variantId-nulling updates too.
+    expect(db.select().from(schema.stockMovements).all()[0].variantId).toBe(v.id);
+    expect(listVariants(db, hid, productId).some((row) => row.id === v.id)).toBe(true);
+  });
 });

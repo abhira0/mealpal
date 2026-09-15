@@ -43,17 +43,19 @@ export function deleteVariant(db: Db, householdId: number, id: number): boolean 
   // Every history/plan row referencing this variant keeps its row but loses the
   // link — variantId is a FK (foreign_keys=ON), so leaving any of these set
   // would make the delete below throw a FOREIGN KEY constraint failure.
-  db.update(schema.consumptions).set({ variantId: null })
-    .where(and(eq(schema.consumptions.householdId, householdId), eq(schema.consumptions.variantId, id))).run();
-  db.update(schema.stockMovements).set({ variantId: null })
-    .where(and(eq(schema.stockMovements.householdId, householdId), eq(schema.stockMovements.variantId, id))).run();
-  db.update(schema.mealEvents).set({ variantId: null })
-    .where(and(eq(schema.mealEvents.householdId, householdId), eq(schema.mealEvents.variantId, id))).run();
-  db.update(schema.mealRules).set({ variantId: null })
-    .where(and(eq(schema.mealRules.householdId, householdId), eq(schema.mealRules.variantId, id))).run();
-  db.update(schema.batchItems).set({ variantId: null })
-    .where(eq(schema.batchItems.variantId, id)).run();
-  return db.delete(schema.productVariants)
-    .where(and(eq(schema.productVariants.id, id), eq(schema.productVariants.householdId, householdId)))
-    .returning().all().length > 0;
+  return db.transaction((tx) => {
+    tx.update(schema.consumptions).set({ variantId: null })
+      .where(and(eq(schema.consumptions.householdId, householdId), eq(schema.consumptions.variantId, id))).run();
+    tx.update(schema.stockMovements).set({ variantId: null })
+      .where(and(eq(schema.stockMovements.householdId, householdId), eq(schema.stockMovements.variantId, id))).run();
+    tx.update(schema.mealEvents).set({ variantId: null })
+      .where(and(eq(schema.mealEvents.householdId, householdId), eq(schema.mealEvents.variantId, id))).run();
+    tx.update(schema.mealRules).set({ variantId: null })
+      .where(and(eq(schema.mealRules.householdId, householdId), eq(schema.mealRules.variantId, id))).run();
+    tx.update(schema.batchItems).set({ variantId: null })
+      .where(eq(schema.batchItems.variantId, id)).run();
+    return tx.delete(schema.productVariants)
+      .where(and(eq(schema.productVariants.id, id), eq(schema.productVariants.householdId, householdId)))
+      .returning().all().length > 0;
+  });
 }
