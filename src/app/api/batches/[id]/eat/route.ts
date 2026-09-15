@@ -10,7 +10,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const b = await req.json().catch(() => null);
   const date = b?.date ?? todayISO();
-  eatFromBatch(db, session.user.householdId, Number(id), date);
+  const result = eatFromBatch(db, session.user.householdId, Number(id), date);
+  if (result === "empty") {
+    return NextResponse.json({ error: "No meals remaining in this batch" }, { status: 409 });
+  }
   return NextResponse.json(getBatch(db, session.user.householdId, Number(id)));
 }
 
