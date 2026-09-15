@@ -66,12 +66,38 @@ export function DesktopShop() {
             />
 
             {s.shops.length > 0 && (
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input
+                  type="search"
+                  className="input"
+                  aria-label="Search shopping list"
+                  placeholder="Search ingredients or products…"
+                  value={s.query}
+                  onChange={(e) => s.setQuery(e.target.value)}
+                  style={{ flex: 1 }}
+                />
+                <button
+                  type="button"
+                  className="btn"
+                  style={{ flex: "0 0 auto" }}
+                  onClick={() => s.setSort(s.sort === "shop" ? "cost" : "shop")}
+                >
+                  Sort: {s.sort === "shop" ? "Shop" : "Cost"}
+                </button>
+              </div>
+            )}
+
+            {s.shops.length > 0 && s.shownShops.length === 0 && (
+              <p className="empty">No items match your search.</p>
+            )}
+
+            {s.shownShops.length > 0 && (
               <div
                 className="dash-grid"
                 data-testid="dash"
                 style={{ gridTemplateColumns: "repeat(auto-fill,minmax(320px,1fr))" }}
               >
-                {s.shops.map(([key, group]) => {
+                {s.shownShops.map(([key, group]) => {
                   const meta = group.shopId != null ? s.shopMeta[group.shopId] : undefined;
                   return (
                     <ShopTicket

@@ -11,6 +11,8 @@ export const RECIPE_LIST: ListConfig = {
   itemPath: (id) => `/api/recipes/${id}`, // unused (canDelete: false), edit happens on detail page
   canEdit: true,
   canDelete: false,
+  searchable: true,
+  sortKeys: [{ key: "name", label: "Name" }],
   columns: [
     { key: "name", label: "Name" },
     {
