@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { nextCooks } from "@/lib/agenda";
 import { topUpRules } from "@/lib/rules";
-import { buildIcs, calendarTokenValid, DEFAULT_TIMEZONE } from "@/lib/calendar";
+import { buildIcs, calendarTokenMatches, DEFAULT_TIMEZONE } from "@/lib/calendar";
 import { todayISO } from "@/lib/dates";
 
 // Mirrors TodayAgenda's "🍳 Next cooking" filter — only these prep cards show.
@@ -22,13 +22,15 @@ export async function GET(
   const { hid: hidStr, token: tokenParam } = await params;
   const hid = Number(hidStr);
   const token = tokenParam.replace(/\.ics$/, ""); // TickTick appends nothing, but be forgiving
-  if (!Number.isInteger(hid) || !calendarTokenValid(hid, token)) {
+  const household = Number.isInteger(hid)
+    ? db.select().from(schema.households).where(eq(schema.households.id, hid)).get()
+    : undefined;
+  if (!household || !calendarTokenMatches(household.calendarToken, token)) {
     return new NextResponse("Not found", { status: 404 });
   }
   const today = todayISO();
   topUpRules(db, hid, today);
-  const household = db.select().from(schema.households).where(eq(schema.households.id, hid)).get();
-  const ics = buildIcs(nextCooks(db, hid, today).filter(isVisibleCook), household?.timezone ?? DEFAULT_TIMEZONE);
+  const ics = buildIcs(nextCooks(db, hid, today).filter(isVisibleCook), household.timezone ?? DEFAULT_TIMEZONE);
   return new NextResponse(ics, {
     headers: {
       "Content-Type": "text/calendar; charset=utf-8",

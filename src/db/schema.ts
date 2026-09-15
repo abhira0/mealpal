@@ -7,6 +7,12 @@ export const households = sqliteTable("households", {
   // served (see mealpal-a9e); every calendar-feed prep time is wall-clock in
   // this zone.
   timezone: text("timezone").notNull().default("America/Phoenix"),
+  // Per-household ICS feed secret (see src/lib/calendar.ts). Stored (not
+  // derived from AUTH_SECRET) so a single household's feed can be revoked by
+  // regenerating this column, without rotating AUTH_SECRET and invalidating
+  // every session in the app. Nullable only for pre-migration rows that
+  // haven't been backfilled yet (see drizzle/0039_household_calendar_token.sql).
+  calendarToken: text("calendar_token"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
