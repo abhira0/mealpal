@@ -36,7 +36,16 @@ const PAGE = 50; // history page size for infinite scroll
 const groupTotal = (group: Pending[]) =>
   group.reduce((sum, r) => sum + (r.hintCents ?? 0) * r.quantity, 0);
 
-export function Bill({ onCount, history = false }: { onCount?: (n: number) => void; history?: boolean }) {
+export function Bill({
+  onCount,
+  history = false,
+  purchaseSignal,
+}: {
+  onCount?: (n: number) => void;
+  history?: boolean;
+  /** Forwarded to AddPurchase's openSignal — see command palette "New purchase". */
+  purchaseSignal?: number;
+}) {
   const [rows, setRows] = useState<Pending[] | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [shops, setShops] = useState<Shop[]>([]);
@@ -165,7 +174,9 @@ export function Bill({ onCount, history = false }: { onCount?: (n: number) => vo
         </div>
       )}
 
-      {history && rows !== null && <AddPurchase products={products} shops={shops} onAdded={loadFirst} />}
+      {history && rows !== null && (
+        <AddPurchase products={products} shops={shops} onAdded={loadFirst} openSignal={purchaseSignal} />
+      )}
 
       {rows && rows.length === 0 && (
         <p className="empty">

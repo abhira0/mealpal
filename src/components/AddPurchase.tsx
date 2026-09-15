@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { Dropdown } from "@/components/Dropdown";
 import { Sheet } from "@/components/Sheet";
@@ -14,13 +14,21 @@ export function AddPurchase({
   products,
   shops = [],
   onAdded,
+  openSignal,
 }: {
   products: Product[];
   shops?: Shop[];
   onAdded: () => void;
+  /** Bump this (e.g. from the command palette's "New purchase" action) to open the sheet externally. */
+  openSignal?: number;
 }) {
   const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD, local
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- external trigger (command palette), not derived render state
+    if (openSignal) setOpen(true);
+  }, [openSignal]);
   const [productId, setProductId] = useState("");
   const [shopId, setShopId] = useState("");
   const [quantity, setQuantity] = useState("1");

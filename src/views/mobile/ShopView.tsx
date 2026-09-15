@@ -1,16 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ShopTicket } from "@/components/ShopTicket";
 import { Bill } from "@/components/Bill";
 import { AddExtra } from "@/components/AddExtra";
 import { centsToDollars } from "@/lib/money";
 import { useShopData } from "@/views/shop-data";
 import { SkeletonRows } from "@/components/Skeleton";
+import { consumePendingCmdkAction } from "@/lib/cmdk-bus";
 
 export function MobileShop() {
   const s = useShopData();
   const [tab, setTab] = useState<"run" | "bill" | "history">("run");
+  // Command palette "New purchase" (mealpal-d3f): jump to History and open
+  // the existing AddPurchase sheet there.
+  const [purchaseSignal, setPurchaseSignal] = useState(0);
+  useEffect(() => {
+    return consumePendingCmdkAction((action) => {
+      if (action.type === "new-purchase") {
+        setTab("history");
+        setPurchaseSignal((n) => n + 1);
+      }
+    });
+  }, []);
 
   return (
     <div data-testid="mobile-shop">
@@ -38,7 +50,7 @@ export function MobileShop() {
         {tab === "bill" ? (
           <Bill onCount={s.setPendingCount} />
         ) : tab === "history" ? (
-          <Bill history />
+          <Bill history purchaseSignal={purchaseSignal} />
         ) : (
           <>
             <div className="filter">
