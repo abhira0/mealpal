@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { makeTestDb, type TestDb } from "@/test/db";
 import { seedHousehold } from "@/test/fixtures";
 import { schema } from "@/db";
-import { createRecipe, deleteRecipe, getPublicRecipe, getRecipe, listRecipes, setShared, updateRecipe } from "@/lib/recipes";
+import { createRecipe, deleteRecipe, getPublicRecipe, getRecipe, listRecipes, normalizeStep, setShared, updateRecipe } from "@/lib/recipes";
 
 let db: TestDb;
 let hid: number;
@@ -14,6 +14,22 @@ beforeEach(() => {
   flourId = db.insert(schema.ingredients)
     .values({ householdId: hid, name: "Flour", canonicalUnit: "g" })
     .returning().all()[0].id;
+});
+
+describe("normalizeStep", () => {
+  it("preserves null startSeconds/endSeconds instead of coercing to 0", () => {
+    expect(normalizeStep({ text: "x", startSeconds: null })).toEqual({ text: "x", startSeconds: null, endSeconds: null });
+    expect(normalizeStep({ text: "x", startSeconds: undefined, endSeconds: undefined })).toEqual({ text: "x", startSeconds: null, endSeconds: null });
+    expect(normalizeStep({ text: "x", startSeconds: "" })).toEqual({ text: "x", startSeconds: null, endSeconds: null });
+  });
+
+  it("still parses valid numeric timings, including 0", () => {
+    expect(normalizeStep({ text: "x", startSeconds: 0, endSeconds: 12 })).toEqual({ text: "x", startSeconds: 0, endSeconds: 12 });
+  });
+
+  it("normalizes a plain string step", () => {
+    expect(normalizeStep("Mix")).toEqual({ text: "Mix", startSeconds: null, endSeconds: null });
+  });
 });
 
 describe("recipes", () => {

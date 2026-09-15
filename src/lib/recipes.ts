@@ -22,7 +22,10 @@ export type StepInput = { text: string; startSeconds?: number | null; endSeconds
 export function normalizeStep(s: unknown): StepInput {
   if (typeof s === "string") return { text: s, startSeconds: null, endSeconds: null };
   const o = (s ?? {}) as { text?: unknown; startSeconds?: unknown; endSeconds?: unknown };
-  const num = (v: unknown) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Math.round(Number(v)) : null);
+  const num = (v: unknown) => {
+    if (v == null || v === "") return null;
+    return Number.isFinite(Number(v)) && Number(v) >= 0 ? Math.round(Number(v)) : null;
+  };
   return { text: String(o.text ?? ""), startSeconds: num(o.startSeconds), endSeconds: num(o.endSeconds) };
 }
 
