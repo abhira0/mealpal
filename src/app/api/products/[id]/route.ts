@@ -54,6 +54,9 @@ export async function PATCH(
   if (b?.shopId !== undefined && !ownsShop(session.user.householdId, Number(b.shopId))) {
     return NextResponse.json({ error: "Unknown shopId." }, { status: 400 });
   }
+  if (b?.packSize !== undefined && !(Number(b.packSize) > 0)) {
+    return NextResponse.json({ error: "packSize must be a positive number." }, { status: 400 });
+  }
   const trimmedImageUrl = b?.imageUrl == null ? null : String(b.imageUrl).trim() || null;
   const imageUrl =
     b?.imageUrl !== undefined
